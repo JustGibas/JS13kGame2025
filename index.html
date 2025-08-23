@@ -59,11 +59,10 @@
     <div id="rightJoy" class="joystick"><div class="joystick-handle"></div></div>
 
     <script>
+    // --- FEATURE: Core ---
     // Expose Math functions to global scope
     Object.getOwnPropertyNames(Math).forEach(n => window[n.toUpperCase()] = Math[n]);
-
     // --- Tiny Math Library ---
-
     const M4 = (v) => new F32(v || [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]);
     const V3 = (v) => new F32(v || 3);
     const SUB=(t,n,r)=>(t[0]=n[0]-r[0],t[1]=n[1]-r[1],t[2]=n[2]-r[2],t);
@@ -85,27 +84,53 @@
     // Creates a translation and scale matrix
     function translateScale(x,y,z,sx,sy,sz) { return new F32([sx,0,0,0, 0,sy,0,0, 0,0,sz,0, x,y,z,1]); }
 
-    // --- Global State and Constants ---
-
-    // Check if the primary input is a coarse pointer (like a finger), indicating a mobile/touch device
-    const isMobile = matchMedia('(pointer:coarse)').matches;
-    
-    // State variables for the user/camera, rendering loop, and WebGL/WebXR contexts
-    let user = { x: 0, y: 1.6, z: 2, yaw: 0, pitch: 0 }; // User position and orientation
-    let last = 0; // Timestamp of the last frame for calculating delta time
-    let gl, xr = null, ref = null, off = null; // WebGL and WebXR objects
-
-    // const D = document
+     // const D = document
     // const C = D.getElementById('canvas');
     const canvas = document.getElementById('canvas');
     const F32 = Float32Array;
     const D2R = Math.PI / 180;
 
-    // Movement and input constants
-    const MOVES = 3;    // Movement speed in meters per second
-    const TURNS = 2;    // Turning speed in radians per second
-    const DZ = 0.1;    // Deadzone for joystick/gamepad axes to prevent drift
+    // --- World Matrices ---
+    const M = M4(), V = M4(), P = M4(); // Model, View, Projection
+    let PV = M4(), invPV = M4(); // Combined and inverse matrices for picking
 
+   // State variables for the user/camera, rendering loop, and WebGL/WebXR contexts
+    let user = { x: 0, y: 1.6, z: 2, yaw: 0, pitch: 0 }; // User position and orientation
+    let last = 0; // Timestamp of the last frame for calculating delta time
+    let gl, xr = null, ref = null, off = null; // WebGL and WebXR objects
+
+    gl = canvas.getContext('webgl2', { antialias: true, xrCompatible: true });
+    if (!gl) { alert('WebGL2 is required for this application.'); }
+
+    // Resize the canvas to fill the window, accounting for device pixel ratio
+    function resize() {
+        const w = innerWidth, h = innerHeight, dpr = devicePixelRatio || 1;
+        canvas.width = w * dpr;
+        canvas.height = h * dpr;
+        canvas.style.width = w + 'px';
+        canvas.style.height = h + 'px';
+    }
+    addEventListener('resize', resize);
+    resize(); // Initial resize
+
+    // Helper function to compile and link a shader program
+    function prog(vs, fs) {
+        const p = gl.createProgram();
+        const v = gl.createShader(gl.VERTEX_SHADER);
+        const f = gl.createShader(gl.FRAGMENT_SHADER);
+        gl.shaderSource(v, vs); gl.compileShader(v);
+        if (!gl.getShaderParameter(v, gl.COMPILE_STATUS)) throw gl.getShaderInfoLog(v);
+        gl.shaderSource(f, fs); gl.compileShader(f);
+        if (!gl.getShaderParameter(f, gl.COMPILE_STATUS)) throw gl.getShaderInfoLog(f);
+        gl.attachShader(p, v); gl.attachShader(p, f); gl.linkProgram(p);
+        if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw gl.getProgramInfoLog(p);
+        return p;
+    }
+    // --- /FEATURE: Core ---
+
+    // --- FEATURE: Input ---
+    // Check if the primary input is a coarse pointer (like a finger), indicating a mobile/touch device
+    const isMobile = matchMedia('(pointer:coarse)').matches;
     // Unified input state object for keyboard, joysticks, pointer-look, and pointer coordinates
     const input = {
         keys: {},
@@ -113,23 +138,11 @@
         look: { id: null, x: 0, y: 0 },
         pointer: { x: 0, y: 0 }
     };
-
+    
     // A map to track the previous pressed state of VR controller buttons for edge detection (press/release)
     const pressedMap = new Map();
-
-     // Positions and scales for the scattered L-system plants.
-    const PLANT_POSITIONS = [
-        [0, 0, 1],
-        [5, -4, 1.2],
-        [-3, -8, 0.9],
-        [8, 10, 1.1],
-        [-10, 5, 1.3],
-        [12, -12, 0.8],
-        [-15, -9, 1.0]
-    ];
-
+    
     // --- Unified Input Handling ---
-
     // Keyboard event listeners for movement and HUD toggle
     document.addEventListener('keydown', e => {
         const k = e.key.toLowerCase();
@@ -232,8 +245,14 @@
         }
     }
     initJoysticks();
+    // --- /FEATURE: Input ---
 
+    // --- FEATURE: Gameplay ---
     // --- Movement Logic ---
+    // Movement and input constants
+    const MOVES = 3;    // Movement speed in meters per second
+    const TURNS = 2;    // Turning speed in radians per second
+    const DZ = 0.1;    // Deadzone for joystick/gamepad axes to prevent drift
 
     // Consolidates input from keyboard, joysticks, and VR controllers into a single movement vector
     function getMove(session) {
@@ -290,7 +309,10 @@
         user.x += (r[0] * mv.x + f[0] * mv.y) * sp;
         user.z += (r[2] * mv.x + f[2] * mv.y) * sp;
     }
-
+    
+    // --- /FEATURE: Gameplay ---
+    
+    // --- FEATURE: Scene ---
     // NEW: Web Audio setup
     let audioCtx = null;
     let lastStepTime = 0;
@@ -340,9 +362,50 @@
       gain.gain.linearRampToValueAtTime(0.2, t + 4);
       //gain.gain.exponentialRampToValueAtTime(0.001, t + 200.0);
 
-      source.start(t);
-      audioCtx.windSource = source;
-      audioCtx.windGain = gain;
+      
+      // expose nodes so we can modulate them each frame to match grass gusts
+            audioCtx.windSource = source;
+            audioCtx.windGain = gain;
+            audioCtx.windFilter = filter;
+    }
+
+        // --- Wind gust math (mirror of grass shader) ---
+        // Compute gust/sway values using same vectors and time constants as the grass vertex shader
+        function computeGustAt(x, z, timeSec) {
+            // same direction vectors used in the grass vertex shader
+            const w1x = 0.07, w1y = 0.05;
+            const w2x = -0.03, w2y = 0.04;
+
+            const dot1 = x * w1x + z * w1y;
+            const dot2 = x * w2x + z * w2y;
+
+            const g = 0.6 * Math.sin(dot1 + timeSec * 0.7) + 0.4 * Math.sin(dot2 - timeSec * 1.2);
+            // small global phase term similar to per-blade phase in shader
+            const sway = 0.25 * g + 0.07 * Math.sin(timeSec * 1.7 + 0.0);
+            return { gust: g, sway: sway };
+        }
+
+        // Update audio parameters (gain and filter) to follow gusts
+        function updateWind(timeSec, camX, camZ) {
+            if (!audioCtx || !audioCtx.windGain || !audioCtx.windFilter) return;
+            const now = audioCtx.currentTime;
+            const s = computeGustAt(camX, camZ, timeSec);
+
+            // Map sway into a sensible gain range
+            const baseGain = 0.08; // quiet baseline
+            const gainScale = 0.6; // how strongly gust affects loudness
+            let targetGain = baseGain + gainScale * s.sway;
+            targetGain = Math.max(0.01, Math.min(1.0, targetGain));
+            audioCtx.windGain.gain.setTargetAtTime(targetGain, now, 0.25);
+
+            // Modulate lowpass frequency to make gusts brighter when stronger
+            const baseFreq = 200;
+            // normalize sway (~ -0.32..0.32) to 0..1
+            const norm = (s.sway + 0.32) / 0.64;
+            const freq = baseFreq + norm * 1200; // ~200..1400
+            audioCtx.windFilter.frequency.setTargetAtTime(freq, now, 0.25);
+
+            source.start();
     }
 
     function playClickSound(){
@@ -374,36 +437,6 @@
       gain.gain.exponentialRampToValueAtTime(0.1, t + 0.45);
       osc.start(t);
       osc.stop(t + 0.35);
-    }
-
-    // --- WebGL Setup ---
-
-    gl = canvas.getContext('webgl2', { antialias: true, xrCompatible: true });
-    if (!gl) { alert('WebGL2 is required for this application.'); }
-
-    // Resize the canvas to fill the window, accounting for device pixel ratio
-    function resize() {
-        const w = innerWidth, h = innerHeight, dpr = devicePixelRatio || 1;
-        canvas.width = w * dpr;
-        canvas.height = h * dpr;
-        canvas.style.width = w + 'px';
-        canvas.style.height = h + 'px';
-    }
-    addEventListener('resize', resize);
-    resize(); // Initial resize
-
-    // Helper function to compile and link a shader program
-    function prog(vs, fs) {
-        const p = gl.createProgram();
-        const v = gl.createShader(gl.VERTEX_SHADER);
-        const f = gl.createShader(gl.FRAGMENT_SHADER);
-        gl.shaderSource(v, vs); gl.compileShader(v);
-        if (!gl.getShaderParameter(v, gl.COMPILE_STATUS)) throw gl.getShaderInfoLog(v);
-        gl.shaderSource(f, fs); gl.compileShader(f);
-        if (!gl.getShaderParameter(f, gl.COMPILE_STATUS)) throw gl.getShaderInfoLog(f);
-        gl.attachShader(p, v); gl.attachShader(p, f); gl.linkProgram(p);
-        if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw gl.getProgramInfoLog(p);
-        return p;
     }
 
     // --- Sky Shader ---
@@ -770,6 +803,17 @@
     gl.vertexAttribPointer(0, 1, gl.FLOAT, false, 0, 0);
 
     // --- L-System Plant Shader ---
+    // Positions and scales for the scattered L-system plants.
+    const PLANT_POSITIONS = [
+        [0, 0, 1],
+        [5, -4, 1.2],
+        [-3, -8, 0.9],
+        [8, 10, 1.1],
+        [-10, 5, 1.3],
+        [12, -12, 0.8],
+        [-15, -9, 1.0]
+    ];
+
     const vsPlants = `#version 300 es
     precision highp float;
     layout(location=0) in vec3 p;
@@ -1003,12 +1047,11 @@
     gl.bufferData(gl.ARRAY_BUFFER, new F32([0,0,0, 1,0,0, 1,0,1, 0,0,0, 1,0,1, 0,0,1]), gl.STATIC_DRAW);
     gl.enableVertexAttribArray(0);
     gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+    // --- /FEATURE: Scene ---
 
-    // --- World Matrices ---
-
-    const M = M4(), V = M4(), P = M4(); // Model, View, Projection
-    let PV = M4(), invPV = M4(); // Combined and inverse matrices for picking
-
+    
+   
+    
     // --- Log and HUD UI State ---
 
     const LOG = [];
@@ -1278,6 +1321,7 @@
         return new DOMMatrix([1,0,0,0, 0,1,0,0, 0,0,1,0, 0, 0.5, -1.15, 1]).toFloat32Array();
     }
 
+    // --- CORE: render ---
     // --- Main Render Loop (Desktop) ---
 
     function loop(t) {
@@ -1456,7 +1500,9 @@
         PV = MULTMAT4(M4(), P, V);
         invPV = INV(PV);
     }
+    // --- /CORE: Render ---
 
+    // --- FEATURE: VR ---
     // --- WebXR ---
 
     // Checks for WebXR support
@@ -1618,7 +1664,7 @@
                 gl.bindVertexArray(vaoPlants);
                 gl.enable(gl.BLEND);
                 gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-                gl.disable(gl.CULL_FACE);
+                //gl.disable(gl.CULL_FACE);
                 gl.depthMask(false);
 
                 const worldFromView = v.transform.matrix;
@@ -1641,7 +1687,7 @@
                 }
 
                 gl.depthMask(true);
-                gl.enable(gl.CULL_FACE);
+                //gl.enable(gl.CULL_FACE);
                 gl.disable(gl.BLEND);
             }
 
@@ -1741,9 +1787,9 @@
         }
         return { o: [0, 0, 0], d: [0, 0, -1] }; // Fallback, ray from Head
     }
+    // --- /FEATURE: VR ---
 
     // --- Application Entry Point ---
-
     (function main() {
         initXR();
         requestAnimationFrame(loop);
