@@ -74,16 +74,19 @@
     const INV = (m) => (new DOMMatrix(m)).inverse().toFloat32Array();
     const PERSP = (o, f, a, n, fa) => { const t = 1 / TAN(f * D2R / 2); o.set([t/a,0,0,0, 0,t,0,0, 0,0,(fa+n)/(n-fa),-1, 0,0,(2*fa*n)/(n-fa),0]); return o; };
     const LOOKAT = (o, e, c, u) => { let z=V3(),x=V3(),y=V3(); SUB(z,e,c); NORM(z,z); CROSS(x,u,z); NORM(x,x); CROSS(y,z,x); o.set([x[0],y[0],z[0],0, x[1],y[1],z[1],0, x[2],y[2],z[2],0, -DOT(x,e),-DOT(y,e),-DOT(z,e),1]); return o; };
-
+    
     // Multiplies a 3D point (w=1) by a 4x4 matrix
     function mulPoint(m, p) { const x=p[0],y=p[1],z=p[2],w=1; return [m[0]*x+m[4]*y+m[8]*z+m[12]*w, m[1]*x+m[5]*y+m[9]*z+m[13]*w, m[2]*x+m[6]*y+m[10]*z+m[14]*w]; }
 
     // Multiplies a 3D direction (w=0) by a 4x4 matrix
     function mulDir(m, d) { const x=d[0],y=d[1],z=d[2],w=0; return [m[0]*x+m[4]*y+m[8]*z+m[12]*w, m[1]*x+m[5]*y+m[9]*z+m[13]*w, m[2]*x+m[6]*y+m[10]*z+m[14]*w]; }
 
+    function mul4(m, v) { return [m[0]*v[0]+m[4]*v[1]+m[8]*v[2]+m[12]*v[3], m[1]*v[0]+m[5]*v[1]+m[9]*v[2]+m[13]*v[3], m[2]*v[0]+m[6]*v[1]+m[10]*v[2]+m[14]*v[3], m[3]*v[0]+m[7]*v[1]+m[11]*v[2]+m[15]*v[3]]; }
+
     // Creates a translation and scale matrix
     function translateScale(x,y,z,sx,sy,sz) { return new F32([sx,0,0,0, 0,sy,0,0, 0,0,sz,0, x,y,z,1]); }
 
+    // --- Global State and Constants ---
      // const D = document
     // const C = D.getElementById('canvas');
     const canvas = document.getElementById('canvas');
@@ -438,6 +441,275 @@
       osc.start(t);
       osc.stop(t + 0.35);
     }
+
+    // --- Log and HUD UI State ---
+
+    const LOG = [];
+    const LOG_MAX = 200;
+    let logScroll = 0;
+    let logVisible = true;
+    let hudVisible = true;
+
+    function log(s) { LOG.push(s); if (LOG.length > LOG_MAX) LOG.shift(); }
+    function logClear() { LOG.length = 0; log('log cleared'); }
+
+    // UI button definitions. Each object defines a button's ID, position (in UV space), label, and click handler
+    let uiEnterLabel = 'Enter VR';
+    const UI_MAIN = [
+        { id: 'reset', u0: 0.4, v0: 0.1, u1: 0.7, v1: 0.2, label: 'Reset', onClick: () => { playClickSound(); user.x = 0; user.z = 2; user.yaw = 0; user.pitch = 0; log('reset position'); } },
+        { id: 'vr', u0: 0.4, v0: 0.3, u1: 0.7, v1: 0.4, label: () => uiEnterLabel, onClick: () => { playClickSound(); toggleXRFromUI(); } },
+        { id: 'logtog', u0: 0.85, v0: 0.5, u1: 0.98, v1: 0.6 , label: 'LOG', onClick: () => { playClickSound(); logVisible = !logVisible; } },
+        { id: 'logup', u0: 0.85, v0: 0.7, u1: 0.98, v1: 0.8, label: 'Up', onClick: () => { playClickSound(); logScroll = MAX(0, logScroll - 1); } },
+        { id: 'logdn', u0: 0.85, v0: 0.8, u1: 0.98, v1: 0.9, label: 'Down', onClick: () => { playClickSound(); logScroll = MIN(MAX(0, LOG.length - 1), logScroll + 1); } },
+        { id: 'hudx', u0: 0.8, v0: 0.03, u1: 0.98, v1: 0.1, label: 'Close', onClick: () => { playClickSound(); hudVisible = false; } }
+    ];
+    const UI_TAB = [
+        { id: 'hudopen', u0: 0.4, v0: 0, u1: 0.6, v1: 0.12, label: 'HUD', onClick: () => { playClickSound(); hudVisible = true; } }
+    ];
+
+    // Returns the currently active set of UI buttons
+    function currentUI() { return hudVisible ? UI_MAIN : UI_TAB; }
+
+    // State for HUD interaction.
+    let HUD_WH_world = M4(); // World matrix of the HUD quad
+    let hoverBtn = null; // The button currently being hovered over
+
+    // --- HUD Drawing and Interaction ---
+
+    // Draws the entire HUD onto the 2D canvas
+    function drawHUDCanvas(mode, hit, uiSet, dt) {
+        const ui = uiSet || currentUI();
+        hudCtx.clearRect(0, 0, hudCan.width, hudCan.height);
+
+        if (!hudVisible) {
+            // Draw the small "HUD" tab at the top of the screen
+            const b = ui[0];
+            const x = b.u0 * hudCan.width,
+                  y = b.v0 * hudCan.height,
+                  w = (b.u1 - b.u0) * hudCan.width,
+                  h = (b.v1 - b.v0) * hudCan.height;
+            const hov = hoverBtn && hoverBtn.id === 'hudopen';
+            hudCtx.fillStyle = hov ? 'rgba(160,200,255,.28)' : 'rgba(120,160,255,.18)';
+            hudCtx.strokeStyle = hov ? 'rgba(190,220,255,.95)' : 'rgba(160,200,255,.55)';
+            hudCtx.lineWidth = 2;
+            hudCtx.beginPath();
+            hudCtx.roundRect(x, y, w, h, 10);
+            hudCtx.fill();
+            hudCtx.stroke();
+            hudCtx.fillStyle = hov ? '#fff' : '#eef';
+            hudCtx.font = '16px system-ui';
+            hudCtx.textAlign = 'center';
+            hudCtx.textBaseline = 'middle';
+            hudCtx.fillText('HUD', x + w / 2, y + h / 2);
+            hudCtx.textAlign = 'left';
+            hudCtx.textBaseline = 'alphabetic';
+        } else {
+            // Draw the full HUD panel
+            hudCtx.fillStyle = 'rgba(20,30,40,.90)';
+            hudCtx.strokeStyle = 'rgba(255,255,255,.12)';
+            hudCtx.lineWidth = 2;
+            hudCtx.beginPath();
+            hudCtx.roundRect(6, 6, hudCan.width - 12, hudCan.height - 12, 16);
+            hudCtx.fill();
+            hudCtx.stroke();
+
+            // Header text
+            hudCtx.fillStyle = '#9cf';
+            hudCtx.font = '24px system-ui';
+            hudCtx.fillText('HUD', 20, 34);
+            hudCtx.fillStyle = '#fff';
+            hudCtx.font = '16px system-ui';
+            hudCtx.fillText(`Mode: ${mode}${isMobile ? ' (Touch)' : ''}`, 20, 60);
+            hudCtx.fillText(`FPS: ${Math.round(1/dt)}`, 20, 80);
+            hudCtx.fillText(`MS: ${dt.toFixed(3)}`, 100, 80);
+            hudCtx.fillText(`Pos: (${user.x.toFixed(1)}, ${user.z.toFixed(1)})`, 100, 100);
+            hudCtx.fillText(`Yaw: ${(user.yaw * 180 / PI | 0)}°`, 20, 100);
+            if (hit) { hudCtx.fillStyle = '#afa';
+            hudCtx.fillText(`Hit @ ground: (${hit[0].toFixed(2)}, ${hit[2].toFixed(2)})`, 20, 120); }
+
+            // Log box
+            if (logVisible) {
+                const x = 18,
+                      y = 150,
+                      w = hudCan.width - 120,
+                      h = hudCan.height - 160;
+                hudCtx.fillStyle = 'rgba(0,0,0,.35)';
+                hudCtx.strokeStyle = 'rgba(255,255,255,.1)';
+                hudCtx.beginPath();
+                hudCtx.roundRect(x, y, w, h, 10);
+                hudCtx.fill();
+                hudCtx.stroke();
+                hudCtx.save();
+                hudCtx.beginPath();
+                hudCtx.rect(x + 8, y + 8, w - 16, h - 16);
+                hudCtx.clip();
+                hudCtx.fillStyle = '#eee';
+                hudCtx.font = '14px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+                const lines = LOG.slice(MAX(0, LOG.length - 8 - logScroll), LOG.length - logScroll);
+                for (let i = 0; i < lines.length; i++)
+                    hudCtx.fillText(lines[i], x + 12, y + 24 + i * 16);
+                hudCtx.restore();
+            }
+
+            // Buttons
+            for (const b of UI_MAIN) {
+                const lab = (typeof b.label === 'function') ? b.label() : b.label;
+                const x = b.u0 * hudCan.width,
+                      y = b.v0 * hudCan.height,
+                      w = (b.u1 - b.u0) * hudCan.width,
+                      h = (b.v1 - b.v0) * hudCan.height;
+                const hov = hoverBtn && hoverBtn.id === b.id;
+                hudCtx.fillStyle = hov ? 'rgba(150,190,255,.25)' : 'rgba(120,160,255,.12)';
+                hudCtx.strokeStyle = hov ? 'rgba(190,220,255,.9)' : 'rgba(160,200,255,.4)';
+                hudCtx.lineWidth = 2;
+                hudCtx.beginPath();
+                hudCtx.roundRect(x, y, w, h, 8);
+                hudCtx.fill(); hudCtx.stroke();
+                hudCtx.fillStyle = hov ? '#fff' : '#eef';
+                hudCtx.font = '16px system-ui';
+                hudCtx.fillText(lab, x + 10, y + h * 0.65);
+            }
+        }
+
+        // Upload the canvas content to the WebGL texture
+        gl.bindTexture(gl.TEXTURE_2D, hudTex);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, hudCan);
+    }
+
+    // --- Raycasting and Picking ---
+
+    // Checks if a world-space ray intersects with a button on the HUD
+    function HUD_pick(WH, ray, uiSet) {
+        const ui = uiSet || currentUI();
+        const inv = INV(WH);
+        const o = mulPoint(inv, ray.o); // Transform ray to HUD's local space
+        const d = mulDir(inv, ray.d);
+        const t = -o[2] / d[2]; // Intersect with the Z=0 plane
+        if (t <= 0) return null;
+
+        const x = o[0] + d[0] * t;
+        const y = o[1] + d[1] * t;
+
+        // Check if the hit is within the quad's bounds
+        if (x < -0.26 || x > 0.26 || y < -0.15 || y > 0.15) return null;
+        
+        // Convert local coordinates to UV coordinates
+        const u = (x + 0.26) / (0.26 * 2);
+        const v = (0.15 - y) / (0.15 * 2);
+
+        // Check against each button's UV bounds
+        for (const b of ui) {
+            if (u >= b.u0 && u <= b.u1 && v >= b.v0 && v <= b.v1) {
+                return { id: b.id, u, v, button: b, t };
+            }
+        }
+        return { id: null, u, v, button: null, t }; // Hit the panel but not a button
+    }
+
+    // Creates a world-space ray from screen coordinates (for desktop mouse picking)
+    function rayFromScreen(px, py) {
+        const r = canvas.getBoundingClientRect();
+        const x = ((px - r.left) / r.width) * 2 - 1;
+        const y = 1 - ((py - r.top) / r.height) * 2;
+        const near = [x, y, -1, 1], far = [x, y, 1, 1];
+
+        // Unproject near and far points from clip space to world space
+        const n4 = mul4(invPV, near),
+              f4 = mul4(invPV, far);
+        const n = [n4[0] / n4[3], n4[1] / n4[3], n4[2] / n4[3]];
+        const f = [f4[0] / f4[3], f4[1] / f4[3], f4[2] / f4[3]];
+        
+        // Create a normalized direction vector.
+        const d = [f[0] - n[0], f[1] - n[1], f[2] - n[2]];
+        const il = 1 / HYPOT(d[0], d[1], d[2]);
+        return { o: n, d: [d[0] * il, d[1] * il, d[2] * il] };
+    }
+
+    // Creates a world-space ray from the camera or a VR controller
+    function rayFrom(mode, frame, src) {
+        if (mode === 'VR' && frame) {
+            // Use the controller's target ray space if available
+            if (src && src.targetRaySpace) {
+                const pose = frame.getPose(src.targetRaySpace, off || ref || null);
+                if (pose) {
+                    const m = pose.transform.matrix;
+                    const o = [m[12], m[13], m[14]];
+                    const d = [-m[8], -m[9], -m[10]]; // -Z is forward in WebXR.
+                    return { o, d };
+                }
+            }
+            // Fallback to any available controller
+            for (const s of xr.inputSources) {
+                if (s.targetRaySpace) {
+                    const pose = frame.getPose(s.targetRaySpace, off || ref || null);
+                    if (pose) {
+                        const m = pose.transform.matrix;
+                        const o = [m[12], m[13], m[14]];
+                        const d = [-m[8], -m[9], -m[10]];
+                        return { o, d };
+                    }
+                }
+            }
+            // Fallback to gaze/head pose
+            const pose = frame.getViewerPose(off || ref || null);
+            if (pose) {
+                const m = pose.views[0].transform.matrix;
+                return { o: [m[12], m[13], m[14]], d: [-m[8], -m[9], -m[10]] };
+            }
+        } else { // Desktop mode
+            const cy = COS(user.yaw), sy = SIN(user.yaw);
+            const cp = COS(user.pitch), sp = SIN(user.pitch);
+            const d = [-sy * cp, -sp, -cy * cp];
+            const o = [user.x, user.y, user.z];
+            return { o, d };
+        }
+        return null;
+    }
+
+    // Calculates the intersection point of a ray with the ground plane (Y=0)
+    function rayHitGround(ray) {
+        if (!ray || ray.d[1] >= 0) return null; // Ray is parallel to or going away from the ground
+        const t = (0 - ray.o[1]) / ray.d[1];
+        if (t > 0) {
+            return [ray.o[0] + ray.d[0] * t, 0.001, ray.o[2] + ray.d[2] * t];
+        }
+        return null;
+    }
+
+    // State for the ground reticle
+    let lastHit = null;
+
+    // Handles a click/tap interaction in desktop mode
+    function interactDesktopAt(px, py) {
+        const ui = currentUI();
+        const r = rayFromScreen(px, py);
+        if (!r) return;
+        const WH = HUD_WH_world;
+        const h = HUD_pick(WH, r, ui);
+
+        if (h && h.button) {
+            h.button.onClick(); // A button was clicked
+            return;
+        }
+
+        // If no button was clicked, check for a hit on the ground
+        const g = rayHitGround(r);
+        if (g) {
+            lastHit = g;
+            log('ground ' + g.map(v => v.toFixed(2)).join(','));
+        }
+    }
+
+    // Returns the correct local transform for the HUD based on its visibility state
+    function getHudTransform() {
+        if (hudVisible) { // Centered panel
+            return new DOMMatrix([1,0,0,0, 0,1,0,0, 0,0,1,0, 0, -0.05, -1.15, 1]).toFloat32Array();
+        }
+        // Top tab.
+        return new DOMMatrix([1,0,0,0, 0,1,0,0, 0,0,1,0, 0, 0.5, -1.15, 1]).toFloat32Array();
+    }
+
 
     // --- Sky Shader ---
 
@@ -1052,275 +1324,7 @@
     
    
     
-    // --- Log and HUD UI State ---
-
-    const LOG = [];
-    const LOG_MAX = 200;
-    let logScroll = 0;
-    let logVisible = true;
-    let hudVisible = true;
-
-    function log(s) { LOG.push(s); if (LOG.length > LOG_MAX) LOG.shift(); }
-    function logClear() { LOG.length = 0; log('log cleared'); }
-
-    // UI button definitions. Each object defines a button's ID, position (in UV space), label, and click handler
-    let uiEnterLabel = 'Enter VR';
-    const UI_MAIN = [
-        { id: 'reset', u0: 0.4, v0: 0.1, u1: 0.7, v1: 0.2, label: 'Reset', onClick: () => { playClickSound(); user.x = 0; user.z = 2; user.yaw = 0; user.pitch = 0; log('reset position'); } },
-        { id: 'vr', u0: 0.4, v0: 0.3, u1: 0.7, v1: 0.4, label: () => uiEnterLabel, onClick: () => { playClickSound(); toggleXRFromUI(); } },
-        { id: 'logtog', u0: 0.85, v0: 0.5, u1: 0.98, v1: 0.6 , label: 'LOG', onClick: () => { playClickSound(); logVisible = !logVisible; } },
-        { id: 'logup', u0: 0.85, v0: 0.7, u1: 0.98, v1: 0.8, label: 'Up', onClick: () => { playClickSound(); logScroll = MAX(0, logScroll - 1); } },
-        { id: 'logdn', u0: 0.85, v0: 0.8, u1: 0.98, v1: 0.9, label: 'Down', onClick: () => { playClickSound(); logScroll = MIN(MAX(0, LOG.length - 1), logScroll + 1); } },
-        { id: 'hudx', u0: 0.8, v0: 0.03, u1: 0.98, v1: 0.1, label: 'Close', onClick: () => { playClickSound(); hudVisible = false; } }
-    ];
-    const UI_TAB = [
-        { id: 'hudopen', u0: 0.4, v0: 0, u1: 0.6, v1: 0.12, label: 'HUD', onClick: () => { playClickSound(); hudVisible = true; } }
-    ];
-
-    // Returns the currently active set of UI buttons
-    function currentUI() { return hudVisible ? UI_MAIN : UI_TAB; }
-
-    // State for HUD interaction.
-    let HUD_WH_world = M4(); // World matrix of the HUD quad
-    let hoverBtn = null; // The button currently being hovered over
-
-    // --- HUD Drawing and Interaction ---
-
-    // Draws the entire HUD onto the 2D canvas
-    function drawHUDCanvas(mode, hit, uiSet, dt) {
-        const ui = uiSet || currentUI();
-        hudCtx.clearRect(0, 0, hudCan.width, hudCan.height);
-
-        if (!hudVisible) {
-            // Draw the small "HUD" tab at the top of the screen
-            const b = ui[0];
-            const x = b.u0 * hudCan.width,
-                  y = b.v0 * hudCan.height,
-                  w = (b.u1 - b.u0) * hudCan.width,
-                  h = (b.v1 - b.v0) * hudCan.height;
-            const hov = hoverBtn && hoverBtn.id === 'hudopen';
-            hudCtx.fillStyle = hov ? 'rgba(160,200,255,.28)' : 'rgba(120,160,255,.18)';
-            hudCtx.strokeStyle = hov ? 'rgba(190,220,255,.95)' : 'rgba(160,200,255,.55)';
-            hudCtx.lineWidth = 2;
-            hudCtx.beginPath();
-            hudCtx.roundRect(x, y, w, h, 10);
-            hudCtx.fill();
-            hudCtx.stroke();
-            hudCtx.fillStyle = hov ? '#fff' : '#eef';
-            hudCtx.font = '16px system-ui';
-            hudCtx.textAlign = 'center';
-            hudCtx.textBaseline = 'middle';
-            hudCtx.fillText('HUD', x + w / 2, y + h / 2);
-            hudCtx.textAlign = 'left';
-            hudCtx.textBaseline = 'alphabetic';
-        } else {
-            // Draw the full HUD panel
-            hudCtx.fillStyle = 'rgba(20,30,40,.90)';
-            hudCtx.strokeStyle = 'rgba(255,255,255,.12)';
-            hudCtx.lineWidth = 2;
-            hudCtx.beginPath();
-            hudCtx.roundRect(6, 6, hudCan.width - 12, hudCan.height - 12, 16);
-            hudCtx.fill();
-            hudCtx.stroke();
-
-            // Header text
-            hudCtx.fillStyle = '#9cf';
-            hudCtx.font = '24px system-ui';
-            hudCtx.fillText('HUD', 20, 34);
-            hudCtx.fillStyle = '#fff';
-            hudCtx.font = '16px system-ui';
-            hudCtx.fillText(`Mode: ${mode}${isMobile ? ' (Touch)' : ''}`, 20, 60);
-            hudCtx.fillText(`FPS: ${Math.round(1/dt)}`, 20, 80);
-            hudCtx.fillText(`MS: ${dt.toFixed(3)}`, 100, 80);
-            hudCtx.fillText(`Pos: (${user.x.toFixed(1)}, ${user.z.toFixed(1)})`, 100, 100);
-            hudCtx.fillText(`Yaw: ${(user.yaw * 180 / PI | 0)}°`, 20, 100);
-            if (hit) { hudCtx.fillStyle = '#afa';
-            hudCtx.fillText(`Hit @ ground: (${hit[0].toFixed(2)}, ${hit[2].toFixed(2)})`, 20, 120); }
-
-            // Log box
-            if (logVisible) {
-                const x = 18,
-                      y = 150,
-                      w = hudCan.width - 120,
-                      h = hudCan.height - 160;
-                hudCtx.fillStyle = 'rgba(0,0,0,.35)';
-                hudCtx.strokeStyle = 'rgba(255,255,255,.1)';
-                hudCtx.beginPath();
-                hudCtx.roundRect(x, y, w, h, 10);
-                hudCtx.fill();
-                hudCtx.stroke();
-                hudCtx.save();
-                hudCtx.beginPath();
-                hudCtx.rect(x + 8, y + 8, w - 16, h - 16);
-                hudCtx.clip();
-                hudCtx.fillStyle = '#eee';
-                hudCtx.font = '14px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
-                const lines = LOG.slice(MAX(0, LOG.length - 8 - logScroll), LOG.length - logScroll);
-                for (let i = 0; i < lines.length; i++)
-                    hudCtx.fillText(lines[i], x + 12, y + 24 + i * 16);
-                hudCtx.restore();
-            }
-
-            // Buttons
-            for (const b of UI_MAIN) {
-                const lab = (typeof b.label === 'function') ? b.label() : b.label;
-                const x = b.u0 * hudCan.width,
-                      y = b.v0 * hudCan.height,
-                      w = (b.u1 - b.u0) * hudCan.width,
-                      h = (b.v1 - b.v0) * hudCan.height;
-                const hov = hoverBtn && hoverBtn.id === b.id;
-                hudCtx.fillStyle = hov ? 'rgba(150,190,255,.25)' : 'rgba(120,160,255,.12)';
-                hudCtx.strokeStyle = hov ? 'rgba(190,220,255,.9)' : 'rgba(160,200,255,.4)';
-                hudCtx.lineWidth = 2;
-                hudCtx.beginPath();
-                hudCtx.roundRect(x, y, w, h, 8);
-                hudCtx.fill(); hudCtx.stroke();
-                hudCtx.fillStyle = hov ? '#fff' : '#eef';
-                hudCtx.font = '16px system-ui';
-                hudCtx.fillText(lab, x + 10, y + h * 0.65);
-            }
-        }
-
-        // Upload the canvas content to the WebGL texture
-        gl.bindTexture(gl.TEXTURE_2D, hudTex);
-        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, hudCan);
-    }
-
-    // --- Raycasting and Picking ---
-
-    // Checks if a world-space ray intersects with a button on the HUD
-    function HUD_pick(WH, ray, uiSet) {
-        const ui = uiSet || currentUI();
-        const inv = INV(WH);
-        const o = mulPoint(inv, ray.o); // Transform ray to HUD's local space
-        const d = mulDir(inv, ray.d);
-        const t = -o[2] / d[2]; // Intersect with the Z=0 plane
-        if (t <= 0) return null;
-
-        const x = o[0] + d[0] * t;
-        const y = o[1] + d[1] * t;
-
-        // Check if the hit is within the quad's bounds
-        if (x < -0.26 || x > 0.26 || y < -0.15 || y > 0.15) return null;
-        
-        // Convert local coordinates to UV coordinates
-        const u = (x + 0.26) / (0.26 * 2);
-        const v = (0.15 - y) / (0.15 * 2);
-
-        // Check against each button's UV bounds
-        for (const b of ui) {
-            if (u >= b.u0 && u <= b.u1 && v >= b.v0 && v <= b.v1) {
-                return { id: b.id, u, v, button: b, t };
-            }
-        }
-        return { id: null, u, v, button: null, t }; // Hit the panel but not a button
-    }
-
-    // Creates a world-space ray from screen coordinates (for desktop mouse picking)
-    function rayFromScreen(px, py) {
-        const r = canvas.getBoundingClientRect();
-        const x = ((px - r.left) / r.width) * 2 - 1;
-        const y = 1 - ((py - r.top) / r.height) * 2;
-        const near = [x, y, -1, 1], far = [x, y, 1, 1];
-
-        // Unproject near and far points from clip space to world space
-        const n4 = mul4(invPV, near),
-              f4 = mul4(invPV, far);
-        const n = [n4[0] / n4[3], n4[1] / n4[3], n4[2] / n4[3]];
-        const f = [f4[0] / f4[3], f4[1] / f4[3], f4[2] / f4[3]];
-        
-        // Create a normalized direction vector.
-        const d = [f[0] - n[0], f[1] - n[1], f[2] - n[2]];
-        const il = 1 / HYPOT(d[0], d[1], d[2]);
-        return { o: n, d: [d[0] * il, d[1] * il, d[2] * il] };
-    }
-    function mul4(m, v) { return [m[0]*v[0]+m[4]*v[1]+m[8]*v[2]+m[12]*v[3], m[1]*v[0]+m[5]*v[1]+m[9]*v[2]+m[13]*v[3], m[2]*v[0]+m[6]*v[1]+m[10]*v[2]+m[14]*v[3], m[3]*v[0]+m[7]*v[1]+m[11]*v[2]+m[15]*v[3]]; }
-
-    // Creates a world-space ray from the camera or a VR controller
-    function rayFrom(mode, frame, src) {
-        if (mode === 'VR' && frame) {
-            // Use the controller's target ray space if available
-            if (src && src.targetRaySpace) {
-                const pose = frame.getPose(src.targetRaySpace, off || ref || null);
-                if (pose) {
-                    const m = pose.transform.matrix;
-                    const o = [m[12], m[13], m[14]];
-                    const d = [-m[8], -m[9], -m[10]]; // -Z is forward in WebXR.
-                    return { o, d };
-                }
-            }
-            // Fallback to any available controller
-            for (const s of xr.inputSources) {
-                if (s.targetRaySpace) {
-                    const pose = frame.getPose(s.targetRaySpace, off || ref || null);
-                    if (pose) {
-                        const m = pose.transform.matrix;
-                        const o = [m[12], m[13], m[14]];
-                        const d = [-m[8], -m[9], -m[10]];
-                        return { o, d };
-                    }
-                }
-            }
-            // Fallback to gaze/head pose
-            const pose = frame.getViewerPose(off || ref || null);
-            if (pose) {
-                const m = pose.views[0].transform.matrix;
-                return { o: [m[12], m[13], m[14]], d: [-m[8], -m[9], -m[10]] };
-            }
-        } else { // Desktop mode
-            const cy = COS(user.yaw), sy = SIN(user.yaw);
-            const cp = COS(user.pitch), sp = SIN(user.pitch);
-            const d = [-sy * cp, -sp, -cy * cp];
-            const o = [user.x, user.y, user.z];
-            return { o, d };
-        }
-        return null;
-    }
-
-    // Calculates the intersection point of a ray with the ground plane (Y=0)
-    function rayHitGround(ray) {
-        if (!ray || ray.d[1] >= 0) return null; // Ray is parallel to or going away from the ground
-        const t = (0 - ray.o[1]) / ray.d[1];
-        if (t > 0) {
-            return [ray.o[0] + ray.d[0] * t, 0.001, ray.o[2] + ray.d[2] * t];
-        }
-        return null;
-    }
-
-    // State for the ground reticle
-    let lastHit = null;
-
-    // Handles a click/tap interaction in desktop mode
-    function interactDesktopAt(px, py) {
-        const ui = currentUI();
-        const r = rayFromScreen(px, py);
-        if (!r) return;
-        const WH = HUD_WH_world;
-        const h = HUD_pick(WH, r, ui);
-
-        if (h && h.button) {
-            h.button.onClick(); // A button was clicked
-            return;
-        }
-
-        // If no button was clicked, check for a hit on the ground
-        const g = rayHitGround(r);
-        if (g) {
-            lastHit = g;
-            log('ground ' + g.map(v => v.toFixed(2)).join(','));
-        }
-    }
-
-    // Returns the correct local transform for the HUD based on its visibility state
-    function getHudTransform() {
-        if (hudVisible) { // Centered panel
-            return new DOMMatrix([1,0,0,0, 0,1,0,0, 0,0,1,0, 0, -0.05, -1.15, 1]).toFloat32Array();
-        }
-        // Top tab.
-        return new DOMMatrix([1,0,0,0, 0,1,0,0, 0,0,1,0, 0, 0.5, -1.15, 1]).toFloat32Array();
-    }
-
+    
     // --- CORE: render ---
     // --- Main Render Loop (Desktop) ---
 
