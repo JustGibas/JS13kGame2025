@@ -3,7 +3,8 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-    <title>JustGibas VR 13K Game 2025</title>
+    <title>'Wild Cats' 13K Game 2025</title>
+    <link rel="icon" type="image/svg+xml" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="55%" x="50%" dominant-baseline="middle" text-anchor="middle" font-size="80">🐈‍⬛</text></svg>'>
     <style>
         /* Basic styles to make the canvas and joysticks fill the screen */
         html, body {
@@ -62,9 +63,12 @@
     // --- FEATURE: Core ---
     // Expose Math functions to global scope
     Object.getOwnPropertyNames(Math).forEach(n => window[n.toUpperCase()] = Math[n]);
-    // --- Tiny Math Library ---
+    // --- Math Library ---
+    const D2R = 0.0174532925 // or Math.PI / 180;
+    const F32 = Float32Array;
     const M4 = (v) => new F32(v || [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]);
     const V3 = (v) => new F32(v || 3);
+    const T_V3_A = V3(), T_V3_B = V3(), T_V3_C = V3(); // Reusable temporary V3s
     const SUB=(t,n,r)=>(t[0]=n[0]-r[0],t[1]=n[1]-r[1],t[2]=n[2]-r[2],t);
     const DOT=(t,n)=>t[0]*n[0]+t[1]*n[1]+t[2]*n[2];
     const CROSS=(t,n,r)=>(t[0]=n[1]*r[2]-n[2]*r[1],t[1]=n[2]*r[0]-n[0]*r[2],t[2]=n[0]*r[1]-n[1]*r[0],t);
@@ -73,8 +77,11 @@
     const MULTMAT4 = (o, a, b) => (o.set((new DOMMatrix(a)).multiply(new DOMMatrix(b)).toFloat32Array()), o);
     const INV = (m) => (new DOMMatrix(m)).inverse().toFloat32Array();
     const PERSP = (o, f, a, n, fa) => { const t = 1 / TAN(f * D2R / 2); o.set([t/a,0,0,0, 0,t,0,0, 0,0,(fa+n)/(n-fa),-1, 0,0,(2*fa*n)/(n-fa),0]); return o; };
-    const LOOKAT = (o, e, c, u) => { let z=V3(),x=V3(),y=V3(); SUB(z,e,c); NORM(z,z); CROSS(x,u,z); NORM(x,x); CROSS(y,z,x); o.set([x[0],y[0],z[0],0, x[1],y[1],z[1],0, x[2],y[2],z[2],0, -DOT(x,e),-DOT(y,e),-DOT(z,e),1]); return o; };
-    
+    const LOOKAT = (o, e, c, u) => { SUB(T_V3_A,e,c); NORM(T_V3_A,T_V3_A); CROSS(T_V3_B,u,T_V3_A); NORM(T_V3_B,T_V3_B); CROSS(T_V3_C,T_V3_A,T_V3_B); o.set([T_V3_B[0],T_V3_C[0],T_V3_A[0],0, T_V3_B[1],T_V3_C[1],T_V3_A[1],0, T_V3_B[2],T_V3_C[2],T_V3_A[2],0, -DOT(T_V3_B,e),-DOT(T_V3_C,e),-DOT(T_V3_A,e),1]); return o; };
+    // --- World Matrices ---
+    const M = M4(), V = M4(), P = M4(); // Model, View, Projection
+    let PV = M4(), invPV = M4(); // Combined and inverse matrices for picking
+
     // Multiplies a 3D point (w=1) by a 4x4 matrix
     function mulPoint(m, p) { const x=p[0],y=p[1],z=p[2],w=1; return [m[0]*x+m[4]*y+m[8]*z+m[12]*w, m[1]*x+m[5]*y+m[9]*z+m[13]*w, m[2]*x+m[6]*y+m[10]*z+m[14]*w]; }
 
@@ -86,17 +93,10 @@
     // Creates a translation and scale matrix
     function translateScale(x,y,z,sx,sy,sz) { return new F32([sx,0,0,0, 0,sy,0,0, 0,0,sz,0, x,y,z,1]); }
 
-    // --- Global State and Constants ---
-     // const D = document
+    // const D = document
     // const C = D.getElementById('canvas');
     const canvas = document.getElementById('canvas');
-    const F32 = Float32Array;
-    const D2R = Math.PI / 180;
-
-    // --- World Matrices ---
-    const M = M4(), V = M4(), P = M4(); // Model, View, Projection
-    let PV = M4(), invPV = M4(); // Combined and inverse matrices for picking
-
+    
    // State variables for the user/camera, rendering loop, and WebGL/WebXR contexts
     let user = { x: 0, y: 1.6, z: 2, yaw: 0, pitch: 0 }; // User position and orientation
     let last = 0; // Timestamp of the last frame for calculating delta time
@@ -132,25 +132,25 @@
     // --- /FEATURE: Core ---
 
     // --- FEATURE: Input ---
+    // --- MODULE: Input-Core ---
+    // --- Unified Input Handling ---
     // Check if the primary input is a coarse pointer (like a finger), indicating a mobile/touch device
     const isMobile = matchMedia('(pointer:coarse)').matches;
     // Unified input state object for keyboard, joysticks, pointer-look, and pointer coordinates
     const input = {
         keys: {},
-        joy: { left: { x: 0, y: 0, id: null }, right: { x: 0, y: 0, id: null } },
+        joy: { left: { x: 0, y: 0, id: null }, right: { x: 0, y: 0, id: null } }, // 
         look: { id: null, x: 0, y: 0 },
         pointer: { x: 0, y: 0 }
     };
-    
     // A map to track the previous pressed state of VR controller buttons for edge detection (press/release)
     const pressedMap = new Map();
-    
-    // --- Unified Input Handling ---
+
     // Keyboard event listeners for movement and HUD toggle
     document.addEventListener('keydown', e => {
         const k = e.key.toLowerCase();
         input.keys[k] = true;
-        if (k === 'h') {playClickSound(); hudVisible = !hudVisible;} // 'H' key toggles HUD visibility
+        if (k === 'h' || k === 'escape') {playClickSound(); hudVisible = !hudVisible;} // 'H' key toggles HUD visibility
     });
     document.addEventListener('keyup', e => input.keys[e.key.toLowerCase()] = false);
 
@@ -201,9 +201,10 @@
             input.look.id = null;
         }
     });
-
+    // --- /MODULE: Input-Core ---
+    
+    // --- MODULE: Input-Joystick ---
     // --- Virtual Joysticks for Touch Devices ---
-
     function initJoysticks() {
         const joys = [
             { side: 'left', el: document.getElementById('leftJoy') },
@@ -248,9 +249,145 @@
         }
     }
     initJoysticks();
+    // --- /MODULE:Input-Joystick ---
+    // --- MODULE: Input-Ray ---
+    // --- Raycasting and Picking ---
+
+    // Checks if a world-space ray intersects with a button on the HUD
+    function HUD_pick(WH, ray, uiSet) {
+        const ui = uiSet || currentUI();
+        const inv = INV(WH);
+        const o = mulPoint(inv, ray.o); // Transform ray to HUD's local space
+        const d = mulDir(inv, ray.d);
+        const t = -o[2] / d[2]; // Intersect with the Z=0 plane
+        if (t <= 0) return null;
+
+        const x = o[0] + d[0] * t;
+        const y = o[1] + d[1] * t;
+
+        // Check if the hit is within the quad's bounds
+        if (x < -0.26 || x > 0.26 || y < -0.15 || y > 0.15) return null;
+        
+        // Convert local coordinates to UV coordinates
+        const u = (x + 0.26) / (0.26 * 2);
+        const v = (0.15 - y) / (0.15 * 2);
+
+        // Check against each button's UV bounds
+        for (const b of ui) {
+            if (u >= b.u0 && u <= b.u1 && v >= b.v0 && v <= b.v1) {
+                return { id: b.id, u, v, button: b, t };
+            }
+        }
+        return { id: null, u, v, button: null, t }; // Hit the panel but not a button
+    }
+
+    // Creates a world-space ray from screen coordinates (for desktop mouse picking)
+    function rayFromScreen(px, py) {
+        const r = canvas.getBoundingClientRect();
+        const x = ((px - r.left) / r.width) * 2 - 1;
+        const y = 1 - ((py - r.top) / r.height) * 2;
+        const near = [x, y, -1, 1], far = [x, y, 1, 1];
+
+        // Unproject near and far points from clip space to world space
+        const n4 = mul4(invPV, near),
+              f4 = mul4(invPV, far);
+        const n = [n4[0] / n4[3], n4[1] / n4[3], n4[2] / n4[3]];
+        const f = [f4[0] / f4[3], f4[1] / f4[3], f4[2] / f4[3]];
+        
+        // Create a normalized direction vector.
+        const d = [f[0] - n[0], f[1] - n[1], f[2] - n[2]];
+        const il = 1 / HYPOT(d[0], d[1], d[2]);
+        return { o: n, d: [d[0] * il, d[1] * il, d[2] * il] };
+    }
+
+    // Creates a world-space ray from the camera or a VR controller
+    function rayFrom(mode, frame, src) {
+        if (mode === 'VR' && frame) {
+            // Use the controller's target ray space if available
+            if (src && src.targetRaySpace) {
+                const pose = frame.getPose(src.targetRaySpace, off || ref || null);
+                if (pose) {
+                    const m = pose.transform.matrix;
+                    const o = [m[12], m[13], m[14]];
+                    const d = [-m[8], -m[9], -m[10]]; // -Z is forward in WebXR.
+                    return { o, d };
+                }
+            }
+            // Fallback to any available controller
+            for (const s of xr.inputSources) {
+                if (s.targetRaySpace) {
+                    const pose = frame.getPose(s.targetRaySpace, off || ref || null);
+                    if (pose) {
+                        const m = pose.transform.matrix;
+                        const o = [m[12], m[13], m[14]];
+                        const d = [-m[8], -m[9], -m[10]];
+                        return { o, d };
+                    }
+                }
+            }
+            // Fallback to gaze/head pose
+            const pose = frame.getViewerPose(off || ref || null);
+            if (pose) {
+                const m = pose.views[0].transform.matrix;
+                return { o: [m[12], m[13], m[14]], d: [-m[8], -m[9], -m[10]] };
+            }
+        } else { // Desktop mode
+            const cy = COS(user.yaw), sy = SIN(user.yaw);
+            const cp = COS(user.pitch), sp = SIN(user.pitch);
+            const d = [-sy * cp, -sp, -cy * cp];
+            const o = [user.x, user.y, user.z];
+            return { o, d };
+        }
+        return null;
+    }
+
+    // Calculates the intersection point of a ray with the ground plane (Y=0)
+    function rayHitGround(ray) {
+        if (!ray || ray.d[1] >= 0) return null; // Ray is parallel to or going away from the ground
+        const t = (0 - ray.o[1]) / ray.d[1];
+        if (t > 0) {
+            return [ray.o[0] + ray.d[0] * t, 0.001, ray.o[2] + ray.d[2] * t];
+        }
+        return null;
+    }
+
+    // State for the ground reticle
+    let lastHit = null;
+
+    // Handles a click/tap interaction in desktop mode
+    function interactDesktopAt(px, py) {
+        const ui = currentUI();
+        const r = rayFromScreen(px, py);
+        if (!r) return;
+        const WH = HUD_WH_world;
+        const h = HUD_pick(WH, r, ui);
+
+        if (h && h.button) {
+            h.button.onClick(); // A button was clicked
+            return;
+        }
+
+        // If no button was clicked, check for a hit on the ground
+        const g = rayHitGround(r);
+        if (g) {
+            lastHit = g;
+            log('ground ' + g.map(v => v.toFixed(2)).join(','));
+        }
+    }
+
+    // Returns the correct local transform for the HUD based on its visibility state
+    function getHudTransform() {
+        if (hudVisible) { // Centered panel
+            return new DOMMatrix([1,0,0,0, 0,1,0,0, 0,0,1,0, 0, -0.05, -1.15, 1]).toFloat32Array();
+        }
+        // Top tab.
+        return new DOMMatrix([1,0,0,0, 0,1,0,0, 0,0,1,0, 0, 0.5, -1.15, 1]).toFloat32Array();
+    }
+    // --- /MODULE: Input-Ray ---
     // --- /FEATURE: Input ---
 
     // --- FEATURE: Gameplay ---
+    // --- MODULE: Gameplay-Movement ---
     // --- Movement Logic ---
     // Movement and input constants
     const MOVES = 3;    // Movement speed in meters per second
@@ -304,19 +441,21 @@
         // Calculate forward and right vectors based on current yaw
         const cy = COS(user.yaw);
         const sy = SIN(user.yaw);
-        const f = [-sy, 0, -cy];
-        const r = [cy, 0, -sy];
+        T_V3_A[0] = -sy; T_V3_A[1] = 0; T_V3_A[2] = -cy; // 'f' vector
+        T_V3_B[0] = cy;  T_V3_B[1] = 0; T_V3_B[2] = -sy;  // 'r' vector
         const sp = MOVES * dt;
 
         // Apply movement along forward and right vectors
-        user.x += (r[0] * mv.x + f[0] * mv.y) * sp;
-        user.z += (r[2] * mv.x + f[2] * mv.y) * sp;
+        user.x += (T_V3_B[0] * mv.x + T_V3_A[0] * mv.y) * sp;
+        user.z += (T_V3_B[2] * mv.x + T_V3_A[2] * mv.y) * sp;
     }
-    
+    // --- /MODULE: Gameplay-Movement ---
+    // --- MODULE: Gameplay-Input ---
     // --- /FEATURE: Gameplay ---
     
     // --- FEATURE: Scene ---
-    // NEW: Web Audio setup
+    // --- MODULE: Scene-Audio ---
+    // todo: implement stereo sources to get spatial audio (directional wind sound)
     let audioCtx = null;
     let lastStepTime = 0;
     const stepInterval = 400; // ms between walking sounds
@@ -441,9 +580,10 @@
       osc.start(t);
       osc.stop(t + 0.35);
     }
+    // --- /MODULE: Scene-Audio ---
 
+    // --- MODULE: Scene-HUD ---
     // --- Log and HUD UI State ---
-
     const LOG = [];
     const LOG_MAX = 200;
     let logScroll = 0;
@@ -577,142 +717,58 @@
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, hudCan);
     }
 
-    // --- Raycasting and Picking ---
+    
+    // --- HUD Shader ---
+    // The HUD is a 2D canvas drawn in the DOM, then uploaded to a WebGL texture to be displayed on a 3D quad
 
-    // Checks if a world-space ray intersects with a button on the HUD
-    function HUD_pick(WH, ray, uiSet) {
-        const ui = uiSet || currentUI();
-        const inv = INV(WH);
-        const o = mulPoint(inv, ray.o); // Transform ray to HUD's local space
-        const d = mulDir(inv, ray.d);
-        const t = -o[2] / d[2]; // Intersect with the Z=0 plane
-        if (t <= 0) return null;
+    let hudTex = gl.createTexture();
+    let hudCan = document.createElement('canvas');
+    let hudCtx = hudCan.getContext('2d');
+    hudCan.width = 640;
+    hudCan.height = 320;
 
-        const x = o[0] + d[0] * t;
-        const y = o[1] + d[1] * t;
+    gl.bindTexture(gl.TEXTURE_2D, hudTex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
-        // Check if the hit is within the quad's bounds
-        if (x < -0.26 || x > 0.26 || y < -0.15 || y > 0.15) return null;
-        
-        // Convert local coordinates to UV coordinates
-        const u = (x + 0.26) / (0.26 * 2);
-        const v = (0.15 - y) / (0.15 * 2);
+    // Simple textured quad shader for the HUD
+    const vsH = `#version 300 es
+    precision highp float;
+    layout(location=0) in vec3 p;
+    layout(location=1) in vec2 uv;
+    uniform mat4 M, V, P;
+    out vec2 U;
+    void main(){
+        U = uv;
+        gl_Position = P * V * M * vec4(p, 1.0);
+    }`;
+    const fsH = `#version 300 es
+    precision highp float;
+    #define UNIFORM uniform
+    in vec2 U;
+    UNIFORM sampler2D T;
+    out vec4 o;
+    void main(){
+        vec4 c = texture(T, U);
+        if(c.a < 0.01) discard; // Discard fully transparent pixels.
+        o = c;
+    }`;
+    const PH = prog(vsH, fsH);
+    const uMH = gl.getUniformLocation(PH, 'M'), uVH = gl.getUniformLocation(PH, 'V'), uPH = gl.getUniformLocation(PH, 'P'), uT = gl.getUniformLocation(PH, 'T');
 
-        // Check against each button's UV bounds
-        for (const b of ui) {
-            if (u >= b.u0 && u <= b.u1 && v >= b.v0 && v <= b.v1) {
-                return { id: b.id, u, v, button: b, t };
-            }
-        }
-        return { id: null, u, v, button: null, t }; // Hit the panel but not a button
-    }
+    const vboH = gl.createBuffer(), vaoH = gl.createVertexArray();
+    gl.bindVertexArray(vaoH);
+    gl.bindBuffer(gl.ARRAY_BUFFER, vboH);
+    // Vertex data for the HUD quad (position and UV coordinates).
+    gl.bufferData(gl.ARRAY_BUFFER, new F32([-0.26,0.15,0, 0,1,  0.26,0.15,0, 1,1,  0.26,-0.15,0, 1,0,  -0.26,0.15,0, 0,1,  0.26,-0.15,0, 1,0,  -0.26,-0.15,0, 0,0]), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 20, 0);
+    gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 20, 12);
 
-    // Creates a world-space ray from screen coordinates (for desktop mouse picking)
-    function rayFromScreen(px, py) {
-        const r = canvas.getBoundingClientRect();
-        const x = ((px - r.left) / r.width) * 2 - 1;
-        const y = 1 - ((py - r.top) / r.height) * 2;
-        const near = [x, y, -1, 1], far = [x, y, 1, 1];
-
-        // Unproject near and far points from clip space to world space
-        const n4 = mul4(invPV, near),
-              f4 = mul4(invPV, far);
-        const n = [n4[0] / n4[3], n4[1] / n4[3], n4[2] / n4[3]];
-        const f = [f4[0] / f4[3], f4[1] / f4[3], f4[2] / f4[3]];
-        
-        // Create a normalized direction vector.
-        const d = [f[0] - n[0], f[1] - n[1], f[2] - n[2]];
-        const il = 1 / HYPOT(d[0], d[1], d[2]);
-        return { o: n, d: [d[0] * il, d[1] * il, d[2] * il] };
-    }
-
-    // Creates a world-space ray from the camera or a VR controller
-    function rayFrom(mode, frame, src) {
-        if (mode === 'VR' && frame) {
-            // Use the controller's target ray space if available
-            if (src && src.targetRaySpace) {
-                const pose = frame.getPose(src.targetRaySpace, off || ref || null);
-                if (pose) {
-                    const m = pose.transform.matrix;
-                    const o = [m[12], m[13], m[14]];
-                    const d = [-m[8], -m[9], -m[10]]; // -Z is forward in WebXR.
-                    return { o, d };
-                }
-            }
-            // Fallback to any available controller
-            for (const s of xr.inputSources) {
-                if (s.targetRaySpace) {
-                    const pose = frame.getPose(s.targetRaySpace, off || ref || null);
-                    if (pose) {
-                        const m = pose.transform.matrix;
-                        const o = [m[12], m[13], m[14]];
-                        const d = [-m[8], -m[9], -m[10]];
-                        return { o, d };
-                    }
-                }
-            }
-            // Fallback to gaze/head pose
-            const pose = frame.getViewerPose(off || ref || null);
-            if (pose) {
-                const m = pose.views[0].transform.matrix;
-                return { o: [m[12], m[13], m[14]], d: [-m[8], -m[9], -m[10]] };
-            }
-        } else { // Desktop mode
-            const cy = COS(user.yaw), sy = SIN(user.yaw);
-            const cp = COS(user.pitch), sp = SIN(user.pitch);
-            const d = [-sy * cp, -sp, -cy * cp];
-            const o = [user.x, user.y, user.z];
-            return { o, d };
-        }
-        return null;
-    }
-
-    // Calculates the intersection point of a ray with the ground plane (Y=0)
-    function rayHitGround(ray) {
-        if (!ray || ray.d[1] >= 0) return null; // Ray is parallel to or going away from the ground
-        const t = (0 - ray.o[1]) / ray.d[1];
-        if (t > 0) {
-            return [ray.o[0] + ray.d[0] * t, 0.001, ray.o[2] + ray.d[2] * t];
-        }
-        return null;
-    }
-
-    // State for the ground reticle
-    let lastHit = null;
-
-    // Handles a click/tap interaction in desktop mode
-    function interactDesktopAt(px, py) {
-        const ui = currentUI();
-        const r = rayFromScreen(px, py);
-        if (!r) return;
-        const WH = HUD_WH_world;
-        const h = HUD_pick(WH, r, ui);
-
-        if (h && h.button) {
-            h.button.onClick(); // A button was clicked
-            return;
-        }
-
-        // If no button was clicked, check for a hit on the ground
-        const g = rayHitGround(r);
-        if (g) {
-            lastHit = g;
-            log('ground ' + g.map(v => v.toFixed(2)).join(','));
-        }
-    }
-
-    // Returns the correct local transform for the HUD based on its visibility state
-    function getHudTransform() {
-        if (hudVisible) { // Centered panel
-            return new DOMMatrix([1,0,0,0, 0,1,0,0, 0,0,1,0, 0, -0.05, -1.15, 1]).toFloat32Array();
-        }
-        // Top tab.
-        return new DOMMatrix([1,0,0,0, 0,1,0,0, 0,0,1,0, 0, 0.5, -1.15, 1]).toFloat32Array();
-    }
-
-
+    // --- /MODULE: Scene-HUD ---
+    // --- MODULE: Scene-Sky ---
     // --- Sky Shader ---
-
     let noiseTex = gl.createTexture();
     let cloudCoverage = 0.25;      // threshold knob -> more/less cloud
     let cloudSharpness = 0.52;     // edge softness knob
@@ -929,6 +985,8 @@
     const uCloudScaleLoc = gl.getUniformLocation(PSKY, 'uCloudScale');
     const uCloudMotionSpeedLoc = gl.getUniformLocation(PSKY, 'uCloudMotionSpeed');
 
+    // --- /MODULE: Scene-HUD ---
+    // --- MODULE: Scene-Ground ---
     // --- Grid Shader ---
     // A simple shader to draw a grid on the ground plane
     const vsG = `#version 300 es
@@ -967,8 +1025,9 @@
     gl.enableVertexAttribArray(0);
     gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
 
+    // --- /MODULE: Scene-Ground ---
+    // --- MODULE: Scene-Grass ---
     // --- Grass Shaders ---
-
     // Grass rendering constants.
     const GRASS_SEG = 4; // Number of segments per blade of grass
     const GRASS_VCOUNT = (GRASS_SEG + 1) * 2; // Total vertices per blade
@@ -1074,8 +1133,11 @@
     gl.enableVertexAttribArray(0);
     gl.vertexAttribPointer(0, 1, gl.FLOAT, false, 0, 0);
 
+    // --- /MODULE: Scene-Grass ---
+    // --- MODULE: Scene-Plant ---
     // --- L-System Plant Shader ---
     // Positions and scales for the scattered L-system plants.
+    // later we will generate positions and scatter instances
     const PLANT_POSITIONS = [
         [0, 0, 1],
         [5, -4, 1.2],
@@ -1188,57 +1250,9 @@
     gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 20, 0);
     gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 20, 12);
 
+    // --- /MODULE: Scene-Plant ---
 
-
-    // --- HUD Setup ---
-
-    // The HUD is a 2D canvas drawn in the DOM, then uploaded to a WebGL texture to be displayed on a 3D quad
-
-    let hudTex = gl.createTexture();
-    let hudCan = document.createElement('canvas');
-    let hudCtx = hudCan.getContext('2d');
-    hudCan.width = 640;
-    hudCan.height = 320;
-
-    gl.bindTexture(gl.TEXTURE_2D, hudTex);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-
-    // Simple textured quad shader for the HUD
-    const vsH = `#version 300 es
-    precision highp float;
-    layout(location=0) in vec3 p;
-    layout(location=1) in vec2 uv;
-    uniform mat4 M, V, P;
-    out vec2 U;
-    void main(){
-        U = uv;
-        gl_Position = P * V * M * vec4(p, 1.0);
-    }`;
-    const fsH = `#version 300 es
-    precision highp float;
-    #define UNIFORM uniform
-    in vec2 U;
-    UNIFORM sampler2D T;
-    out vec4 o;
-    void main(){
-        vec4 c = texture(T, U);
-        if(c.a < 0.01) discard; // Discard fully transparent pixels.
-        o = c;
-    }`;
-    const PH = prog(vsH, fsH);
-    const uMH = gl.getUniformLocation(PH, 'M'), uVH = gl.getUniformLocation(PH, 'V'), uPH = gl.getUniformLocation(PH, 'P'), uT = gl.getUniformLocation(PH, 'T');
-
-    const vboH = gl.createBuffer(), vaoH = gl.createVertexArray();
-    gl.bindVertexArray(vaoH);
-    gl.bindBuffer(gl.ARRAY_BUFFER, vboH);
-    // Vertex data for the HUD quad (position and UV coordinates).
-    gl.bufferData(gl.ARRAY_BUFFER, new F32([-0.26,0.15,0, 0,1,  0.26,0.15,0, 1,1,  0.26,-0.15,0, 1,0,  -0.26,0.15,0, 0,1,  0.26,-0.15,0, 1,0,  -0.26,-0.15,0, 0,0]), gl.STATIC_DRAW);
-    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 20, 0);
-    gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 20, 12);
-
+    
     // --- Reticle Shader ---
 
     // A small disc drawn on the ground where the user is looking
@@ -1375,7 +1389,11 @@
         gl.uniformMatrix4fv(uM, false, M);
         gl.uniformMatrix4fv(uV, false, V);
         gl.uniformMatrix4fv(uP, false, P);
+        gl.enable(gl.CULL_FACE);
+        gl.cullFace(gl.FRONT);
+        gl.cullFace(gl.BACK);
         gl.drawArrays(gl.TRIANGLES, 0, 6);
+        gl.disable(gl.CULL_FACE);
 
         // Render Grass in multiple passes for density and LOD
         {
@@ -1393,7 +1411,6 @@
             gl.bindVertexArray(vaoPlants);
             gl.enable(gl.BLEND);
             gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-            //gl.disable(gl.CULL_FACE);
             gl.depthMask(false); // Render transparent objects without writing to depth buffer
 
             const camX = user.x;
@@ -1415,7 +1432,6 @@
             }
 
             gl.depthMask(true);
-            //gl.enable(gl.CULL_FACE);
             gl.disable(gl.BLEND);
         }
         // Render Reticle if there's a ground hit
@@ -1486,7 +1502,6 @@
         gl.uniform1i(uGridN, gridN | 0);
         gl.uniform1f(uRadius, radius);
         gl.uniform1f(uSeed, seed);
-        //gl.disable(gl.CULL_FACE); // Grass blades are double-sided
         gl.enable(gl.DEPTH_TEST);
         gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, GRASS_VCOUNT, gridN * gridN);
     }
@@ -1639,7 +1654,6 @@
             gl.uniform1f(uCloudHeightLoc, cloudHeight);
             gl.uniform1f(uCloudScaleLoc, cloudScale);       // adjust for global cloud size
             gl.uniform1f(uCloudMotionSpeedLoc, cloudMotionSpeed);
-
             gl.drawArrays(gl.TRIANGLES, 0, 3);
             gl.enable(gl.DEPTH_TEST);
 
@@ -1668,7 +1682,6 @@
                 gl.bindVertexArray(vaoPlants);
                 gl.enable(gl.BLEND);
                 gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-                //gl.disable(gl.CULL_FACE);
                 gl.depthMask(false);
 
                 const worldFromView = v.transform.matrix;
@@ -1691,7 +1704,7 @@
                 }
 
                 gl.depthMask(true);
-                //gl.enable(gl.CULL_FACE);
+                // gl.enable(gl.CULL_FACE);
                 gl.disable(gl.BLEND);
             }
 
@@ -1792,7 +1805,8 @@
         return { o: [0, 0, 0], d: [0, 0, -1] }; // Fallback, ray from Head
     }
     // --- /FEATURE: VR ---
-
+    
+    // --- FEATURE: CORE ---
     // --- Application Entry Point ---
     (function main() {
         initXR();
@@ -1801,7 +1815,8 @@
         log('Use the top "HUD" button (or H key) to open/close HUD');
         log('Use (WASD) to move and (Q & E) to rotate');
     })();
-
+    
+    // --- /FEATURE: CORE ---
     </script>
 </body>
 </html>
