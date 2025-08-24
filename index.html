@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>'Wild Cats' 13K Game 2025</title>
     <link rel="icon" type="image/svg+xml" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="55%" x="50%" dominant-baseline="middle" text-anchor="middle" font-size="80">🐈‍⬛</text></svg>'>
     <style>
@@ -60,10 +60,10 @@
     <div id="rightJoy" class="joystick"><div class="joystick-handle"></div></div>
 
     <script>
-    // --- FEATURE: Core ---
+    // -- FEATURE: Core --
     // Expose Math functions to global scope
     Object.getOwnPropertyNames(Math).forEach(n => window[n.toUpperCase()] = Math[n]);
-    // --- Math Library ---
+    // -- Math Library --
     const D2R = 0.0174532925 // or Math.PI / 180;
     const F32 = Float32Array;
     const M4 = (v) => new F32(v || [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]);
@@ -129,10 +129,10 @@
         if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw gl.getProgramInfoLog(p);
         return p;
     }
-    // --- /FEATURE: Core ---
+    // -- /FEATURE: Core --
 
-    // --- FEATURE: Input ---
-    // --- MODULE: Input-Core ---
+    // -- FEATURE: Input --
+    // -- MODULE: Input-Core --
     // --- Unified Input Handling ---
     // Check if the primary input is a coarse pointer (like a finger), indicating a mobile/touch device
     const isMobile = matchMedia('(pointer:coarse)').matches;
@@ -150,7 +150,8 @@
     document.addEventListener('keydown', e => {
         const k = e.key.toLowerCase();
         input.keys[k] = true;
-        if (k === 'h' || k === 'escape') {playClickSound(); hudVisible = !hudVisible;} // 'H' key toggles HUD visibility
+        if (k === 'h' || k === 'escape') {playClickSound(); hudVisible = !hudVisible;} // 'H' and escape key toggles HUD visibility
+        if (k === 'f') {playClickSound(); beastMode = !beastMode;} // 'F' key toggles beastMode
     });
     document.addEventListener('keyup', e => input.keys[e.key.toLowerCase()] = false);
 
@@ -201,9 +202,9 @@
             input.look.id = null;
         }
     });
-    // --- /MODULE: Input-Core ---
+    // -- /MODULE: Input-Core --
     
-    // --- MODULE: Input-Joystick ---
+    // -- MODULE: Input-Joystick --
     // --- Virtual Joysticks for Touch Devices ---
     function initJoysticks() {
         const joys = [
@@ -249,10 +250,9 @@
         }
     }
     initJoysticks();
-    // --- /MODULE:Input-Joystick ---
-    // --- MODULE: Input-Ray ---
+    // -- /MODULE:Input-Joystick --
+    // -- MODULE: Input-Ray --
     // --- Raycasting and Picking ---
-
     // Checks if a world-space ray intersects with a button on the HUD
     function HUD_pick(WH, ray, uiSet) {
         const ui = uiSet || currentUI();
@@ -383,11 +383,21 @@
         // Top tab.
         return new DOMMatrix([1,0,0,0, 0,1,0,0, 0,0,1,0, 0, 0.5, -1.15, 1]).toFloat32Array();
     }
-    // --- /MODULE: Input-Ray ---
-    // --- /FEATURE: Input ---
 
-    // --- FEATURE: Gameplay ---
-    // --- MODULE: Gameplay-Movement ---
+    // Helper to get a ray from a VR controller
+    function controllerRay(frame, src) {
+        const pose = src.targetRaySpace ? frame.getPose(src.targetRaySpace, off || ref || null) : null;
+        if (pose) {
+            const m = pose.transform.matrix;
+            return { o: [m[12], m[13], m[14]], d: [-m[8], -m[9], -m[10]] };
+        }
+        return { o: [0, 0, 0], d: [0, 0, -1] }; // Fallback, ray from Head
+    }
+    // -- /MODULE: Input-Ray --
+    // -- /FEATURE: Input --
+
+    // -- FEATURE: Gameplay --
+    // -- MODULE: Gameplay-Movement --
     // --- Movement Logic ---
     // Movement and input constants
     const MOVES = 3;    // Movement speed in meters per second
@@ -449,12 +459,12 @@
         user.x += (T_V3_B[0] * mv.x + T_V3_A[0] * mv.y) * sp;
         user.z += (T_V3_B[2] * mv.x + T_V3_A[2] * mv.y) * sp;
     }
-    // --- /MODULE: Gameplay-Movement ---
-    // --- MODULE: Gameplay-Input ---
-    // --- /FEATURE: Gameplay ---
+    // -- /MODULE: Gameplay-Movement --
+    beastMode = false; // toggle beast mode
+    // -- /FEATURE: Gameplay --
     
-    // --- FEATURE: Scene ---
-    // --- MODULE: Scene-Audio ---
+    // -- FEATURE: Scene --
+    // -- MODULE: Scene-Audio --
     // todo: implement stereo sources to get spatial audio (directional wind sound)
     let audioCtx = null;
     let lastStepTime = 0;
@@ -580,9 +590,9 @@
       osc.start(t);
       osc.stop(t + 0.35);
     }
-    // --- /MODULE: Scene-Audio ---
+    // -- /MODULE: Scene-Audio --
 
-    // --- MODULE: Scene-HUD ---
+    // -- MODULE: Scene-HUD --
     // --- Log and HUD UI State ---
     const LOG = [];
     const LOG_MAX = 200;
@@ -766,8 +776,8 @@
     gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 20, 0);
     gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 20, 12);
 
-    // --- /MODULE: Scene-HUD ---
-    // --- MODULE: Scene-Sky ---
+    // -- /MODULE: Scene-HUD --
+    // -- MODULE: Scene-Sky --
     // --- Sky Shader ---
     let noiseTex = gl.createTexture();
     let cloudCoverage = 0.25;      // threshold knob -> more/less cloud
@@ -985,8 +995,8 @@
     const uCloudScaleLoc = gl.getUniformLocation(PSKY, 'uCloudScale');
     const uCloudMotionSpeedLoc = gl.getUniformLocation(PSKY, 'uCloudMotionSpeed');
 
-    // --- /MODULE: Scene-HUD ---
-    // --- MODULE: Scene-Ground ---
+    // -- /MODULE: Scene-HUD --
+    // -- MODULE: Scene-Ground --
     // --- Grid Shader ---
     // A simple shader to draw a grid on the ground plane
     const vsG = `#version 300 es
@@ -1025,8 +1035,8 @@
     gl.enableVertexAttribArray(0);
     gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
 
-    // --- /MODULE: Scene-Ground ---
-    // --- MODULE: Scene-Grass ---
+    // -- /MODULE: Scene-Ground --
+    // -- MODULE: Scene-Grass --
     // --- Grass Shaders ---
     // Grass rendering constants.
     const GRASS_SEG = 4; // Number of segments per blade of grass
@@ -1133,8 +1143,8 @@
     gl.enableVertexAttribArray(0);
     gl.vertexAttribPointer(0, 1, gl.FLOAT, false, 0, 0);
 
-    // --- /MODULE: Scene-Grass ---
-    // --- MODULE: Scene-Plant ---
+    // -- /MODULE: Scene-Grass --
+    // -- MODULE: Scene-Plant --
     // --- L-System Plant Shader ---
     // Positions and scales for the scattered L-system plants.
     // later we will generate positions and scatter instances
@@ -1250,7 +1260,7 @@
     gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 20, 0);
     gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 20, 12);
 
-    // --- /MODULE: Scene-Plant ---
+    // -- /MODULE: Scene-Plant --
 
     
     // --- Reticle Shader ---
@@ -1284,8 +1294,9 @@
     gl.enableVertexAttribArray(0);
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
 
-    // --- Controller Indicator Shaders ---
 
+    // -- MODULE: Scene-VR --
+    // --- Controller Indicator Shaders ---
     // Disc for hand position
     const vsDisc = `#version 300 es
     precision highp float;
@@ -1333,13 +1344,14 @@
     gl.bufferData(gl.ARRAY_BUFFER, new F32([0,0,0, 1,0,0, 1,0,1, 0,0,0, 1,0,1, 0,0,1]), gl.STATIC_DRAW);
     gl.enableVertexAttribArray(0);
     gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
-    // --- /FEATURE: Scene ---
+    // -- /MODULE: Scene-VR --
+    // -- /FEATURE: Scene --
 
     
    
     
     
-    // --- CORE: render ---
+    // -- CORE: render --
     // --- Main Render Loop (Desktop) ---
 
     function loop(t) {
@@ -1389,11 +1401,11 @@
         gl.uniformMatrix4fv(uM, false, M);
         gl.uniformMatrix4fv(uV, false, V);
         gl.uniformMatrix4fv(uP, false, P);
+        if (beastMode===true){
         gl.enable(gl.CULL_FACE);
-        gl.cullFace(gl.FRONT);
-        gl.cullFace(gl.BACK);
+        gl.cullFace(gl.FRONT)}
+        else {gl.disable(gl.CULL_FACE);};
         gl.drawArrays(gl.TRIANGLES, 0, 6);
-        gl.disable(gl.CULL_FACE);
 
         // Render Grass in multiple passes for density and LOD
         {
@@ -1519,9 +1531,9 @@
         PV = MULTMAT4(M4(), P, V);
         invPV = INV(PV);
     }
-    // --- /CORE: Render ---
+    // -- /CORE: Render --
 
-    // --- FEATURE: VR ---
+    // -- FEATURE: VR --
     // --- WebXR ---
 
     // Checks for WebXR support
@@ -1562,7 +1574,7 @@
         }
     }
 
-    // --- Main Render Loop (WebXR) ---
+    // -- Main Render Loop (WebXR) --
 
     function onXR(t, frame) {
         const s = frame.session;
@@ -1586,7 +1598,7 @@
         const rel = frame.getViewerPose(off);
         if (!rel) return;
 
-        // --- VR Input and Interaction ---
+        // -- VR Input and Interaction --
 
         for (const src of s.inputSources) {
             const gp = src.gamepad;
@@ -1617,7 +1629,7 @@
             pressedMap.set(src, now);
         }
 
-        // --- VR Rendering ---
+        // -- VR Rendering --
 
         gl.bindFramebuffer(gl.FRAMEBUFFER, s.renderState.baseLayer.framebuffer);
         gl.clearColor(0, 0, 0, 1);
@@ -1704,7 +1716,6 @@
                 }
 
                 gl.depthMask(true);
-                // gl.enable(gl.CULL_FACE);
                 gl.disable(gl.BLEND);
             }
 
@@ -1717,9 +1728,13 @@
                 gl.uniformMatrix4fv(uMR, false, Tm);
                 gl.uniformMatrix4fv(uVR, false, v.transform.inverse.matrix);
                 gl.uniformMatrix4fv(uPR, false, v.projectionMatrix);
-                gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-                gl.disable(gl.DEPTH_TEST); gl.drawArrays(gl.TRIANGLES, 0, 6);
-                gl.enable(gl.DEPTH_TEST); gl.disable(gl.BLEND);
+                gl.enable(gl.BLEND); 
+                gl.blendFunc(gl.SRC_ALPHA, 
+                gl.ONE_MINUS_SRC_ALPHA);
+                gl.disable(gl.DEPTH_TEST); 
+                gl.drawArrays(gl.TRIANGLES, 0, 6);
+                gl.enable(gl.DEPTH_TEST); 
+                gl.disable(gl.BLEND);
             }
             
             // Render HUD
@@ -1736,11 +1751,18 @@
             updHUD('VR', lastHit, currentUI(), dt);
             gl.useProgram(PH);
             gl.bindVertexArray(vaoH);
-            gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, hudTex); gl.uniform1i(uT, 0);
-            gl.uniformMatrix4fv(uMH, false, WH); gl.uniformMatrix4fv(uVH, false, v.transform.inverse.matrix); gl.uniformMatrix4fv(uPH, false, v.projectionMatrix);
-            gl.disable(gl.DEPTH_TEST); gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, hudTex);
+            gl.uniform1i(uT, 0);
+            gl.uniformMatrix4fv(uMH, false, WH);
+            gl.uniformMatrix4fv(uVH, false, v.transform.inverse.matrix);
+            gl.uniformMatrix4fv(uPH, false, v.projectionMatrix);
+            gl.disable(gl.DEPTH_TEST);
+            gl.enable(gl.BLEND);
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
             gl.drawArrays(gl.TRIANGLES, 0, 6);
-            gl.disable(gl.BLEND); gl.enable(gl.DEPTH_TEST);
+            gl.disable(gl.BLEND);
+            gl.enable(gl.DEPTH_TEST);
 
             // Render Controller Indicators and Rays
             for (const src of s.inputSources) {
@@ -1750,12 +1772,19 @@
                 const grip = src.gripSpace ? frame.getPose(src.gripSpace, off) : null;
                 if (grip) {
                     const Mhand = new DOMMatrix(grip.transform.matrix).multiply(new DOMMatrix([0.06,0,0,0, 0,0.06,0,0, 0,0,0.06,0, 0,0,0,1])).toFloat32Array();
-                    gl.useProgram(PDisc); gl.bindVertexArray(vaoR);
-                    gl.uniformMatrix4fv(uMDisc, false, Mhand); gl.uniformMatrix4fv(uVDisc, false, v.transform.inverse.matrix); gl.uniformMatrix4fv(uPDisc, false, v.projectionMatrix);
+                    gl.useProgram(PDisc);
+                    gl.bindVertexArray(vaoR);
+
+                    gl.uniformMatrix4fv(uMDisc, false, Mhand);
+                    gl.uniformMatrix4fv(uVDisc, false, v.transform.inverse.matrix); 
+                    gl.uniformMatrix4fv(uPDisc, false, v.projectionMatrix);
                     gl.uniform4f(uColDisc, col[0], col[1], col[2], 0.95);
-                    gl.disable(gl.DEPTH_TEST); gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+                    gl.disable(gl.DEPTH_TEST); 
+                    gl.enable(gl.BLEND); 
+                    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
                     gl.drawArrays(gl.TRIANGLES, 0, 6);
-                    gl.disable(gl.BLEND); gl.enable(gl.DEPTH_TEST);
+                    gl.disable(gl.BLEND); 
+                    gl.enable(gl.DEPTH_TEST);
                 }
 
                 // Laser beam
@@ -1795,18 +1824,9 @@
         }
     }
 
-    // Helper to get a ray from a VR controller
-    function controllerRay(frame, src) {
-        const pose = src.targetRaySpace ? frame.getPose(src.targetRaySpace, off || ref || null) : null;
-        if (pose) {
-            const m = pose.transform.matrix;
-            return { o: [m[12], m[13], m[14]], d: [-m[8], -m[9], -m[10]] };
-        }
-        return { o: [0, 0, 0], d: [0, 0, -1] }; // Fallback, ray from Head
-    }
-    // --- /FEATURE: VR ---
+    // -- /FEATURE: VR --
     
-    // --- FEATURE: CORE ---
+    // -- FEATURE: CORE --
     // --- Application Entry Point ---
     (function main() {
         initXR();
@@ -1816,7 +1836,7 @@
         log('Use (WASD) to move and (Q & E) to rotate');
     })();
     
-    // --- /FEATURE: CORE ---
+    // -- /FEATURE: CORE --
     </script>
 </body>
 </html>
