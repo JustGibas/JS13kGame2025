@@ -341,20 +341,7 @@
         // -- /SOLUTION: Gameplay-Movement-Joystick --
 
         // -- SOLUTION: Gameplay-Movement-VR --
-        // VR gamepad input
-        if (session) {
-            for (const src of session.inputSources) {
-                const a = src.gamepad?.axes;
-                if (!a || a.length < 4) continue;
-                const dz = v => ABS(v) > DZ ? v : 0; // Apply deadzone
-                const x = dz(a[2]);
-                const y = dz(a[3]);
-                
-                if (src.handedness === 'left') { vx = x; vy = -y; }
-                else if (src.handedness === 'right') { vt = -x; }
-                else if (!vx && !vy) { vx = x; vy = -y; } // Fallback for undefined handedness
-            }
-        }
+        
         // -- /SOLUTION: Gameplay-Movement-VR --
 
         // Return combined movement, prioritizing VR, then keyboard, then joystick
