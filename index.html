@@ -14,6 +14,40 @@
             overflow: hidden;
             touch-action: none; /* Prevents default touch actions like scrolling */
         }
+
+        /* Styling for the virtual joysticks */
+        .joystick {
+            position: fixed;
+            width: 112px;
+            height: 112px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.08);
+            border: 2px solid rgba(255, 255, 255, 0.25);
+            z-index: 10;
+            display: none; /* Hidden by default, shown for touch devices */
+        }
+
+        /* The movable part of the joystick */
+        .joystick-handle {
+            position: absolute;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.9);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none; /* The handle itself doesn't capture clicks */
+        }
+
+        /* Positioning for left and right joysticks */
+        #leftJoy { bottom: 36px; left: 36px; }
+        #rightJoy { bottom: 36px; right: 36px; }
+
+        /* Media query to show joysticks only on touch-capable (coarse pointer) devices */
+        @media (pointer:coarse) {
+            .joystick { display: block; }
+        }
     </style>
 </head>
 <body>
@@ -22,7 +56,9 @@
     <canvas id="canvas"></canvas>
 
     <!-- HTML elements for the virtual joysticks -->
-    
+    <div id="leftJoy" class="joystick"><div class="joystick-handle"></div></div>
+    <div id="rightJoy" class="joystick"><div class="joystick-handle"></div></div>
+
     <script>
     // -- FEATURE: Core --
     // Expose Math functions to global scope
@@ -98,6 +134,8 @@
     // -- FEATURE: Input --
     // -- MODULE: Input-Core --
     // --- Unified Input Handling ---
+    // Check if the primary input is a coarse pointer (like a finger), indicating a mobile/touch device
+    const isMobile = matchMedia('(pointer:coarse)').matches;
     // Unified input state object for keyboard, joysticks, pointer-look, and pointer coordinates
     const input = {
         keys: {},
@@ -111,6 +149,7 @@
 
     // State for the raycast
     let lastHit = null;
+    //ray = null; // delete
     // -- /MODULE: Input-Core --
     
     // -- MODULE: Input-KeyPointer --
@@ -162,6 +201,7 @@
         // Update pointer position and trigger an interaction check
         input.pointer.x = e.clientX;
         input.pointer.y = e.clientY;
+        interactDesktopAt(e.clientX, e.clientY);
     });
     
     canvas.addEventListener('pointercancel', e => {
@@ -169,11 +209,108 @@
             input.look.id = null;
         }
     });
-    // -- /MODULE: Input-KeyPoint --
+    // -- /MODULE: Input-KeyPointer --
     
     // -- MODULE: Input-Joystick --
+    // --- Virtual Joysticks for Touch Devices ---
+    function initJoysticks() {
+        const joys = [
+            { side: 'left', el: document.getElementById('leftJoy') },
+            { side: 'right', el: document.getElementById('rightJoy') }
+        ];
+        const handleSel = s => document.querySelector('#' + s + 'Joy .joystick-handle');
+
+        for (const j of joys) {
+            const handle = handleSel(j.side);
+            j.el.addEventListener('pointerdown', e => { initAudio(); j.id = e.pointerId; j.el.setPointerCapture(e.pointerId); updateJoy(j, e, handle); });
+            j.el.addEventListener('pointermove', e => { if (e.pointerId === j.id) updateJoy(j, e, handle); });
+            j.el.addEventListener('pointerup', e => { if (e.pointerId === j.id) { resetJoy(j, handle); } });
+            j.el.addEventListener('pointercancel', e => { if (e.pointerId === j.id) { resetJoy(j, handle); } });
+        }
+
+        function updateJoy(j, e, handle) {
+            const r = j.el.getBoundingClientRect();
+            const cx = r.left + r.width / 2;
+            const cy = r.top + r.height / 2;
+            const R = r.width / 2 - 6; // Max radius for handle movement
+            const dx = e.clientX - cx;
+            const dy = e.clientY - cy;
+            const L = MIN(HYPOT(dx, dy), R);
+            const a = ATAN2(dy, dx);
+
+            // Normalize joystick output from -1 to 1
+            const x = L > DZ * 30 ? (L / R) * COS(a) : 0;
+            const y = L > DZ * 30 ? (L / R) * SIN(a) : 0;
+
+            input.joy[j.side].x = x;
+            input.joy[j.side].y = y;
+
+            // Update handle's visual position
+            handle.style.transform = `translate(calc(-50% + ${x * R}px), calc(-50% + ${y * R}px))`;
+        }
+
+        function resetJoy(j, handle) {
+            input.joy[j.side].x = 0;
+            input.joy[j.side].y = 0;
+            handle.style.transform = 'translate(-50%, -50%)';
+            j.id = null;
+        }
+    }
+    initJoysticks();
     // -- /MODULE:Input-Joystick --
     // -- MODULE: Input-Ray --
+    // --- Raycasting and Picking ---
+    // Checks if a world-space ray intersects with a button on the HUD
+    // -- SOLUTION: Input-Ray-Screen --
+    // Creates a world-space ray from screen coordinates (for desktop mouse picking)
+    function rayFromScreen(px, py) {
+        const r = canvas.getBoundingClientRect();
+        const x = ((px - r.left) / r.width) * 2 - 1;
+        const y = 1 - ((py - r.top) / r.height) * 2;
+        const near = [x, y, -1, 1], far = [x, y, 1, 1];
+
+        // Unproject near and far points from clip space to world space
+        const n4 = mul4(invPV, near),
+              f4 = mul4(invPV, far);
+        const n = [n4[0] / n4[3], n4[1] / n4[3], n4[2] / n4[3]];
+        const f = [f4[0] / f4[3], f4[1] / f4[3], f4[2] / f4[3]];
+        
+        // Create a normalized direction vector.
+        const d = [f[0] - n[0], f[1] - n[1], f[2] - n[2]];
+        const il = 1 / HYPOT(d[0], d[1], d[2]);
+        return { o: n, d: [d[0] * il, d[1] * il, d[2] * il] };
+    }
+    // Handles a click/tap interaction in desktop mode
+    function interactDesktopAt(px, py) {
+        const ui = currentUI();
+        const r = rayFromScreen(px, py);
+        if (!r) return;
+        const WH = HUD_WH_world;
+        const h = HUD_pick(WH, r, ui);
+
+        if (h && h.button) {
+            h.button.onClick(); // A button was clicked
+            return;
+        }
+
+        // If no button was clicked, check for a hit on the ground
+        const g = rayHitGround(r);
+        if (g) {
+            lastHit = g;
+            log('ground ' + g.map(v => v.toFixed(2)).join(','));
+        }
+    }
+
+    // Calculates the intersection point of a ray with the ground plane (Y=0)
+    function rayHitGround(ray) {
+        if (!ray || ray.d[1] >= 0) return null; // Ray is parallel to or going away from the ground
+        const t = (0 - ray.o[1]) / ray.d[1];
+        if (t > 0) {
+            return [ray.o[0] + ray.d[0] * t, 0.001, ray.o[2] + ray.d[2] * t];
+        }
+        return null;
+    }
+
     // -- /MODULE: Input-Ray --
     // -- /FEATURE: Input --
 
@@ -196,13 +333,17 @@
         // -- /SOLUTION: Gameplay-Movement-Keyboard --
     
         // -- SOLUTION: Gameplay-Movement-Joystick --
+        // Virtual joystick input
+        const jx = input.joy.left.x;
+        const jy = -input.joy.left.y;
+        const jt = -input.joy.right.x;
         // -- /SOLUTION: Gameplay-Movement-Joystick --
 
         // -- SOLUTION: Gameplay-Movement-VR --
         // -- /SOLUTION: Gameplay-Movement-VR --
 
         // Return combined movement, prioritizing VR, then keyboard, then joystick
-        return { x: vx || kx, y: vy || ky, t: vt || kt};
+        return { x: vx || kx || jx, y: vy || ky || jy, t: vt || kt || jt };
     }
 
     // -- SOLUTION: Gameplay-Movement-Step --
@@ -380,7 +521,20 @@
     }
     // -- /SOLUTION: Scene-Audio-Wind --
     // -- SOLUTION: Scene-Audio-Click --
-    function playClickSound(){}
+    function playClickSound(){
+      if(!audioCtx) return;
+      const t = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(300, t);
+      gain.gain.setValueAtTime(0.3, t);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.1);
+      osc.start(t);
+      osc.stop(t + 0.1);
+    }
     // -- /SOLUTION: Scene-Audio-Click --
     // -- SOLUTION: Scene-Audio-Step --
     function playStepSound(){
@@ -402,6 +556,232 @@
     // -- /MODULE: Scene-Audio --
 
     // -- MODULE: Scene-HUD --
+    // --- Log and HUD UI State ---
+    const LOG = [];
+    const LOG_MAX = 200;
+    let logScroll = 0;
+    let logVisible = true;
+    let hudVisible = true;
+
+    // State for HUD interaction.
+    let HUD_WH_world = M4(); // World matrix of the HUD quad
+    let hoverBtn = null; // The button currently being hovered over
+
+    function log(s) { LOG.push(s); if (LOG.length > LOG_MAX) LOG.shift(); }
+    function logClear() { LOG.length = 0; log('log cleared'); }
+
+    // UI button definitions. Each object defines a button's ID, position (in UV space), label, and click handler
+    let uiEnterLabel = 'Enter VR';
+    const UI_MAIN = [
+        { id: 'reset', u0: 0.4, v0: 0.1, u1: 0.7, v1: 0.2, label: 'Reset', onClick: () => { playClickSound(); user.x = 0; user.z = 2; user.yaw = 0; user.pitch = 0; log('reset position'); } },
+        { id: 'vr', u0: 0.4, v0: 0.3, u1: 0.7, v1: 0.4, label: () => uiEnterLabel, onClick: () => { playClickSound(); toggleXRFromUI(); } },
+        { id: 'logtog', u0: 0.85, v0: 0.5, u1: 0.98, v1: 0.6 , label: 'LOG', onClick: () => { playClickSound(); logVisible = !logVisible; } },
+        { id: 'logdn', u0: 0.85, v0: 0.8, u1: 0.98, v1: 0.9, label: 'Down', onClick: () => { playClickSound(); logScroll = MAX(0, logScroll - 1); } },
+        { id: 'logup', u0: 0.85, v0: 0.7, u1: 0.98, v1: 0.8, label: 'Up', onClick: () => { playClickSound(); logScroll = MIN(MAX(0, LOG.length - 1), logScroll + 1); } },
+        { id: 'hudx', u0: 0.8, v0: 0.03, u1: 0.98, v1: 0.1, label: 'Close', onClick: () => { playClickSound(); hudVisible = false; } }
+    ];
+    const UI_TAB = [
+        { id: 'hudopen', u0: 0.4, v0: 0, u1: 0.6, v1: 0.12, label: 'HUD', onClick: () => { playClickSound(); hudVisible = true; } }
+    ];
+
+    // Returns the currently active set of UI buttons
+    function currentUI() { return hudVisible ? UI_MAIN : UI_TAB; }
+
+    // Returns the correct local transform for the HUD based on its visibility state
+    function getHudTransform() {
+        if (hudVisible) { // Centered panel
+            return new DOMMatrix([1,0,0,0, 0,1,0,0, 0,0,1,0, 0, -0.05, -1.15, 1]).toFloat32Array();
+        }
+        // Top tab.
+        return new DOMMatrix([1,0,0,0, 0,1,0,0, 0,0,1,0, 0, 0.5, -1.15, 1]).toFloat32Array();
+    }
+
+    // --- HUD Interaction Needs Input-ray ---
+    function HUD_pick(WH, ray, uiSet) {
+        const ui = uiSet || currentUI();
+        const inv = INV(WH);
+        const o = mulPoint(inv, ray.o); // Transform ray to HUD's local space
+        const d = mulDir(inv, ray.d);
+        const t = -o[2] / d[2]; // Intersect with the Z=0 plane
+        if (t <= 0) return null;
+
+        const x = o[0] + d[0] * t;
+        const y = o[1] + d[1] * t;
+
+        // Check if the hit is within the quad's bounds
+        if (x < -0.26 || x > 0.26 || y < -0.15 || y > 0.15) return null;
+        
+        // Convert local coordinates to UV coordinates
+        const u = (x + 0.26) / (0.26 * 2);
+        const v = (0.15 - y) / (0.15 * 2);
+
+        // Check against each button's UV bounds
+        for (const b of ui) {
+            if (u >= b.u0 && u <= b.u1 && v >= b.v0 && v <= b.v1) {
+                return { id: b.id, u, v, button: b, t };
+            }
+        }
+        return { id: null, u, v, button: null, t }; // Hit the panel but not a button
+    }
+
+    // --- HUD Drawing ---
+    // Draws the entire HUD onto the 2D canvas
+    function drawHUDCanvas(mode, hit, uiSet, dt) {
+        const ui = uiSet || currentUI();
+        hudCtx.clearRect(0, 0, hudCan.width, hudCan.height);
+
+        if (!hudVisible) {
+            // Draw the small "HUD" tab at the top of the screen
+            const b = ui[0];
+            const x = b.u0 * hudCan.width,
+                  y = b.v0 * hudCan.height,
+                  w = (b.u1 - b.u0) * hudCan.width,
+                  h = (b.v1 - b.v0) * hudCan.height;
+            const hov = hoverBtn && hoverBtn.id === 'hudopen';
+            hudCtx.fillStyle = hov ? 'rgba(160,200,255,.28)' : 'rgba(120,160,255,.18)';
+            hudCtx.strokeStyle = hov ? 'rgba(190,220,255,.95)' : 'rgba(160,200,255,.55)';
+            hudCtx.lineWidth = 2;
+            hudCtx.beginPath();
+            hudCtx.roundRect(x, y, w, h, 10);
+            hudCtx.fill();
+            hudCtx.stroke();
+            hudCtx.fillStyle = hov ? '#fff' : '#eef';
+            hudCtx.font = '16px system-ui';
+            hudCtx.textAlign = 'center';
+            hudCtx.textBaseline = 'middle';
+            hudCtx.fillText('HUD', x + w / 2, y + h / 2);
+            hudCtx.textAlign = 'left';
+            hudCtx.textBaseline = 'alphabetic';
+        } else {
+            // Draw the full HUD panel
+            hudCtx.fillStyle = 'rgba(20,30,40,.90)';
+            hudCtx.strokeStyle = 'rgba(255,255,255,.12)';
+            hudCtx.lineWidth = 2;
+            hudCtx.beginPath();
+            hudCtx.roundRect(6, 6, hudCan.width - 12, hudCan.height - 12, 16);
+            hudCtx.fill();
+            hudCtx.stroke();
+
+            // Header text
+            hudCtx.fillStyle = '#9cf';
+            hudCtx.font = '24px system-ui';
+            hudCtx.fillText('HUD', 20, 34);
+            hudCtx.fillStyle = '#fff';
+            hudCtx.font = '16px system-ui';
+            hudCtx.fillText(`Mode: ${mode}${isMobile ? ' (Touch)' : ''}`, 20, 60);
+            hudCtx.fillText(`FPS: ${Math.round(1/dt)}`, 20, 80);
+            hudCtx.fillText(`MS: ${dt.toFixed(3)}`, 100, 80);
+            hudCtx.fillText(`Pos: (${user.x.toFixed(1)}, ${user.z.toFixed(1)})`, 100, 100);
+            hudCtx.fillText(`Yaw: ${(user.yaw * 180 / PI | 0)}°`, 20, 100);
+            if (hit) { hudCtx.fillStyle = '#afa';
+            hudCtx.fillText(`Hit @ ground: (${hit[0].toFixed(2)}, ${hit[2].toFixed(2)})`, 20, 120); }
+
+            // Log box
+            if (logVisible) {
+                const x = 18,
+                      y = 150,
+                      w = hudCan.width - 120,
+                      h = hudCan.height - 160;
+                hudCtx.fillStyle = 'rgba(0,0,0,.35)';
+                hudCtx.strokeStyle = 'rgba(255,255,255,.1)';
+                hudCtx.beginPath();
+                hudCtx.roundRect(x, y, w, h, 10);
+                hudCtx.fill();
+                hudCtx.stroke();
+                hudCtx.save();
+                hudCtx.beginPath();
+                hudCtx.rect(x + 8, y + 8, w - 16, h - 16);
+                hudCtx.clip();
+                hudCtx.fillStyle = '#eee';
+                hudCtx.font = '14px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+                const lines = LOG.slice(MAX(0, LOG.length - 8 - logScroll), LOG.length - logScroll);
+                for (let i = 0; i < lines.length; i++)
+                    hudCtx.fillText(lines[i], x + 12, y + 24 + i * 16);
+                hudCtx.restore();
+            }
+
+            // Buttons
+            for (const b of UI_MAIN) {
+                const lab = (typeof b.label === 'function') ? b.label() : b.label;
+                const x = b.u0 * hudCan.width,
+                      y = b.v0 * hudCan.height,
+                      w = (b.u1 - b.u0) * hudCan.width,
+                      h = (b.v1 - b.v0) * hudCan.height;
+                const hov = hoverBtn && hoverBtn.id === b.id;
+                hudCtx.fillStyle = hov ? 'rgba(150,190,255,.25)' : 'rgba(120,160,255,.12)';
+                hudCtx.strokeStyle = hov ? 'rgba(190,220,255,.9)' : 'rgba(160,200,255,.4)';
+                hudCtx.lineWidth = 2;
+                hudCtx.beginPath();
+                hudCtx.roundRect(x, y, w, h, 8);
+                hudCtx.fill(); hudCtx.stroke();
+                hudCtx.fillStyle = hov ? '#fff' : '#eef';
+                hudCtx.font = '16px system-ui';
+                hudCtx.fillText(lab, x + 10, y + h * 0.65);
+            }
+        }
+
+        // Upload the canvas content to the WebGL texture
+        gl.bindTexture(gl.TEXTURE_2D, hudTex);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, hudCan);
+    }
+
+    
+    // --- HUD Shader ---
+    // The HUD is a 2D canvas drawn in the DOM, then uploaded to a WebGL texture to be displayed on a 3D quad
+
+    let hudTex = gl.createTexture();
+    let hudCan = document.createElement('canvas');
+    let hudCtx = hudCan.getContext('2d');
+    hudCan.width = 640;
+    hudCan.height = 320;
+
+    gl.bindTexture(gl.TEXTURE_2D, hudTex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+    // Simple textured quad shader for the HUD
+    const vsH = `#version 300 es
+    precision highp float;
+    layout(location=0) in vec3 p;
+    layout(location=1) in vec2 uv;
+    uniform mat4 M, V, P;
+    out vec2 U;
+    void main(){
+        U = uv;
+        gl_Position = P * V * M * vec4(p, 1.0);
+    }`;
+    const fsH = `#version 300 es
+    precision highp float;
+    #define UNIFORM uniform
+    in vec2 U;
+    UNIFORM sampler2D T;
+    out vec4 o;
+    void main(){
+        vec4 c = texture(T, U);
+        if(c.a < 0.01) discard; // Discard fully transparent pixels.
+        o = c;
+    }`;
+    const PH = prog(vsH, fsH);
+    const uMH = gl.getUniformLocation(PH, 'M'),
+          uVH = gl.getUniformLocation(PH, 'V'),
+          uPH = gl.getUniformLocation(PH, 'P'),
+          uT = gl.getUniformLocation(PH, 'T');
+
+    const vboH = gl.createBuffer(), vaoH = gl.createVertexArray();
+    gl.bindVertexArray(vaoH);
+    gl.bindBuffer(gl.ARRAY_BUFFER, vboH);
+    // Vertex data for the HUD quad (position and UV coordinates).
+    gl.bufferData(gl.ARRAY_BUFFER, new F32([-0.26,0.15,0, 0,1,  0.26,0.15,0, 1,1,  0.26,-0.15,0, 1,0,  -0.26,0.15,0, 0,1,  0.26,-0.15,0, 1,0,  -0.26,-0.15,0, 0,0]), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0); 
+    gl.vertexAttribPointer(0, 3, 
+    gl.FLOAT, false, 20, 0);
+    gl.enableVertexAttribArray(1); 
+    gl.vertexAttribPointer(1, 2, 
+    gl.FLOAT, false, 20, 12);
+
     // -- /MODULE: Scene-HUD --
     // -- MODULE: Scene-Sky --
     // --- Sky Shader ---
@@ -744,12 +1124,44 @@
         // Render Reticle if there's a ground hit
         
         // Render HUD
-        
+        const T = getHudTransform();
+        const W = INV(V); // Get world-from-view matrix
+        const WH = new DOMMatrix(W).multiply(new DOMMatrix(T)).toFloat32Array(); // Combine to get HUD's world matri
+        HUD_WH_world = WH;
+        hoverBtn = null;
+
+        // Check for hover state if not in mouse-look mode
+        if (input.look.id === null) {
+            const r = rayFromScreen(input.pointer.x, input.pointer.y);
+            const h = HUD_pick(WH, r, currentUI());
+            if (h && h.button) hoverBtn = h.button;
+        }
+
+        updHUD('Desktop', lastHit, currentUI(), dt); // Redraw and upload HUD texture
+
+        gl.useProgram(PH);
+        gl.bindVertexArray(vaoH);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, hudTex);
+        gl.uniform1i(uT, 0);
+        gl.uniformMatrix4fv(uMH, false, WH);
+        gl.uniformMatrix4fv(uVH, false, V);
+        gl.uniformMatrix4fv(uPH, false, P);
+        gl.disable(gl.DEPTH_TEST);
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        gl.disable(gl.BLEND);
+        gl.enable(gl.DEPTH_TEST);
+
         requestAnimationFrame(loop);
     }
 
     // Helper to update the HUD canvas content
-    
+    function updHUD(mode, hit, uiSet, dt) {
+        drawHUDCanvas(mode, hit, uiSet, dt);
+    }
+
     // Helper to submit a grass draw call
 
     // Computes the view and projection matrices for desktop mode
@@ -775,6 +1187,9 @@
     (function main() {
         initXR();
         requestAnimationFrame(loop);
+        log(`App initialized ${isMobile ? '(Mobile)' : '(Desktop)'} — JustGibas VR 13K Game 2025`);
+        log('Use the top "HUD" button (or H key) to open/close HUD');
+        log('Use (WASD) to move and (Q & E) to rotate');
     })();
     
     // -- /FEATURE: CORE --
