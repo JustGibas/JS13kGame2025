@@ -63,7 +63,7 @@
     // -- FEATURE: Core --
     // Expose Math functions to global scope
     Object.getOwnPropertyNames(Math).forEach(n => window[n.toUpperCase()] = Math[n]);
-    // -- Math Library --
+    // --- Math Library ---
     const D2R = 0.0174532925 // or Math.PI / 180;
     const F32 = Float32Array;
     const M4 = (v) => new F32(v || [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]);
@@ -397,6 +397,7 @@
     // -- /FEATURE: Input --
 
     // -- FEATURE: Gameplay --
+    let beastMode = false; // toggle beast mode
     // -- MODULE: Gameplay-Movement --
     // --- Movement Logic ---
     // Movement and input constants
@@ -406,18 +407,22 @@
 
     // Consolidates input from keyboard, joysticks, and VR controllers into a single movement vector
     function getMove(session) {
+        let vx = 0, vy = 0, vt = 0;
+        // -- SOLUTION: Gameplay-Movement-Keyboard --
         // Keyboard input (WASD for move, QE for turn)
         const kx = (+!!input.keys.d) - (+!!input.keys.a);
         const ky = (+!!input.keys.w) - (+!!input.keys.s);
         const kt = (+!!input.keys.q) - (+!!input.keys.e);
-
+        // -- /SOLUTION: Gameplay-Movement-Keyboard --
+    
+        // -- SOLUTION: Gameplay-Movement-Joystick --
         // Virtual joystick input
         const jx = input.joy.left.x;
         const jy = -input.joy.left.y;
         const jt = -input.joy.right.x;
+        // -- /SOLUTION: Gameplay-Movement-Joystick --
 
-        let vx = 0, vy = 0, vt = 0;
-
+        // -- SOLUTION: Gameplay-Movement-VR --
         // VR gamepad input
         if (session) {
             for (const src of session.inputSources) {
@@ -426,41 +431,42 @@
                 const dz = v => ABS(v) > DZ ? v : 0; // Apply deadzone
                 const x = dz(a[2]);
                 const y = dz(a[3]);
-
+                
                 if (src.handedness === 'left') { vx = x; vy = -y; }
                 else if (src.handedness === 'right') { vt = -x; }
                 else if (!vx && !vy) { vx = x; vy = -y; } // Fallback for undefined handedness
             }
         }
+        // -- /SOLUTION: Gameplay-Movement-VR --
 
         // Return combined movement, prioritizing VR, then keyboard, then joystick
         return { x: vx || kx || jx, y: vy || ky || jy, t: vt || kt || jt };
     }
 
+    // -- SOLUTION: Gameplay-Movement-Step --
     // Updates the user's position and orientation based on movement input and delta time
     function step(dt, mv) {
-        // NEW: Play step sound
         const now = performance.now();
         const moveMagnitude = Math.hypot(mv.x, mv.y);
         if(moveMagnitude > 0.1 && now - lastStepTime > stepInterval){
-          playStepSound();
-          lastStepTime = now;
+            playStepSound();
+            lastStepTime = now;
         }
         user.yaw += mv.t * TURNS * dt; // Apply turning
-
+        
         // Calculate forward and right vectors based on current yaw
         const cy = COS(user.yaw);
         const sy = SIN(user.yaw);
         T_V3_A[0] = -sy; T_V3_A[1] = 0; T_V3_A[2] = -cy; // 'f' vector
         T_V3_B[0] = cy;  T_V3_B[1] = 0; T_V3_B[2] = -sy;  // 'r' vector
         const sp = MOVES * dt;
-
+        
         // Apply movement along forward and right vectors
         user.x += (T_V3_B[0] * mv.x + T_V3_A[0] * mv.y) * sp;
         user.z += (T_V3_B[2] * mv.x + T_V3_A[2] * mv.y) * sp;
     }
+    // -- /SOLUTION: Gameplay-Movement-Step --
     // -- /MODULE: Gameplay-Movement --
-    beastMode = false; // toggle beast mode
     // -- /FEATURE: Gameplay --
     
     // -- FEATURE: Scene --
@@ -474,33 +480,33 @@
       if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       if (!window.windPlaying) { window.windPlaying = true; playWindSound(); }
     }
-
+    // -- SOLUTION: Scene-Audio-Wind --
     function playWindSound(){
-      if(!audioCtx) return;
-      // if already created, do nothing
-      if (audioCtx.windGain) return;
-
-      const t = audioCtx.currentTime;
-      const bufferSize = audioCtx.sampleRate * 3; // 3 seconds of audio
-      const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-      const data = buffer.getChannelData(0);
-      
-      // Generate brown noise (filtered white noise for wind-like sound)
-      let lastOut = 0;
-      for (let i = 0; i < bufferSize; i++) {
-        const white = Math.random() * 2 - 1;
-        const brown = (lastOut + (0.01 * white)) / 1.03;
-        data[i] = brown; //  *3 Amplify
-        lastOut = brown;
-      }
-      
-      const source = audioCtx.createBufferSource();
-      const filter = audioCtx.createBiquadFilter();
-      const gain = audioCtx.createGain();
-      
-      source.buffer = buffer;
-      source.loop = true;
-      
+        if(!audioCtx) return;
+        // if already created, do nothing
+        if (audioCtx.windGain) return;
+        
+        const t = audioCtx.currentTime;
+        const bufferSize = audioCtx.sampleRate * 3; // 3 seconds of audio
+        const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+        
+        // Generate brown noise (filtered white noise for wind-like sound)
+        let lastOut = 0;
+        for (let i = 0; i < bufferSize; i++) {
+            const white = Math.random() * 2 - 1;
+            const brown = (lastOut + (0.01 * white)) / 1.03;
+            data[i] = brown; //  *3 Amplify
+            lastOut = brown;
+        }
+        
+        const source = audioCtx.createBufferSource();
+        const filter = audioCtx.createBiquadFilter();
+        const gain = audioCtx.createGain();
+        
+        source.buffer = buffer;
+        source.loop = true;
+        
       // Low-pass filter for wind character
       filter.type = 'lowpass';
       filter.frequency.setValueAtTime(200, t);
@@ -559,7 +565,8 @@
 
             source.start();
     }
-
+    // -- /SOLUTION: Scene-Audio-Wind --
+    // -- SOLUTION: Scene-Audio-Click --
     function playClickSound(){
       if(!audioCtx) return;
       const t = audioCtx.currentTime;
@@ -574,6 +581,8 @@
       osc.start(t);
       osc.stop(t + 0.1);
     }
+    // -- /SOLUTION: Scene-Audio-Click --
+    // -- SOLUTION: Scene-Audio-Step --
 
     function playStepSound(){
       if(!audioCtx) return;
@@ -590,6 +599,7 @@
       osc.start(t);
       osc.stop(t + 0.35);
     }
+    // -- /SOLUTION: Scene-Audio-Step --
     // -- /MODULE: Scene-Audio --
 
     // -- MODULE: Scene-HUD --
