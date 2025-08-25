@@ -497,21 +497,7 @@
             gl.disable(gl.BLEND);
         }
         // Render Reticle if there's a ground hit
-        if (lastHit) {
-            const T = translateScale(lastHit[0], 0.001, lastHit[2], 0.15, 1, 0.15);
-            gl.useProgram(PR);
-            gl.bindVertexArray(vaoR);
-            gl.uniformMatrix4fv(uMR, false, T);
-            gl.uniformMatrix4fv(uVR, false, V);
-            gl.uniformMatrix4fv(uPR, false, P);
-            gl.enable(gl.BLEND);
-            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-            gl.disable(gl.DEPTH_TEST);
-            gl.drawArrays(gl.TRIANGLES, 0, 6);
-            gl.enable(gl.DEPTH_TEST);
-            gl.disable(gl.BLEND);
-        }
-
+        
         // Render HUD
         const T = getHudTransform();
         const W = INV(V); // Get world-from-view matrix
