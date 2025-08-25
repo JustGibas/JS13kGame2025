@@ -454,7 +454,7 @@
     function playWindSound(){
         if(!audioCtx) return;
         // if already created, do nothing
-        //if (audioCtx.windGain) return;
+        if (audioCtx.gain) return;
         
         const t = audioCtx.currentTime;
         const bufferSize = audioCtx.sampleRate * 3; // 3 seconds of audio
