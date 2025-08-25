@@ -302,48 +302,6 @@
         }
     }
 
-    // Creates a world-space ray from the camera or a VR controller
-    function rayFrom(mode, frame, src) {
-        if (mode === 'VR' && frame) {
-            // Use the controller's target ray space if available
-            if (src && src.targetRaySpace) {
-                const pose = frame.getPose(src.targetRaySpace, off || ref || null);
-                if (pose) {
-                    const m = pose.transform.matrix;
-                    const o = [m[12], m[13], m[14]];
-                    const d = [-m[8], -m[9], -m[10]]; // -Z is forward in WebXR.
-                    return { o, d };
-                }
-            }
-            // Fallback to any available controller
-            for (const s of xr.inputSources) {
-                if (s.targetRaySpace) {
-                    const pose = frame.getPose(s.targetRaySpace, off || ref || null);
-                    if (pose) {
-                        const m = pose.transform.matrix;
-                        const o = [m[12], m[13], m[14]];
-                        const d = [-m[8], -m[9], -m[10]];
-                        return { o, d };
-                    }
-                }
-            }
-            // Fallback to gaze/head pose
-            const pose = frame.getViewerPose(off || ref || null);
-            if (pose) {
-                const m = pose.views[0].transform.matrix;
-                return { o: [m[12], m[13], m[14]], d: [-m[8], -m[9], -m[10]] };
-            }
-        } else { // Desktop mode
-            const cy = COS(user.yaw), sy = SIN(user.yaw);
-            const cp = COS(user.pitch), sp = SIN(user.pitch);
-            const d = [-sy * cp, -sp, -cy * cp];
-            const o = [user.x, user.y, user.z];
-            return { o, d };
-        }
-        return null;
-    }
-    
-
     // Calculates the intersection point of a ray with the ground plane (Y=0)
     function rayHitGround(ray) {
         if (!ray || ray.d[1] >= 0) return null; // Ray is parallel to or going away from the ground
@@ -354,15 +312,6 @@
         return null;
     }
 
-    // Helper to get a ray from a VR controller
-    function controllerRay(frame, src) {
-        const pose = src.targetRaySpace ? frame.getPose(src.targetRaySpace, off || ref || null) : null;
-        if (pose) {
-            const m = pose.transform.matrix;
-            return { o: [m[12], m[13], m[14]], d: [-m[8], -m[9], -m[10]] };
-        }
-        return { o: [0, 0, 0], d: [0, 0, -1] }; // Fallback, ray from Head
-    }
     // -- /MODULE: Input-Ray --
     // -- /FEATURE: Input --
 
