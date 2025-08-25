@@ -392,7 +392,7 @@
     // todo: implement stereo sources to get spatial audio (directional wind sound)
     let audioCtx = null;
     let lastStepTime = 0;
-    const stepInterval = 400; // ms between walking sounds
+    const stepInterval = 500; // ms between walking sounds
     
     function initAudio(){
       if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -595,12 +595,12 @@
       osc.connect(gain);
       gain.connect(audioCtx.destination);
       osc.type = 'triangle';
-      osc.frequency.setValueAtTime(100, t);
-      osc.frequency.exponentialRampToValueAtTime(60, t + 0.15);
-      gain.gain.setValueAtTime(0.4, t);
-      gain.gain.exponentialRampToValueAtTime(0.1, t + 0.15);
+      osc.frequency.setValueAtTime(60, t);
+      osc.frequency.exponentialRampToValueAtTime(160, t + 0.2);
+      gain.gain.setValueAtTime(0.3, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
       osc.start(t);
-      osc.stop(t + 0.15);
+      osc.stop(t + 0.3);
     }
     // -- /SOLUTION: Scene-Audio-Step --
     // -- /MODULE: Scene-Audio --
