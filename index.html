@@ -596,11 +596,11 @@
       gain.connect(audioCtx.destination);
       osc.type = 'triangle';
       osc.frequency.setValueAtTime(100, t);
-      osc.frequency.exponentialRampToValueAtTime(60, t + 0.6);
+      osc.frequency.exponentialRampToValueAtTime(60, t + 0.15);
       gain.gain.setValueAtTime(0.4, t);
-      gain.gain.exponentialRampToValueAtTime(0.1, t + 0.45);
+      gain.gain.exponentialRampToValueAtTime(0.1, t + 0.15);
       osc.start(t);
-      osc.stop(t + 0.35);
+      osc.stop(t + 0.15);
     }
     // -- /SOLUTION: Scene-Audio-Step --
     // -- /MODULE: Scene-Audio --
