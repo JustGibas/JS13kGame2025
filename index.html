@@ -130,7 +130,7 @@
         return p;
     }
     // -- /FEATURE: Core --
-    
+
     // -- FEATURE: Input --
     // -- MODULE: Input-Core --
     // --- Unified Input Handling ---
@@ -149,9 +149,10 @@
 
     // State for the raycast
     let lastHit = null;
+    //ray = null; // delete
     // -- /MODULE: Input-Core --
     
-    // -- MODULE: Input-KeyPoint --
+    // -- MODULE: Input-KeyPointer --
     // Keyboard event listeners for movement and HUD toggle
     document.addEventListener('keydown', e => {
         const k = e.key.toLowerCase();
@@ -208,7 +209,7 @@
             input.look.id = null;
         }
     });
-    // -- /MODULE: Input-KeyPoint --
+    // -- /MODULE: Input-KeyPointer --
     
     // -- MODULE: Input-Joystick --
     // --- Virtual Joysticks for Touch Devices ---
