@@ -447,16 +447,17 @@
     
     function initAudio(){
       if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      
+      if (!window.windPlaying) { window.windPlaying = true; playWindSound(); }
+
     }
     // -- SOLUTION: Scene-Audio-Wind --
-    
+    function playWindSound(){}
     // -- /SOLUTION: Scene-Audio-Wind --
     // -- SOLUTION: Scene-Audio-Click --
-    
+    function playClickSound(){}
     // -- /SOLUTION: Scene-Audio-Click --
     // -- SOLUTION: Scene-Audio-Step --
-
+    function playStepSound(){}
     // -- /SOLUTION: Scene-Audio-Step --
     // -- /MODULE: Scene-Audio --
 
