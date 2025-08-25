@@ -143,6 +143,7 @@
         look: { id: null, x: 0, y: 0 },
         pointer: { x: 0, y: 0 }
     };
+    const DZ = 0.1;    // Deadzone for joystick/gamepad axes to prevent drift
     // A map to track the previous pressed state of VR controller buttons for edge detection (press/release)
     const pressedMap = new Map();
 
