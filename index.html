@@ -211,7 +211,6 @@
     });
     // -- /MODULE: Input-KeyPoint --
     
-    
     // -- MODULE: Input-Joystick --
     // --- Virtual Joysticks for Touch Devices ---
     function initJoysticks() {
@@ -397,7 +396,10 @@
     // --- Log and HUD UI State ---
     const LOG = [];
     const LOG_MAX = 200;
-    
+    let logScroll = 0;
+    let logVisible = true;
+    let hudVisible = true;
+
     // State for HUD interaction.
     let HUD_WH_world = M4(); // World matrix of the HUD quad
     let hoverBtn = null; // The button currently being hovered over
