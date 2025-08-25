@@ -1284,11 +1284,10 @@
     gl.enableVertexAttribArray(1);
     gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 20, 12);
 
-    // -- /MODULE: Scene-Plant --
-
+    // -- /MODULE: Scene-Plant --    
     
+    // -- MODULE: Scene-Reticle --
     // --- Reticle Shader ---
-
     // A small disc drawn on the ground where the user is looking
     const vsR = `#version 300 es
     precision highp float;
@@ -1317,7 +1316,7 @@
     gl.bufferData(gl.ARRAY_BUFFER, new F32([-1,-1, 1,-1, 1,1, -1,-1, 1,1, -1,1]), gl.STATIC_DRAW);
     gl.enableVertexAttribArray(0);
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-
+    // -- MODULE: Scene-Reticle --
 
     // -- MODULE: Scene-VR --
     // --- Controller Indicator Shaders ---
@@ -1371,10 +1370,6 @@
     // -- /MODULE: Scene-VR --
     // -- /FEATURE: Scene --
 
-    
-   
-    
-    
     // -- CORE: render --
     // --- Main Render Loop (Desktop) ---
 
