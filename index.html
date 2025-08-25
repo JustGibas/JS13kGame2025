@@ -499,17 +499,6 @@
         // Render Reticle if there's a ground hit
         
         // Render HUD
-        const T = getHudTransform();
-        const W = INV(V); // Get world-from-view matrix
-        const WH = new DOMMatrix(W).multiply(new DOMMatrix(T)).toFloat32Array(); // Combine to get HUD's world matri
-        HUD_WH_world = WH;
-        hoverBtn = null;
-
-        if (input.look.id === null) {
-            const r = rayFromScreen(input.pointer.x, input.pointer.y);
-            const h = HUD_pick(WH, r, currentUI());
-            if (h && h.button) hoverBtn = h.button;
-        }
         
         requestAnimationFrame(loop);
     }
