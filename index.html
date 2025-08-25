@@ -240,15 +240,128 @@
     const stepInterval = 500; // ms between walking sounds
     
     function initAudio(){
+      if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (!window.windPlaying) { window.windPlaying = true; playWindSound(); }
     }
     // -- SOLUTION: Scene-Audio-Wind --
-    function playWindSound(){}
+    function playWindSound(){
+        if(!audioCtx) return;
+        // if already created, do nothing. (broken)
+        //if (audioCtx.gain) return;
+        
+        const t = audioCtx.currentTime;
+        const bufferSize = audioCtx.sampleRate * 3; // 3 seconds of audio
+        const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+        
+        // Generate brown noise (filtered white noise for wind-like sound)
+        let lastOut = 0;
+        for (let i = 0; i < bufferSize; i++) {
+            const white = Math.random() * 2 - 1;
+            const brown = (lastOut + (0.01 * white)) / 1.03;
+            data[i] = brown; //  *3 Amplify
+            lastOut = brown;
+        }
+        
+        const source = audioCtx.createBufferSource();
+        const filter = audioCtx.createBiquadFilter();
+        const gain = audioCtx.createGain();
+        
+        source.buffer = buffer;
+        source.loop = true;
+        
+      // Low-pass filter for wind character
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(200, t);
+      filter.Q.setValueAtTime(1.1, t);
+      
+      source.connect(filter);
+      filter.connect(gain);
+      gain.connect(audioCtx.destination);
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.2, t + 4);
+      //gain.gain.exponentialRampToValueAtTime(0.001, t + 200.0);
+      source.start();
+
+      
+      // expose nodes so we can modulate them each frame to match grass gusts
+            audioCtx.windSource = source;
+            audioCtx.windGain = gain;
+            audioCtx.windFilter = filter;
+    }
+
+        // --- Wind gust math (mirror of grass shader) ---
+        // Compute gust/sway values using same vectors and time constants as the grass vertex shader
+        function computeGustAt(x, z, timeSec) {
+            // same direction vectors used in the grass vertex shader
+            const w1x = 0.07, w1y = 0.05;
+            const w2x = -0.03, w2y = 0.04;
+
+            const dot1 = x * w1x + z * w1y;
+            const dot2 = x * w2x + z * w2y;
+
+            const g = 0.6 * Math.sin(dot1 + timeSec * 0.7) + 0.4 * Math.sin(dot2 - timeSec * 1.2);
+            // small global phase term similar to per-blade phase in shader
+            const sway = 0.25 * g + 0.07 * Math.sin(timeSec * 1.7 + 0.0);
+            return { gust: g, sway: sway };
+        }
+
+        // Update audio parameters (gain and filter) to follow gusts
+        function updateWind(timeSec, camX, camZ) {
+            if (!audioCtx || !audioCtx.windGain || !audioCtx.windFilter) return;
+            const now = audioCtx.currentTime;
+            const s = computeGustAt(camX, camZ, timeSec);
+
+            // Map sway into a sensible gain range
+            const baseGain = 0.08; // quiet baseline
+            const gainScale = 0.6; // how strongly gust affects loudness
+            let targetGain = baseGain + gainScale * s.sway;
+            targetGain = Math.max(0.01, Math.min(1.0, targetGain));
+            audioCtx.windGain.gain.setTargetAtTime(targetGain, now, 0.25);
+
+            // Modulate lowpass frequency to make gusts brighter when stronger
+            const baseFreq = 200;
+            // normalize sway (~ -0.32..0.32) to 0..1
+            const norm = (s.sway + 0.32) / 0.64;
+            const freq = baseFreq + norm * 1200; // ~200..1400
+            audioCtx.windFilter.frequency.setTargetAtTime(freq, now, 0.25);
+
+            
+    }
     // -- /SOLUTION: Scene-Audio-Wind --
     // -- SOLUTION: Scene-Audio-Click --
-    function playClickSound(){}
+    function playClickSound(){
+      if(!audioCtx) return;
+      const t = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(300, t);
+      gain.gain.setValueAtTime(0.3, t);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.1);
+      osc.start(t);
+      osc.stop(t + 0.1);
+    }
     // -- /SOLUTION: Scene-Audio-Click --
     // -- SOLUTION: Scene-Audio-Step --
-    function playStepSound(){}
+
+    function playStepSound(){
+      if(!audioCtx) return;
+      const t = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(60, t);
+      osc.frequency.exponentialRampToValueAtTime(160, t + 0.2);
+      gain.gain.setValueAtTime(0.3, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+      osc.start(t);
+      osc.stop(t + 0.3);
+    }
     // -- /SOLUTION: Scene-Audio-Step --
     // -- /MODULE: Scene-Audio --
 
