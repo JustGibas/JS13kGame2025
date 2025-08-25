@@ -490,6 +490,8 @@
       //gain.gain.exponentialRampToValueAtTime(0.001, t + 200.0);
 
       
+      // expose nodes so we can modulate them each frame to match grass gusts
+            audioCtx.windSource = source;
             audioCtx.windGain = gain;
             audioCtx.windFilter = filter;
     }
