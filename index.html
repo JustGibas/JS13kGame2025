@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=yes" />
     <title>'Wild Cats' 13K Game 2025</title>
     <link rel="icon" type="image/svg+xml" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="55%" x="50%" dominant-baseline="middle" text-anchor="middle" font-size="80">🐈‍⬛</text></svg>'>
     <style>
@@ -146,6 +146,12 @@
     // A map to track the previous pressed state of VR controller buttons for edge detection (press/release)
     const pressedMap = new Map();
 
+    // State for the raycast
+    let lastHit = null;
+    //ray = null; // delete
+    // -- /MODULE: Input-Core --
+    
+    // -- MODULE: Input-KeyPointer --
     // Keyboard event listeners for movement and HUD toggle
     document.addEventListener('keydown', e => {
         const k = e.key.toLowerCase();
@@ -154,7 +160,7 @@
         if (k === 'f') {playClickSound(); beastMode = !beastMode;} // 'F' key toggles beastMode
     });
     document.addEventListener('keyup', e => input.keys[e.key.toLowerCase()] = false);
-
+    
     // Pointer event listeners on the canvas for mouse-look and interaction
     canvas.addEventListener('pointerdown', e => {
         initAudio(); // NEW: Initialize audio on first user interaction
@@ -169,12 +175,12 @@
         input.pointer.x = e.clientX;
         input.pointer.y = e.clientY;
     });
-
+    
     canvas.addEventListener('pointermove', e => {
         // Update pointer position for hover effects
         input.pointer.x = e.clientX;
         input.pointer.y = e.clientY;
-
+        
         // If we are in mouse-look mode, update camera orientation
         if (e.pointerId === input.look.id) {
             const dx = e.clientX - input.look.x;
@@ -185,7 +191,7 @@
             user.pitch = MAX(-PI / 2, MIN(PI / 2, user.pitch - dy * 0.002));
         }
     });
-
+    
     canvas.addEventListener('pointerup', e => {
         // Stop mouse-look mode.
         if (e.pointerId === input.look.id) {
@@ -196,13 +202,14 @@
         input.pointer.y = e.clientY;
         interactDesktopAt(e.clientX, e.clientY);
     });
-
+    
     canvas.addEventListener('pointercancel', e => {
         if (e.pointerId === input.look.id) {
             input.look.id = null;
         }
     });
-    // -- /MODULE: Input-Core --
+    // -- /MODULE: Input-KeyPointer --
+    
     
     // -- MODULE: Input-Joystick --
     // --- Virtual Joysticks for Touch Devices ---
@@ -254,33 +261,7 @@
     // -- MODULE: Input-Ray --
     // --- Raycasting and Picking ---
     // Checks if a world-space ray intersects with a button on the HUD
-    function HUD_pick(WH, ray, uiSet) {
-        const ui = uiSet || currentUI();
-        const inv = INV(WH);
-        const o = mulPoint(inv, ray.o); // Transform ray to HUD's local space
-        const d = mulDir(inv, ray.d);
-        const t = -o[2] / d[2]; // Intersect with the Z=0 plane
-        if (t <= 0) return null;
-
-        const x = o[0] + d[0] * t;
-        const y = o[1] + d[1] * t;
-
-        // Check if the hit is within the quad's bounds
-        if (x < -0.26 || x > 0.26 || y < -0.15 || y > 0.15) return null;
-        
-        // Convert local coordinates to UV coordinates
-        const u = (x + 0.26) / (0.26 * 2);
-        const v = (0.15 - y) / (0.15 * 2);
-
-        // Check against each button's UV bounds
-        for (const b of ui) {
-            if (u >= b.u0 && u <= b.u1 && v >= b.v0 && v <= b.v1) {
-                return { id: b.id, u, v, button: b, t };
-            }
-        }
-        return { id: null, u, v, button: null, t }; // Hit the panel but not a button
-    }
-
+    // -- SOLUTION: Input-Ray-Screen --
     // Creates a world-space ray from screen coordinates (for desktop mouse picking)
     function rayFromScreen(px, py) {
         const r = canvas.getBoundingClientRect();
@@ -298,6 +279,26 @@
         const d = [f[0] - n[0], f[1] - n[1], f[2] - n[2]];
         const il = 1 / HYPOT(d[0], d[1], d[2]);
         return { o: n, d: [d[0] * il, d[1] * il, d[2] * il] };
+    }
+    // Handles a click/tap interaction in desktop mode
+    function interactDesktopAt(px, py) {
+        const ui = currentUI();
+        const r = rayFromScreen(px, py);
+        if (!r) return;
+        const WH = HUD_WH_world;
+        const h = HUD_pick(WH, r, ui);
+
+        if (h && h.button) {
+            h.button.onClick(); // A button was clicked
+            return;
+        }
+
+        // If no button was clicked, check for a hit on the ground
+        const g = rayHitGround(r);
+        if (g) {
+            lastHit = g;
+            log('ground ' + g.map(v => v.toFixed(2)).join(','));
+        }
     }
 
     // Creates a world-space ray from the camera or a VR controller
@@ -340,6 +341,7 @@
         }
         return null;
     }
+    
 
     // Calculates the intersection point of a ray with the ground plane (Y=0)
     function rayHitGround(ray) {
@@ -349,39 +351,6 @@
             return [ray.o[0] + ray.d[0] * t, 0.001, ray.o[2] + ray.d[2] * t];
         }
         return null;
-    }
-
-    // State for the ground reticle
-    let lastHit = null;
-
-    // Handles a click/tap interaction in desktop mode
-    function interactDesktopAt(px, py) {
-        const ui = currentUI();
-        const r = rayFromScreen(px, py);
-        if (!r) return;
-        const WH = HUD_WH_world;
-        const h = HUD_pick(WH, r, ui);
-
-        if (h && h.button) {
-            h.button.onClick(); // A button was clicked
-            return;
-        }
-
-        // If no button was clicked, check for a hit on the ground
-        const g = rayHitGround(r);
-        if (g) {
-            lastHit = g;
-            log('ground ' + g.map(v => v.toFixed(2)).join(','));
-        }
-    }
-
-    // Returns the correct local transform for the HUD based on its visibility state
-    function getHudTransform() {
-        if (hudVisible) { // Centered panel
-            return new DOMMatrix([1,0,0,0, 0,1,0,0, 0,0,1,0, 0, -0.05, -1.15, 1]).toFloat32Array();
-        }
-        // Top tab.
-        return new DOMMatrix([1,0,0,0, 0,1,0,0, 0,0,1,0, 0, 0.5, -1.15, 1]).toFloat32Array();
     }
 
     // Helper to get a ray from a VR controller
@@ -610,6 +579,10 @@
     let logVisible = true;
     let hudVisible = true;
 
+    // State for HUD interaction.
+    let HUD_WH_world = M4(); // World matrix of the HUD quad
+    let hoverBtn = null; // The button currently being hovered over
+
     function log(s) { LOG.push(s); if (LOG.length > LOG_MAX) LOG.shift(); }
     function logClear() { LOG.length = 0; log('log cleared'); }
 
@@ -619,8 +592,8 @@
         { id: 'reset', u0: 0.4, v0: 0.1, u1: 0.7, v1: 0.2, label: 'Reset', onClick: () => { playClickSound(); user.x = 0; user.z = 2; user.yaw = 0; user.pitch = 0; log('reset position'); } },
         { id: 'vr', u0: 0.4, v0: 0.3, u1: 0.7, v1: 0.4, label: () => uiEnterLabel, onClick: () => { playClickSound(); toggleXRFromUI(); } },
         { id: 'logtog', u0: 0.85, v0: 0.5, u1: 0.98, v1: 0.6 , label: 'LOG', onClick: () => { playClickSound(); logVisible = !logVisible; } },
-        { id: 'logup', u0: 0.85, v0: 0.7, u1: 0.98, v1: 0.8, label: 'Up', onClick: () => { playClickSound(); logScroll = MAX(0, logScroll - 1); } },
-        { id: 'logdn', u0: 0.85, v0: 0.8, u1: 0.98, v1: 0.9, label: 'Down', onClick: () => { playClickSound(); logScroll = MIN(MAX(0, LOG.length - 1), logScroll + 1); } },
+        { id: 'logdn', u0: 0.85, v0: 0.8, u1: 0.98, v1: 0.9, label: 'Down', onClick: () => { playClickSound(); logScroll = MAX(0, logScroll - 1); } },
+        { id: 'logup', u0: 0.85, v0: 0.7, u1: 0.98, v1: 0.8, label: 'Up', onClick: () => { playClickSound(); logScroll = MIN(MAX(0, LOG.length - 1), logScroll + 1); } },
         { id: 'hudx', u0: 0.8, v0: 0.03, u1: 0.98, v1: 0.1, label: 'Close', onClick: () => { playClickSound(); hudVisible = false; } }
     ];
     const UI_TAB = [
@@ -630,12 +603,44 @@
     // Returns the currently active set of UI buttons
     function currentUI() { return hudVisible ? UI_MAIN : UI_TAB; }
 
-    // State for HUD interaction.
-    let HUD_WH_world = M4(); // World matrix of the HUD quad
-    let hoverBtn = null; // The button currently being hovered over
+    // Returns the correct local transform for the HUD based on its visibility state
+    function getHudTransform() {
+        if (hudVisible) { // Centered panel
+            return new DOMMatrix([1,0,0,0, 0,1,0,0, 0,0,1,0, 0, -0.05, -1.15, 1]).toFloat32Array();
+        }
+        // Top tab.
+        return new DOMMatrix([1,0,0,0, 0,1,0,0, 0,0,1,0, 0, 0.5, -1.15, 1]).toFloat32Array();
+    }
 
-    // --- HUD Drawing and Interaction ---
+    // --- HUD Interaction Needs Input-ray ---
+    function HUD_pick(WH, ray, uiSet) {
+        const ui = uiSet || currentUI();
+        const inv = INV(WH);
+        const o = mulPoint(inv, ray.o); // Transform ray to HUD's local space
+        const d = mulDir(inv, ray.d);
+        const t = -o[2] / d[2]; // Intersect with the Z=0 plane
+        if (t <= 0) return null;
 
+        const x = o[0] + d[0] * t;
+        const y = o[1] + d[1] * t;
+
+        // Check if the hit is within the quad's bounds
+        if (x < -0.26 || x > 0.26 || y < -0.15 || y > 0.15) return null;
+        
+        // Convert local coordinates to UV coordinates
+        const u = (x + 0.26) / (0.26 * 2);
+        const v = (0.15 - y) / (0.15 * 2);
+
+        // Check against each button's UV bounds
+        for (const b of ui) {
+            if (u >= b.u0 && u <= b.u1 && v >= b.v0 && v <= b.v1) {
+                return { id: b.id, u, v, button: b, t };
+            }
+        }
+        return { id: null, u, v, button: null, t }; // Hit the panel but not a button
+    }
+
+    // --- HUD Drawing ---
     // Draws the entire HUD onto the 2D canvas
     function drawHUDCanvas(mode, hit, uiSet, dt) {
         const ui = uiSet || currentUI();
@@ -776,15 +781,22 @@
         o = c;
     }`;
     const PH = prog(vsH, fsH);
-    const uMH = gl.getUniformLocation(PH, 'M'), uVH = gl.getUniformLocation(PH, 'V'), uPH = gl.getUniformLocation(PH, 'P'), uT = gl.getUniformLocation(PH, 'T');
+    const uMH = gl.getUniformLocation(PH, 'M'),
+          uVH = gl.getUniformLocation(PH, 'V'),
+          uPH = gl.getUniformLocation(PH, 'P'),
+          uT = gl.getUniformLocation(PH, 'T');
 
     const vboH = gl.createBuffer(), vaoH = gl.createVertexArray();
     gl.bindVertexArray(vaoH);
     gl.bindBuffer(gl.ARRAY_BUFFER, vboH);
     // Vertex data for the HUD quad (position and UV coordinates).
     gl.bufferData(gl.ARRAY_BUFFER, new F32([-0.26,0.15,0, 0,1,  0.26,0.15,0, 1,1,  0.26,-0.15,0, 1,0,  -0.26,0.15,0, 0,1,  0.26,-0.15,0, 1,0,  -0.26,-0.15,0, 0,0]), gl.STATIC_DRAW);
-    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 20, 0);
-    gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 20, 12);
+    gl.enableVertexAttribArray(0); 
+    gl.vertexAttribPointer(0, 3, 
+    gl.FLOAT, false, 20, 0);
+    gl.enableVertexAttribArray(1); 
+    gl.vertexAttribPointer(1, 2, 
+    gl.FLOAT, false, 20, 12);
 
     // -- /MODULE: Scene-HUD --
     // -- MODULE: Scene-Sky --
@@ -1267,8 +1279,10 @@
     gl.bindBuffer(gl.ARRAY_BUFFER, vboPlants);
     // Vertex data for a quad (position and UV coordinates).
     gl.bufferData(gl.ARRAY_BUFFER, new F32([-1,2,0, 0,1,  1,2,0, 1,1,  1,0,0, 1,0,  -1,2,0, 0,1,  1,0,0, 1,0,  -1,0,0, 0,0]), gl.STATIC_DRAW);
-    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 20, 0);
-    gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 20, 12);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 20, 0);
+    gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 20, 12);
 
     // -- /MODULE: Scene-Plant --
 
@@ -1554,6 +1568,7 @@
         }
         navigator.xr.isSessionSupported('immersive-vr').then(s => log(s ? 'VR supported' : 'VR not supported'));
     }
+    // if vr not avalable we split screen in to stereo view
 
     // Toggles an immersive VR session
     async function toggleXRFromUI() {
