@@ -14,40 +14,6 @@
             overflow: hidden;
             touch-action: none; /* Prevents default touch actions like scrolling */
         }
-
-        /* Styling for the virtual joysticks */
-        .joystick {
-            position: fixed;
-            width: 112px;
-            height: 112px;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.08);
-            border: 2px solid rgba(255, 255, 255, 0.25);
-            z-index: 10;
-            display: none; /* Hidden by default, shown for touch devices */
-        }
-
-        /* The movable part of the joystick */
-        .joystick-handle {
-            position: absolute;
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.9);
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            pointer-events: none; /* The handle itself doesn't capture clicks */
-        }
-
-        /* Positioning for left and right joysticks */
-        #leftJoy { bottom: 36px; left: 36px; }
-        #rightJoy { bottom: 36px; right: 36px; }
-
-        /* Media query to show joysticks only on touch-capable (coarse pointer) devices */
-        @media (pointer:coarse) {
-            .joystick { display: block; }
-        }
     </style>
 </head>
 <body>
@@ -56,9 +22,7 @@
     <canvas id="canvas"></canvas>
 
     <!-- HTML elements for the virtual joysticks -->
-    <div id="leftJoy" class="joystick"><div class="joystick-handle"></div></div>
-    <div id="rightJoy" class="joystick"><div class="joystick-handle"></div></div>
-
+    
     <script>
     // -- FEATURE: Core --
     // Expose Math functions to global scope
@@ -134,8 +98,6 @@
     // -- FEATURE: Input --
     // -- MODULE: Input-Core --
     // --- Unified Input Handling ---
-    // Check if the primary input is a coarse pointer (like a finger), indicating a mobile/touch device
-    const isMobile = matchMedia('(pointer:coarse)').matches;
     // Unified input state object for keyboard, joysticks, pointer-look, and pointer coordinates
     const input = {
         keys: {},
@@ -149,7 +111,6 @@
 
     // State for the raycast
     let lastHit = null;
-    //ray = null; // delete
     // -- /MODULE: Input-Core --
     
     // -- MODULE: Input-KeyPoint --
@@ -210,53 +171,8 @@
     });
     // -- /MODULE: Input-KeyPoint --
     
-    
     // -- MODULE: Input-Joystick --
     // --- Virtual Joysticks for Touch Devices ---
-    function initJoysticks() {
-        const joys = [
-            { side: 'left', el: document.getElementById('leftJoy') },
-            { side: 'right', el: document.getElementById('rightJoy') }
-        ];
-        const handleSel = s => document.querySelector('#' + s + 'Joy .joystick-handle');
-
-        for (const j of joys) {
-            const handle = handleSel(j.side);
-            j.el.addEventListener('pointerdown', e => { initAudio(); j.id = e.pointerId; j.el.setPointerCapture(e.pointerId); updateJoy(j, e, handle); });
-            j.el.addEventListener('pointermove', e => { if (e.pointerId === j.id) updateJoy(j, e, handle); });
-            j.el.addEventListener('pointerup', e => { if (e.pointerId === j.id) { resetJoy(j, handle); } });
-            j.el.addEventListener('pointercancel', e => { if (e.pointerId === j.id) { resetJoy(j, handle); } });
-        }
-
-        function updateJoy(j, e, handle) {
-            const r = j.el.getBoundingClientRect();
-            const cx = r.left + r.width / 2;
-            const cy = r.top + r.height / 2;
-            const R = r.width / 2 - 6; // Max radius for handle movement
-            const dx = e.clientX - cx;
-            const dy = e.clientY - cy;
-            const L = MIN(HYPOT(dx, dy), R);
-            const a = ATAN2(dy, dx);
-
-            // Normalize joystick output from -1 to 1
-            const x = L > DZ * 30 ? (L / R) * COS(a) : 0;
-            const y = L > DZ * 30 ? (L / R) * SIN(a) : 0;
-
-            input.joy[j.side].x = x;
-            input.joy[j.side].y = y;
-
-            // Update handle's visual position
-            handle.style.transform = `translate(calc(-50% + ${x * R}px), calc(-50% + ${y * R}px))`;
-        }
-
-        function resetJoy(j, handle) {
-            input.joy[j.side].x = 0;
-            input.joy[j.side].y = 0;
-            handle.style.transform = 'translate(-50%, -50%)';
-            j.id = null;
-        }
-    }
-    initJoysticks();
     // -- /MODULE:Input-Joystick --
     // -- MODULE: Input-Ray --
     // -- /MODULE: Input-Ray --
@@ -281,17 +197,13 @@
         // -- /SOLUTION: Gameplay-Movement-Keyboard --
     
         // -- SOLUTION: Gameplay-Movement-Joystick --
-        // Virtual joystick input
-        const jx = input.joy.left.x;
-        const jy = -input.joy.left.y;
-        const jt = -input.joy.right.x;
         // -- /SOLUTION: Gameplay-Movement-Joystick --
 
         // -- SOLUTION: Gameplay-Movement-VR --
         // -- /SOLUTION: Gameplay-Movement-VR --
 
         // Return combined movement, prioritizing VR, then keyboard, then joystick
-        return { x: vx || kx || jx, y: vy || ky || jy, t: vt || kt || jt };
+        return { x: vx || kx, y: vy || ky, t: vt || kt};
     }
 
     // -- SOLUTION: Gameplay-Movement-Step --
@@ -341,29 +253,6 @@
     // -- /MODULE: Scene-Audio --
 
     // -- MODULE: Scene-HUD --
-    // --- Log and HUD UI State ---
-    const LOG = [];
-    const LOG_MAX = 200;
-    
-    // State for HUD interaction.
-    let HUD_WH_world = M4(); // World matrix of the HUD quad
-    let hoverBtn = null; // The button currently being hovered over
-
-    function log(s) { LOG.push(s); if (LOG.length > LOG_MAX) LOG.shift(); }
-    function logClear() { LOG.length = 0; log('log cleared'); }
-
-    // UI button definitions. Each object defines a button's ID, position (in UV space), label, and click handler
-    
-    // Returns the currently active set of UI buttons
-    function currentUI() {}
-    
-    // --- HUD Interaction Needs Input-ray ---
-    function HUD_pick(WH, ray, uiSet) {}
-
-    // --- HUD Drawing ---
-    
-    // --- HUD Shader ---
-    
     // -- /MODULE: Scene-HUD --
     // -- MODULE: Scene-Sky --
     
@@ -497,9 +386,6 @@
     // --- Application Entry Point ---
     (function main() {
         requestAnimationFrame(loop);
-        log(`App initialized ${isMobile ? '(Mobile)' : '(Desktop)'} — JustGibas VR 13K Game 2025`);
-        log('Use the top "HUD" button (or H key) to open/close HUD');
-        log('Use (WASD) to move and (Q & E) to rotate');
     })();
     
     // -- /FEATURE: CORE --
