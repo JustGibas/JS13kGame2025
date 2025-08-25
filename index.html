@@ -172,7 +172,6 @@
     // -- /MODULE: Input-KeyPoint --
     
     // -- MODULE: Input-Joystick --
-    // --- Virtual Joysticks for Touch Devices ---
     // -- /MODULE:Input-Joystick --
     // -- MODULE: Input-Ray --
     // -- /MODULE: Input-Ray --
@@ -258,47 +257,114 @@
     
     // -- /MODULE: Scene-Sky --
     // -- MODULE: Scene-Ground --
-    // --- Grid Shader ---
-    // A simple shader to draw a grid on the ground plane
-    const vsG = `#version 300 es
-    precision highp float;
-    layout(location=0) in vec3 p;
-    uniform mat4 M, V, P;
-    out vec3 w; // Pass world position to fragment shader.
-    void main(){
-        w = (M * vec4(p, 1.0)).xyz;
-        gl_Position = P * V * vec4(w, 1.0);
-    }`;
-    const fsG = `#version 300 es
-    precision highp float;
-    in vec3 w;
-    out vec4 o;
-    void main(){
-        float c = 2.0; // Grid cell size.
-        // Draw lines using fract() and step().
-        float l = step(abs(fract(w.x/c) - 0.5), 0.01) + step(abs(fract(w.z/c) - 0.5), 0.01);
-        float g = clamp(l, 0.0, 1.0);
-        // Fade to a darker color in the distance.
-        vec3 b = mix(vec3(0.04), vec3(0.08), smoothstep(0.0, 20.0, length(w.xz)));
-        o = vec4(b + g * vec3(0.2, 1.0, 0.2) * 0.6, 1.0);
-    }`;
-
-    const PG = prog(vsG, fsG);
-    const uM = gl.getUniformLocation(PG, 'M');
-    const uV = gl.getUniformLocation(PG, 'V');
-    const uP = gl.getUniformLocation(PG, 'P');
-    const vbo = gl.createBuffer();
-    const vao = gl.createVertexArray();
-    gl.bindVertexArray(vao);
-    gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
-    // A large quad to serve as the ground plane.
-    gl.bufferData(gl.ARRAY_BUFFER, new F32([-1e3,0,-1e3, 1e3,0,-1e3, 1e3,0,1e3, -1e3,0,-1e3, 1e3,0,1e3, -1e3,0,1e3]), gl.STATIC_DRAW);
-    gl.enableVertexAttribArray(0);
-    gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
-
     // -- /MODULE: Scene-Ground --
     // -- MODULE: Scene-Grass --
-    
+    // --- Grass Shaders ---
+    // Grass rendering constants.
+    const GRASS_SEG = 4; // Number of segments per blade of grass
+    const GRASS_VCOUNT = (GRASS_SEG + 1) * 2; // Total vertices per blade
+
+    // Uses instanced rendering to draw many blades of grass efficiently
+    const vsGrass = `#version 300 es
+    precision highp float;
+    #define NORMALIZE normalize
+    uniform mat4 V, P;
+    uniform vec2 uCamXZ;      // Camera's XZ position for LOD and culling.
+    uniform vec3 uCamRight;   // Camera's right vector for billboarding.
+    uniform float uTime;      // Time for wind animation.
+    uniform float uCell;      // Size of the grid cell for this pass.
+    uniform int uGridN;       // Number of cells in the grid (N x N).
+    uniform float uRadius;    // Culling radius.
+    uniform float uSeed;      // Seed for randomization to allow multiple passes.
+    out vec3 vCol;
+
+    // Simple hash functions for procedural generation.
+    float hash12(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453123); }
+    vec2  hash22(vec2 p){ float n = sin(dot(p, vec2(1.0,113.0))); return fract(vec2(262144.0*n, 32768.0*n)); }
+
+    void main(){
+        // Determine the world-space cell for this instance.
+        int N = uGridN;
+        int iid = gl_InstanceID;
+        int ix = iid % N - N/2;
+        int iz = iid / N - N/2;
+
+        vec2 camCellF = floor(uCamXZ / uCell);
+        vec2 cellF = camCellF + vec2(float(ix), float(iz));
+        vec2 baseCenter = (cellF + vec2(0.5)) * uCell;
+
+        // Per-cell randomization for grass placement, height, width, etc.
+        vec2 tileKey = floor(baseCenter / uCell) + vec2(uSeed);   // integer cell used for randomnes
+        //vec2 tileKey = cellF + vec2(uSeed);
+        vec2 jitter = (hash22(tileKey) - 0.5) * (uCell * 0.9);
+        float hRand = hash12(tileKey * 3.1);
+        float wRand = hash12(tileKey * 7.7);
+        float ph = hash12(tileKey * 5.3) * 6.2831853; // Phase for wind sway.
+
+        // Cull instances outside the radius.
+        float dist = length(baseCenter - uCamXZ);
+        float inRadius = step(dist, uRadius);
+
+        // Define the shape of a single grass blade (a triangle strip).
+        float H = mix(0.6, 0.9, hRand);
+        float t = float(gl_VertexID / 2) / float(${GRASS_SEG});
+        float side = (gl_VertexID % 2 == 0) ? -1.0 : 1.0;
+        
+        // Make blades wider when close to the camera to hide gaps.
+        float nearWScale = mix(1.9, 1.0, smoothstep(0.0, uRadius, dist));
+        float width = 0.05 * (1.0 - t) * (0.6 + 0.6 * wRand) * nearWScale;
+
+        // Animate wind using a coherent noise field.
+        vec2 w1 = vec2(0.07, 0.05);
+        vec2 w2 = vec2(-0.03, 0.04);
+        float gust = 0.6 * sin(dot(baseCenter, w1) + uTime * 0.7) + 0.4 * sin(dot(baseCenter, w2) - uTime * 1.2);
+        float sway = (0.25 * gust) + 0.07 * sin(uTime * 1.7 + ph);
+        float bend = (t * t) * sway;
+
+        // Construct the final vertex position.
+        vec2 baseXZ = baseCenter + jitter;
+        vec3 base = vec3(baseXZ.x, 0.0, baseXZ.y);
+        vec3 right = NORMALIZE(uCamRight); // Billboard the blade towards the camera.
+        vec2 w = vec2(cos(0.3 * uTime), sin(0.32 * uTime)); // Two phases out of sync
+        w *= inversesqrt(dot(w,w) + 1e-3);   // add  0.001 to not mult by near 0
+        vec2 windDir = w; // consider calculating once per frame
+        vec3 bendOff = vec3(windDir.x, 0.0, windDir.y) * bend * H;
+        vec3 pos = base + right * (side * width) + vec3(0.0, t * H, 0.0) + bendOff;
+
+        // Hide culled instances by moving them below the ground.
+        //pos.y -= (1.0 - inRadius) * 1.0;   
+
+        // Color the grass with a vertical gradient and slight random tint.
+        vec3 c0 = vec3(0.14, 0.32, 0.10);
+        vec3 c1 = vec3(0.25, 0.70, 0.20);
+        vCol = mix(c0, c1, smoothstep(0.0, 1.0, t)) * (0.85 + 0.15 * hash12(tileKey * 11.1));
+
+        gl_Position = P * V * vec4(pos, 1.0);
+    }`;
+    const fsGrass = `#version 300 es
+    precision highp float;
+    in vec3 vCol;
+    out vec4 o;
+    void main(){ o = vec4(vCol, 1.0); }`;
+
+    const PGRASS = prog(vsGrass, fsGrass);
+    const uVG = gl.getUniformLocation(PGRASS, 'V'), uPG = gl.getUniformLocation(PGRASS, 'P');
+    const uCamXZ = gl.getUniformLocation(PGRASS, 'uCamXZ');
+    const uCamRight = gl.getUniformLocation(PGRASS, 'uCamRight');
+    const uTimeG = gl.getUniformLocation(PGRASS, 'uTime');
+    const uCell = gl.getUniformLocation(PGRASS, 'uCell');
+    const uGridN = gl.getUniformLocation(PGRASS, 'uGridN');
+    const uRadius = gl.getUniformLocation(PGRASS, 'uRadius');
+    const uSeed = gl.getUniformLocation(PGRASS, 'uSeed');
+
+    // The grass VAO is minimal since all vertex data is generated procedurally in the shader
+    const vaoGrass = gl.createVertexArray(), vboGrass = gl.createBuffer();
+    gl.bindVertexArray(vaoGrass);
+    gl.bindBuffer(gl.ARRAY_BUFFER, vboGrass);
+    gl.bufferData(gl.ARRAY_BUFFER, new F32([0]), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 1, gl.FLOAT, false, 0, 0);
+
     // -- /MODULE: Scene-Grass --
     // -- MODULE: Scene-Plant --
     
@@ -338,19 +404,17 @@
         // Noise texture for clouds
 
         // Render Grid
-        gl.useProgram(PG);
-        gl.bindVertexArray(vao);
-        gl.uniformMatrix4fv(uM, false, M);
-        gl.uniformMatrix4fv(uV, false, V);
-        gl.uniformMatrix4fv(uP, false, P);
-        if (beastMode===true){
-        gl.enable(gl.CULL_FACE);
-        gl.cullFace(gl.FRONT)}
-        else {gl.disable(gl.CULL_FACE);};
-        gl.drawArrays(gl.TRIANGLES, 0, 6);
-
-        // Render Grass in multiple passes for density and LOD
         
+        // Render Grass in multiple passes for density and LOD
+        {
+            const cy = COS(user.yaw), sy = SIN(user.yaw);
+            const camRight = [cy, 0, -sy];
+            const timeSec = t * 0.001;
+            drawGrassPass(V, P, [user.x, user.z], camRight, timeSec, 0.8, 64, 30.0, 1.0); // Cell size, Strands number, Radius, Seed
+            drawGrassPass(V, P, [user.x, user.z], camRight, timeSec, 0.4, 64, 20.0, 1.0);
+            drawGrassPass(V, P, [user.x, user.z], camRight, timeSec, 0.4, 40, 10.0, 2.0);
+        }
+
         // Render L-System Plants
         
         // Render Reticle if there's a ground hit
@@ -361,8 +425,21 @@
     }
 
     // Helper to update the HUD canvas content
-    
-    // Helper to submit a grass draw call
+    function drawGrassPass(Vmat, Pmat, camXZ, camRight, timeSec, cell, gridN, radius, seed) {
+        gl.useProgram(PGRASS);
+        gl.bindVertexArray(vaoGrass);
+        gl.uniformMatrix4fv(uVG, false, Vmat);
+        gl.uniformMatrix4fv(uPG, false, Pmat);
+        gl.uniform2f(uCamXZ, camXZ[0], camXZ[1]);
+        gl.uniform3f(uCamRight, camRight[0], camRight[1], camRight[2]);
+        gl.uniform1f(uTimeG, timeSec);
+        gl.uniform1f(uCell, cell);
+        gl.uniform1i(uGridN, gridN | 0);
+        gl.uniform1f(uRadius, radius);
+        gl.uniform1f(uSeed, seed);
+        gl.enable(gl.DEPTH_TEST);
+        gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, GRASS_VCOUNT, gridN * gridN);
+    }
 
     // Computes the view and projection matrices for desktop mode
     function buildViewProj() {
