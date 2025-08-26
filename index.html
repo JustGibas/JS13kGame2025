@@ -304,119 +304,120 @@
     // --- L-System Plant Shader ---
     // Positions and scales for the scattered L-system plants.
     // later we will generate positions and scatter instances
-    const PLANT_POSITIONS = [
-        [0, 0, 1],
-        [5, -4, 1.2],
-        [-3, -8, 0.9],
-        [8, 10, 1.1],
-        [-10, 5, 1.3],
-        [12, -12, 0.8],
-        [-15, -9, 1.0]
+    const PLANT_POSITIONS = [ // Array of plant positions [x, z, scale] for placing plants in the scene
+        [0, 0, 1], // Plant at origin with normal scale
+        [5, -4, 1.2], // Plant at (5, -4) with 20% larger scale
+        [-3, -8, 0.9], // Plant at (-3, -8) with 10% smaller scale
+        [8, 10, 1.1], // Plant at (8, 10) with 10% larger scale
+        [-10, 5, 1.3], // Plant at (-10, 5) with 30% larger scale
+        [12, -12, 0.8], // Plant at (12, -12) with 20% smaller scale
+        [-15, -9, 1.0] // Plant at (-15, -9) with normal scale
     ];
 
-    const vsPlants = `#version 300 es
-    precision highp float;
-    layout(location=0) in vec3 p;
-    layout(location=1) in vec2 uv_in;
-    uniform mat4 M, V, P;
-    out vec2 uv;
-    void main() {
-        uv = uv_in;
-        gl_Position = P * V * M * vec4(p, 1.0);
-    }`;
+    const vsPlants = `#version 300 es // Vertex shader for plants using WebGL2
+    precision highp float; // Use high precision for all float operations
+    layout(location=0) in vec3 p; // Input vertex position attribute at location 0
+    layout(location=1) in vec2 uv_in; // Input UV texture coordinate attribute at location 1
+    uniform mat4 M, V, P; // Model, View, and Projection matrices
+    out vec2 uv; // Pass UV coordinates to fragment shader
+    void main() { // Main vertex shader function
+        uv = uv_in; // Pass through UV coordinates unchanged
+        gl_Position = P * V * M * vec4(p, 1.0); // Transform vertex position to clip space
+    }`; // End of vertex shader
 
-    const fsPlants = `#version 300 es
-    precision highp float;
-    in vec2 uv;
-    out vec4 o;
-    uniform float uTime;
+    const fsPlants = `#version 300 es // Fragment shader for plants using WebGL2
+    precision highp float; // Use high precision for all float operations
+    in vec2 uv; // UV coordinates received from vertex shader
+    out vec4 o; // Output color for this fragment
+    uniform float uTime; // Time uniform for animation
 
-    #define PI 3.14159
+    #define PI 3.14159 // Define PI constant for mathematical calculations
 
-    mat3 Rot(float angle) {
-        float c = cos(angle);
-        float s = sin(angle);
-        return mat3(vec3(c, s, 0), vec3(-s, c, 0), vec3(0, 0, 1));
-    }
+    mat3 Rot(float angle) { // Function to create 2D rotation matrix
+        float c = cos(angle); // Calculate cosine of rotation angle
+        float s = sin(angle); // Calculate sine of rotation angle
+        return mat3(vec3(c, s, 0), vec3(-s, c, 0), vec3(0, 0, 1)); // Return 3x3 rotation matrix
+    } // End of rotation matrix function
 
-    mat3 Disp(vec2 displacement) {
-        return mat3(vec3(1, 0, 0), vec3(0, 1, 0), vec3(displacement, 1));
-    }
+    mat3 Disp(vec2 displacement) { // Function to create 2D displacement matrix
+        return mat3(vec3(1, 0, 0), vec3(0, 1, 0), vec3(displacement, 1)); // Return 3x3 translation matrix
+    } // End of displacement matrix function
 
-    float sdCappedCylinder(vec2 p, vec2 h) {
-        p -= vec2(0., h.y);
-        vec2 d = abs(vec2(length(p.x), p.y)) - h;
-        return min(max(d.x, d.y), 0.0) + length(max(d, 0.0));
-    }
+    float sdCappedCylinder(vec2 p, vec2 h) { // Signed distance function for capped cylinder
+        p -= vec2(0., h.y); // Offset point by cylinder height
+        vec2 d = abs(vec2(length(p.x), p.y)) - h; // Calculate distance to cylinder surface
+        return min(max(d.x, d.y), 0.0) + length(max(d, 0.0)); // Return signed distance to cylinder
+    } // End of capped cylinder distance function
 
-    float center(vec2 pt) {
-        mat3 posR = Rot(-(25.7 / 360.) * 2. * PI);
-        mat3 negR = Rot(25.7 / 360. * 2. * PI);
-        const int depth = 7;
-        const int branches = 3;
-        int maxDepth = 1; for(int i=0; i<depth; i++) maxDepth *= branches; // pow() is not const
-        float len = 1.7;
-        float wid = .01;
-        pt = pt + vec2(0, 2);
-        float trunk = sdCappedCylinder(pt - vec2(0., 0.), vec2(wid, len));
-        float d = 500.;
-        int c = 0;
-        for (int count = 0; count <= 100; ++count) {
-            int off = 1; for(int i=0; i<depth; i++) off *= branches;
-            vec2 pt_n = pt;
-            for (int i = 1; i <= depth; ++i) {
-                float l = len / pow(2., float(i));
-                off /= branches;
-                int dec = c / off;
-                int path = dec - branches * (dec / branches);
-                mat3 mx;
-                if (path == 0) {
-                    mx = posR * Disp(vec2(0, -2. * l));
-                } else if (path == 1) {
-                    mat3 wind = Rot(0.2 * sin(uTime + 6.2));
-                    mx = wind * negR * Disp(vec2(0, -2. * l));
-                } else if (path == 2) {
-                    mat3 wind = Rot(0.2 * sin(uTime + 1.));
-                    mx = wind * Disp(vec2(0, -4. * l));
-                }
-                pt_n = (mx * vec3(pt_n, 1)).xy;
-                float y = sdCappedCylinder(pt_n, vec2(wid, l));
-                if (y - 2.0 * l > 0.0) { c += off - 1; break; }
-                d = min(d, y);
-            }
-            ++c;
-            if (c > maxDepth) break;
-        }
-        return min(d, trunk);
-    }
+    float center(vec2 pt) { // Main function to generate L-system plant structure
+        mat3 posR = Rot(-(25.7 / 360.) * 2. * PI); // Create positive rotation matrix (clockwise)
+        mat3 negR = Rot(25.7 / 360. * 2. * PI); // Create negative rotation matrix (counter-clockwise)
+        const int depth = 7; // Maximum recursion depth for L-system
+        const int branches = 3; // Number of branches per node in L-system
+        int maxDepth = 1; for(int i=0; i<depth; i++) maxDepth *= branches; // Calculate maximum number of nodes (pow() is not const)
+        float len = 1.7; // Base length of plant segments
+        float wid = .01; // Width of plant segments
+        pt = pt + vec2(0, 2); // Offset input point vertically
+        float trunk = sdCappedCylinder(pt - vec2(0., 0.), vec2(wid, len)); // Calculate distance to main trunk
+        float d = 500.; // Initialize minimum distance to a large value
+        int c = 0; // Counter for iterating through L-system nodes
+        for (int count = 0; count <= 100; ++count) { // Loop through all possible L-system branches
+            int off = 1; for(int i=0; i<depth; i++) off *= branches; // Calculate offset for current depth level
+            vec2 pt_n = pt; // Copy current point for transformation
+            for (int i = 1; i <= depth; ++i) { // Iterate through each depth level
+                float l = len / pow(2., float(i)); // Calculate segment length for current depth
+                off /= branches; // Update offset for next level
+                int dec = c / off; // Calculate decision value for branching
+                int path = dec - branches * (dec / branches); // Calculate which branch path to take (0, 1, or 2)
+                mat3 mx; // Matrix for current transformation
+                if (path == 0) { // First branch path
+                    mx = posR * Disp(vec2(0, -2. * l)); // Apply positive rotation and displacement
+                } else if (path == 1) { // Second branch path
+                    mat3 wind = Rot(0.2 * sin(uTime + 6.2)); // Create wind animation with time offset
+                    mx = wind * negR * Disp(vec2(0, -2. * l)); // Apply wind, negative rotation, and displacement
+                } else if (path == 2) { // Third branch path
+                    mat3 wind = Rot(0.2 * sin(uTime + 1.)); // Create wind animation with different time offset
+                    mx = wind * Disp(vec2(0, -4. * l)); // Apply wind and vertical displacement
+                } // End of branch path selection
+                pt_n = (mx * vec3(pt_n, 1)).xy; // Transform point using selected matrix
+                float y = sdCappedCylinder(pt_n, vec2(wid, l)); // Calculate distance to current segment
+                if (y - 2.0 * l > 0.0) { c += off - 1; break; } // If point is too far from segment, skip remaining branches
+                d = min(d, y); // Update minimum distance
+            } // End of depth iteration
+            ++c; // Increment node counter
+            if (c > maxDepth) break; // Exit if all nodes have been processed
+        } // End of L-system iteration
+        return min(d, trunk); // Return minimum distance between branches and trunk
+    } // End of L-system generation function
 
-    void main() {
-        vec2 p = (uv * 2.0 - 1.0) * 5.0; // Scale and center UVs
-        p.y += 2.0; // Adjust vertical position
+    void main() { // Main fragment shader function
+        vec2 p = (uv * 2.0 - 1.0) * 5.0; // Scale and center UVs to range [-5, 5]
+        p.y += 2.0; // Adjust vertical position upward
 
-        float d = center(p);
-        float t = clamp(d, 0.0, .04) * 2. * 12.5;
-        vec4 fg = vec4(.8, .9, .8, 1.0);
-        float alpha = 1.0 - t;
-        if (alpha < 0.05) discard;
-        o = vec4(fg.rgb * alpha, alpha);
-    }`;
+        float d = center(p); // Calculate distance to nearest plant structure
+        float t = clamp(d, 0.0, .04) * 2. * 12.5; // Convert distance to alpha value with clamping
+        vec4 fg = vec4(.8, .9, .8, 1.0); // Define plant color (light green)
+        float alpha = 1.0 - t; // Calculate alpha transparency from distance
+        if (alpha < 0.05) discard; // Discard fragments that are too transparent
+        o = vec4(fg.rgb * alpha, alpha); // Output final color with alpha blending
+    } // End of main fragment shader function
+    `; // End of fragment shader
 
-    const PPLANTS = prog(vsPlants, fsPlants);
-    const uMPla = gl.getUniformLocation(PPLANTS, 'M');
-    const uVPla = gl.getUniformLocation(PPLANTS, 'V');
-    const uPPla = gl.getUniformLocation(PPLANTS, 'P');
-    const uTimePla = gl.getUniformLocation(PPLANTS, 'uTime');
+    const PPLANTS = prog(vsPlants, fsPlants); // Compile and link plant shader program
+    const uMPla = gl.getUniformLocation(PPLANTS, 'M'); // Get location of Model matrix uniform
+    const uVPla = gl.getUniformLocation(PPLANTS, 'V'); // Get location of View matrix uniform
+    const uPPla = gl.getUniformLocation(PPLANTS, 'P'); // Get location of Projection matrix uniform
+    const uTimePla = gl.getUniformLocation(PPLANTS, 'uTime'); // Get location of time uniform for animation
 
-    const vboPlants = gl.createBuffer(), vaoPlants = gl.createVertexArray();
-    gl.bindVertexArray(vaoPlants);
-    gl.bindBuffer(gl.ARRAY_BUFFER, vboPlants);
+    const vboPlants = gl.createBuffer(), vaoPlants = gl.createVertexArray(); // Create vertex buffer and vertex array objects
+    gl.bindVertexArray(vaoPlants); // Bind the vertex array object
+    gl.bindBuffer(gl.ARRAY_BUFFER, vboPlants); // Bind the vertex buffer object
     // Vertex data for a quad (position and UV coordinates).
-    gl.bufferData(gl.ARRAY_BUFFER, new F32([-1,2,0, 0,1,  1,2,0, 1,1,  1,0,0, 1,0,  -1,2,0, 0,1,  1,0,0, 1,0,  -1,0,0, 0,0]), gl.STATIC_DRAW);
-    gl.enableVertexAttribArray(0);
-    gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 20, 0);
-    gl.enableVertexAttribArray(1);
-    gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 20, 12);
+    gl.bufferData(gl.ARRAY_BUFFER, new F32([-1,2,0, 0,1,  1,2,0, 1,1,  1,0,0, 1,0,  -1,2,0, 0,1,  1,0,0, 1,0,  -1,0,0, 0,0]), gl.STATIC_DRAW); // Upload vertex data: 6 vertices forming 2 triangles for a quad, each with position (x,y,z) and UV (u,v)
+    gl.enableVertexAttribArray(0); // Enable vertex attribute array at location 0 (position)
+    gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 20, 0); // Set vertex attribute pointer for position: 3 floats, stride 20 bytes, offset 0
+    gl.enableVertexAttribArray(1); // Enable vertex attribute array at location 1 (UV)
+    gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 20, 12); // Set vertex attribute pointer for UV: 2 floats, stride 20 bytes, offset 12 bytes
 
     // -- /MODULE: Scene-Plant --
     
