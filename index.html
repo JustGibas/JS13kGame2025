@@ -1052,40 +1052,90 @@
 
     // -- /MODULE: Scene-Sky --
     // -- MODULE: Scene-Ground --
-    // --- Grid Shader ---
-    // A simple shader to draw a grid on the ground plane
+    // NEW: Flag to toggle wind visualization on the ground
+    const visualizeWind = true;
+
     const vsG = `#version 300 es
     precision highp float;
     layout(location=0) in vec3 p;
     uniform mat4 M, V, P;
-    out vec3 w; // Pass world position to fragment shader.
+    out vec3 w;
     void main(){
         w = (M * vec4(p, 1.0)).xyz;
         gl_Position = P * V * vec4(w, 1.0);
     }`;
+    
+    // NEW: The ground fragment shader can now visualize the shared noise field.
     const fsG = `#version 300 es
     precision highp float;
     in vec3 w;
     out vec4 o;
+
+    // Uniforms for noise visualization
+    uniform bool uVisualize;
+    uniform sampler2D uNoise;
+    uniform float uTime;
+    uniform float uCloudScale;
+    uniform float uCloudMotionSpeed;
+
+    // FBM function copied from sky shader to be used for visualization
+    float n2(vec2 p) { return texture(uNoise, p).r; }
+    float fbm4(vec2 p) {
+        float sum = 0.0; float amp = 0.5;
+        vec2 v0 = vec2(0.012, 0.007); vec2 v1 = vec2(-0.008, 0.015);
+        vec2 v2 = vec2(0.017, -0.011); vec2 v3 = vec2(-0.011, -0.018);
+        sum += amp * n2(p + uTime * v0 * uCloudMotionSpeed); p *= 2.0; amp *= 0.5;
+        sum += amp * n2(p + uTime * v1 * uCloudMotionSpeed); p *= 2.0; amp *= 0.5;
+        sum += amp * n2(p + uTime * v2 * uCloudMotionSpeed); p *= 2.0; amp *= 0.5;
+        sum += amp * n2(p + uTime * v3 * uCloudMotionSpeed);
+        return sum;
+    }
+
     void main(){
-        float c = 2.0; // Grid cell size.
-        // Draw lines using fract() and step().
-        float l = step(abs(fract(w.x/c) - 0.5), 0.01) + step(abs(fract(w.z/c) - 0.5), 0.01);
-        float g = clamp(l, 0.0, 1.0);
-        // Fade to a darker color in the distance.
-        vec3 b = mix(vec3(0.04), vec3(0.08), smoothstep(0.0, 20.0, length(w.xz)));
-        o = vec4(b + g * vec3(0.2, 1.0, 0.2) * 0.6, 1.0);
+        if (uVisualize) {
+            vec2 p = w.xz * uCloudScale;
+            float f = fbm4(p);
+
+            // To visualize the wind vector, we calculate the gradient of the noise field
+            float eps = 0.001; // A small offset for gradient calculation
+            float gX1 = fbm4(p + vec2(eps, 0.0));
+            float gX0 = fbm4(p - vec2(eps, 0.0));
+            float gZ1 = fbm4(p + vec2(0.0, eps));
+            float gZ0 = fbm4(p - vec2(0.0, eps));
+            
+            float gx = (gX1 - gX0) / (2.0 * eps);
+            float gz = (gZ1 - gZ0) / (2.0 * eps);
+
+            // Wind vector is perpendicular to the gradient
+            vec2 wind = normalize(vec2(-gz, gx));
+
+            // Visualize: map wind vector (x,z) to (R,G) channels, and noise value (f) to B
+            o = vec4(wind.x * 0.5 + 0.5, wind.y * 0.5 + 0.5, f, 1.0);
+        } else {
+            // Original grid rendering
+            float c = 2.0;
+            float l = step(abs(fract(w.x/c) - 0.5), 0.01) + step(abs(fract(w.z/c) - 0.5), 0.01);
+            float g = clamp(l, 0.0, 1.0);
+            vec3 b = mix(vec3(0.04), vec3(0.08), smoothstep(0.0, 20.0, length(w.xz)));
+            o = vec4(b + g * vec3(0.2, 1.0, 0.2) * 0.6, 1.0);
+        }
     }`;
 
     const PG = prog(vsG, fsG);
     const uM = gl.getUniformLocation(PG, 'M');
     const uV = gl.getUniformLocation(PG, 'V');
     const uP = gl.getUniformLocation(PG, 'P');
+    // NEW: Uniform locations for the ground shader's visualization mode
+    const uVisualizeG = gl.getUniformLocation(PG, 'uVisualize');
+    const uNoiseG = gl.getUniformLocation(PG, 'uNoise');
+    const uTimeG_viz = gl.getUniformLocation(PG, 'uTime');
+    const uCloudScaleG = gl.getUniformLocation(PG, 'uCloudScale');
+    const uCloudMotionSpeedG = gl.getUniformLocation(PG, 'uCloudMotionSpeed');
+
     const vbo = gl.createBuffer();
     const vao = gl.createVertexArray();
     gl.bindVertexArray(vao);
     gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
-    // A large quad to serve as the ground plane.
     gl.bufferData(gl.ARRAY_BUFFER, new F32([-1e3,0,-1e3, 1e3,0,-1e3, 1e3,0,1e3, -1e3,0,-1e3, 1e3,0,1e3, -1e3,0,1e3]), gl.STATIC_DRAW);
     gl.enableVertexAttribArray(0);
     gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
@@ -1420,6 +1470,17 @@
         gl.uniformMatrix4fv(uM, false, M);
         gl.uniformMatrix4fv(uV, false, V);
         gl.uniformMatrix4fv(uP, false, P);
+        // NEW: Pass uniforms for wind visualization to ground shader
+        gl.uniform1i(uVisualizeG, visualizeWind);
+        if (visualizeWind) {
+            gl.activeTexture(gl.TEXTURE2);
+            gl.bindTexture(gl.TEXTURE_2D, noiseTex);
+            gl.uniform1i(uNoiseG, 2);
+            gl.uniform1f(uTimeG_viz, t * 0.001);
+            gl.uniform1f(uCloudScaleG, cloudScale);
+            gl.uniform1f(uCloudMotionSpeedG, cloudMotionSpeed);
+        }
+
         if (beastMode===true){
             gl.enable(gl.CULL_FACE);
             gl.cullFace(gl.FRONT);
