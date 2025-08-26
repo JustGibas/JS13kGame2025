@@ -97,7 +97,7 @@
     // const C = D.getElementById('canvas');
     const canvas = document.getElementById('canvas');
     
-   // State variables for the user/camera, rendering loop, and WebGL/WebXR contexts
+    // State variables for the user/camera, rendering loop, and WebGL/WebXR contexts
     let user = { x: 0, y: 1.6, z: 2, yaw: 0, pitch: 0 }; // User position and orientation
     let last = 0; // Timestamp of the last frame for calculating delta time
     let gl, xr = null, ref = null, off = null; // WebGL and WebXR objects
@@ -131,6 +131,67 @@
     }
     // -- /FEATURE: Core --
     
+    // -- FEATURE: Shared Noise --
+    // This module creates a shared, tileable noise grid that can be sampled by both
+    // CPU-side logic (audio, grass wind) and GPU-side shaders (sky) to ensure synchronization.
+    let noiseGrid;
+    let noiseGridSize;
+
+    // Samples the shared noise grid with bilinear filtering and wrapping (tileable).
+    function sampleGrid(u, v) {
+        const n = noiseGridSize;
+        const x = u * n;
+        const y = v * n;
+        const x0 = ((x|0) + n) % n;
+        const y0 = ((y|0) + n) % n;
+        const x1 = (x0 + 1) % n;
+        const y1 = (y0 + 1) % n;
+        const fx = x - Math.floor(x);
+        const fy = y - Math.floor(y);
+        const a = noiseGrid[y0 * n + x0];
+        const b = noiseGrid[y0 * n + x1];
+        const c = noiseGrid[y1 * n + x0];
+        const d = noiseGrid[y1 * n + x1];
+        const ab = a * (1 - fx) + b * fx;
+        const cd = c * (1 - fx) + d * fx;
+        return ab * (1 - fy) + cd * fy;
+    }
+    
+    // Simple noise sample wrapper, mirroring GLSL's n2 function.
+    function n2_js(p) {
+        return sampleGrid(p[0], p[1]);
+    }
+
+    // 4-octave Fractional Brownian Motion, mirroring the sky shader's fbm4 function.
+    // This is used to generate the coherent noise field for wind.
+    function fbm4_js(p, timeSec) {
+        let sum = 0.0;
+        let amp = 0.5;
+        const cloudMotionSpeed = 0.02;
+
+        const baseVel0 = [0.012, 0.007];
+        const baseVel1 = [-0.008, 0.015];
+        const baseVel2 = [0.017, -0.011];
+        const baseVel3 = [-0.011, -0.018];
+
+        sum += amp * n2_js([p[0] + timeSec * baseVel0[0] * cloudMotionSpeed, p[1] + timeSec * baseVel0[1] * cloudMotionSpeed]);
+
+        p = [p[0] * 2.0, p[1] * 2.0];
+        amp *= 0.5;
+        sum += amp * n2_js([p[0] + timeSec * baseVel1[0] * cloudMotionSpeed, p[1] + timeSec * baseVel1[1] * cloudMotionSpeed]);
+
+        p = [p[0] * 2.0, p[1] * 2.0];
+        amp *= 0.5;
+        sum += amp * n2_js([p[0] + timeSec * baseVel2[0] * cloudMotionSpeed, p[1] + timeSec * baseVel2[1] * cloudMotionSpeed]);
+
+        p = [p[0] * 2.0, p[1] * 2.0];
+        amp *= 0.5;
+        sum += amp * n2_js([p[0] + timeSec * baseVel3[0] * cloudMotionSpeed, p[1] + timeSec * baseVel3[1] * cloudMotionSpeed]);
+
+        return sum;
+    }
+    // -- /FEATURE: Shared Noise --
+
     // -- FEATURE: Input --
     // -- MODULE: Input-Core --
     // --- Unified Input Handling ---
@@ -139,7 +200,7 @@
     // Unified input state object for keyboard, joysticks, pointer-look, and pointer coordinates
     const input = {
         keys: {},
-        joy: { left: { x: 0, y: 0, id: null }, right: { x: 0, y: 0, id: null } }, // 
+        joy: { left: { x: 0, y: 0, id: null }, right: { x: 0, y: 0, id: null } },
         look: { id: null, x: 0, y: 0 },
         pointer: { x: 0, y: 0 }
     };
@@ -164,7 +225,7 @@
     
     // Pointer event listeners on the canvas for mouse-look and interaction
     canvas.addEventListener('pointerdown', e => {
-        initAudio(); // NEW: Initialize audio on first user interaction
+        initAudio(); // Initialize audio on first user interaction
         // Start mouse-look on left-click
         if (e.button === 0 && input.look.id === null) {
             input.look.id = e.pointerId;
@@ -379,7 +440,6 @@
     
     // -- FEATURE: Scene --
     // -- MODULE: Scene-Audio --
-    // todo: implement stereo sources to get spatial audio (directional wind sound)
     let audioCtx = null;
     let lastStepTime = 0;
     const stepInterval = 500; // ms between walking sounds
@@ -408,9 +468,7 @@
         
         const source = audioCtx.createBufferSource();
         const filter = audioCtx.createBiquadFilter();
-        const gain = audioCtx.createGain(); // legacy (kept for compatibility / master)
-        // NEW: stereo nodes
-        const leftDelay = audioCtx.createDelay(0.01);   // up to 10ms (we will use < 1ms)
+        const leftDelay = audioCtx.createDelay(0.01);
         const rightDelay = audioCtx.createDelay(0.01);
         const leftGain  = audioCtx.createGain();
         const rightGain = audioCtx.createGain();
@@ -446,39 +504,38 @@
         audioCtx.windRightDelay = rightDelay;
     }
 
-    // Reuse existing gust computation
-    // --- Wind gust math (mirror of grass shader) ---
-        // Compute gust/sway values using same vectors and time constants as the grass vertex shader
-        function computeGustAt(x, z, timeSec) {
-            // same direction vectors used in the grass vertex shader
-            const w1x = 0.07, w1y = 0.05;
-            const w2x = -0.03, w2y = 0.04;
+    // --- Wind gust math now uses the shared noise module ---
+    function computeGustAt(x, z, timeSec) {
+        const cloudScale = 0.0001; // Must match sky shader for consistency
+        const p = [x * cloudScale, z * cloudScale];
+        const f = fbm4_js(p, timeSec);
+        // Remap fbm output [0,1] to gust/sway ranges
+        const gust = f * 2.0 - 1.0; // [-1, 1]
+        const sway = gust * 0.25 + 0.07 * Math.sin(timeSec * 1.7);
+        return { gust: gust, sway: sway };
+    }
 
-            const dot1 = x * w1x + z * w1y;
-            const dot2 = x * w2x + z * w2y;
-
-            const g = 0.6 * Math.sin(dot1 + timeSec * 0.7) + 0.4 * Math.sin(dot2 - timeSec * 1.2);
-            // small global phase term similar to per-blade phase in shader
-            const sway = 0.25 * g + 0.07 * Math.sin(timeSec * 1.7 + 0.0);
-            return { gust: g, sway: sway };
-        }
-
-    // NEW: approximate local wind vector from gust field gradient (finite difference)
     function computeWindVector(x, z, timeSec){
         const eps = 0.5;
-        const gX1 = computeGustAt(x + eps, z, timeSec).gust;
-        const gX0 = computeGustAt(x - eps, z, timeSec).gust;
-        const gZ1 = computeGustAt(x, z + eps, timeSec).gust;
-        const gZ0 = computeGustAt(x, z - eps, timeSec).gust;
-        // gradient
-        let gx = (gX1 - gX0) / (2*eps);
-        let gz = (gZ1 - gZ0) / (2*eps);
-        // Flow taken perpendicular to gradient (simulate flow along isobars)
+        const cloudScale = 0.0001;
+        
+        // Sample fbm at 4 points to calculate the gradient (direction of strongest change)
+        const p = [x * cloudScale, z * cloudScale];
+        const gX1 = fbm4_js([p[0] + eps * cloudScale, p[1]], timeSec);
+        const gX0 = fbm4_js([p[0] - eps * cloudScale, p[1]], timeSec);
+        const gZ1 = fbm4_js([p[0], p[1] + eps * cloudScale], timeSec);
+        const gZ0 = fbm4_js([p[0], p[1] - eps * cloudScale], timeSec);
+        
+        let gx = (gX1 - gX0) / (2 * eps * cloudScale);
+        let gz = (gZ1 - gZ0) / (2 * eps * cloudScale);
+        
+        // Wind flows perpendicular to the gradient (like air around high/low pressure)
         let vx = -gz;
         let vz =  gx;
         const len = Math.hypot(vx, vz) || 1;
         vx /= len; vz /= len;
-        // Slowly rotate vector for variety
+        
+        // Add a slow rotation for more dynamic wind direction
         const rot = 0.2 * Math.sin(timeSec * 0.05);
         const cr = Math.cos(rot), sr = Math.sin(rot);
         const rvx = vx*cr - vz*sr;
@@ -762,9 +819,8 @@
     }`;
     const fsH = `#version 300 es
     precision highp float;
-    #define UNIFORM uniform
     in vec2 U;
-    UNIFORM sampler2D T;
+    uniform sampler2D T;
     out vec4 o;
     void main(){
         vec4 c = texture(T, U);
@@ -793,39 +849,24 @@
     // -- MODULE: Scene-Sky --
     // --- Sky Shader ---
     let noiseTex = gl.createTexture();
-    let cloudCoverage = 0.25;      // threshold knob -> more/less cloud
-    let cloudSharpness = 0.52;     // edge softness knob
-    let shadowSamples = 3;        // cheap self-shadow sampling count
-    let cloudHeight = 100.0;      // height (world units) of the cloud layer (controls horizon)
-    let cloudScale = 0.0001;      // global mapping scale from world XZ -> cloud texture space (MAIN SIZE LEVER)
-    let cloudMotionSpeed = 0.02;   // global motion speed scalar
+    let cloudCoverage = 0.25;
+    let cloudSharpness = 0.52;
+    let shadowSamples = 3;
+    let cloudHeight = 100.0;
+    let cloudScale = 0.0001;
+    let cloudMotionSpeed = 0.02;
 
-    function makeTileableNoise(size) {
+    // This function now initializes the SHARED noise grid for CPU use
+    // and ALSO creates the GPU texture for the sky shader from the same data.
+    function initSharedNoise(size) {
+        noiseGridSize = size|0;
+        const n = noiseGridSize;
+        
+        // Create the shared Float32 grid for CPU sampling.
+        noiseGrid = new F32(n * n);
+        for (let i = 0; i < noiseGrid.length; i++) noiseGrid[i] = Math.random();
 
-        const n = size|0;
-        // make a small random grid then bilinearly sample with wrap to create smooth tileable texture
-        const grid = new Float32Array(n * n);
-        for (let i = 0; i < grid.length; i++) grid[i] = Math.random();
-
-        // bilinear sampling helper with wrap
-        function sampleGrid(u, v) {
-            const x = u * n;
-            const y = v * n;
-            const x0 = ((x|0) + n) % n;
-            const y0 = ((y|0) + n) % n;
-            const x1 = (x0 + 1) % n;
-            const y1 = (y0 + 1) % n;
-            const fx = x - Math.floor(x);
-            const fy = y - Math.floor(y);
-            const a = grid[y0 * n + x0];
-            const b = grid[y0 * n + x1];
-            const c = grid[y1 * n + x0];
-            const d = grid[y1 * n + x1];
-            const ab = a * (1 - fx) + b * fx;
-            const cd = c * (1 - fx) + d * fx;
-            return ab * (1 - fy) + cd * fy;
-        }
-
+        // Create the Uint8Array image data for the GPU texture from the same noise.
         const img = new Uint8Array(n * n * 4);
         for (let y = 0; y < n; y++) {
             for (let x = 0; x < n; x++) {
@@ -844,6 +885,7 @@
             }
         }
 
+        // Upload to GPU texture.
         gl.bindTexture(gl.TEXTURE_2D, noiseTex);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, n, n, 0, gl.RGBA, gl.UNSIGNED_BYTE, img);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
@@ -852,8 +894,8 @@
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
         gl.bindTexture(gl.TEXTURE_2D, null);
     }
-    // Try: makeTileableNoise(256) or (512) for crisper small-scale details (optional)
-    makeTileableNoise(128);
+    // Try: initSharedNoise(256) or (512) for crisper small-scale details (optional)
+    initSharedNoise(128);
 
     // A procedural skybox rendered using a single full-screen triangle
     const vsSky = `#version 300 es
@@ -1067,6 +1109,13 @@
     uniform int uGridN;       // Number of cells in the grid (N x N).
     uniform float uRadius;    // Culling radius.
     uniform float uSeed;      // Seed for randomization to allow multiple passes.
+
+
+
+    // NEW: Per-instance wind vector attribute, calculated on the CPU
+    layout(location=0) in float aDummy; // Still need a base attribute
+    layout(location=1) in vec2 aWindVec; // Per-instance wind direction
+    
     out vec3 vCol;
 
     // Simple hash functions for procedural generation.
@@ -1094,7 +1143,8 @@
 
         // Cull instances outside the radius.
         float dist = length(baseCenter - uCamXZ);
-        float inRadius = step(dist, uRadius);
+        // Culling is now done on CPU by not submitting data, but keep this for potential future use
+        // float inRadius = step(dist, uRadius); 
 
         // Define the shape of a single grass blade (a triangle strip).
         float H = mix(0.6, 0.9, hRand);
@@ -1105,7 +1155,7 @@
         float nearWScale = mix(1.9, 1.0, smoothstep(0.0, uRadius, dist));
         float width = 0.05 * (1.0 - t) * (0.6 + 0.6 * wRand) * nearWScale;
 
-        // Animate wind using a coherent noise field.
+        // Animate wind using the same coherent noise field as audio, but now passed in per-instance
         vec2 w1 = vec2(0.07, 0.05);
         vec2 w2 = vec2(-0.03, 0.04);
         float gust = 0.6 * sin(dot(baseCenter, w1) + uTime * 0.7) + 0.4 * sin(dot(baseCenter, w2) - uTime * 1.2);
@@ -1116,9 +1166,10 @@
         vec2 baseXZ = baseCenter + jitter;
         vec3 base = vec3(baseXZ.x, 0.0, baseXZ.y);
         vec3 right = NORMALIZE(uCamRight); // Billboard the blade towards the camera.
-        vec2 w = vec2(cos(0.3 * uTime), sin(0.32 * uTime)); // Two phases out of sync
-        w *= inversesqrt(dot(w,w) + 1e-3);   // add  0.001 to not mult by near 0
-        vec2 windDir = w; // consider calculating once per frame
+        
+        // Use the per-instance wind vector for the main bend direction
+        vec2 windDir = aWindVec;
+        
         vec3 bendOff = vec3(windDir.x, 0.0, windDir.y) * bend * H;
         vec3 pos = base + right * (side * width) + vec3(0.0, t * H, 0.0) + bendOff;
 
@@ -1148,13 +1199,20 @@
     const uRadius = gl.getUniformLocation(PGRASS, 'uRadius');
     const uSeed = gl.getUniformLocation(PGRASS, 'uSeed');
 
-    // The grass VAO is minimal since all vertex data is generated procedurally in the shader
-    const vaoGrass = gl.createVertexArray(), vboGrass = gl.createBuffer();
+    // VAO setup for grass now includes a second VBO for per-instance wind data.
+    const vaoGrass = gl.createVertexArray();
+    const vboGrassDummy = gl.createBuffer(); // For the dummy attribute at location 0
+    const vboGrassWind = gl.createBuffer();  // For the wind vector at location 1
     gl.bindVertexArray(vaoGrass);
-    gl.bindBuffer(gl.ARRAY_BUFFER, vboGrass);
+    gl.bindBuffer(gl.ARRAY_BUFFER, vboGrassDummy);
     gl.bufferData(gl.ARRAY_BUFFER, new F32([0]), gl.STATIC_DRAW);
     gl.enableVertexAttribArray(0);
     gl.vertexAttribPointer(0, 1, gl.FLOAT, false, 0, 0);
+    
+    gl.bindBuffer(gl.ARRAY_BUFFER, vboGrassWind); // Bind the new buffer
+    gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 0, 0); // 2 floats per vertex
+    gl.vertexAttribDivisor(1, 1); // This is crucial: advance this attribute once per instance.
 
     // -- /MODULE: Scene-Grass --
     // -- MODULE: Scene-Plant --
@@ -1363,9 +1421,11 @@
         gl.uniformMatrix4fv(uV, false, V);
         gl.uniformMatrix4fv(uP, false, P);
         if (beastMode===true){
-        gl.enable(gl.CULL_FACE);
-        gl.cullFace(gl.FRONT)}
-        else {gl.disable(gl.CULL_FACE);};
+            gl.enable(gl.CULL_FACE);
+            gl.cullFace(gl.FRONT);
+        } else {
+            gl.disable(gl.CULL_FACE);
+        }
         gl.drawArrays(gl.TRIANGLES, 0, 6);
 
         // Render Grass in multiple passes for density and LOD
@@ -1462,10 +1522,43 @@
         drawHUDCanvas(mode, hit, uiSet, dt);
     }
 
-    // Helper to submit a grass draw call
+    // This function now calculates wind vectors for each grass instance on the CPU
+    // and uploads them to the GPU via a per-instance vertex attribute.
     function drawGrassPass(Vmat, Pmat, camXZ, camRight, timeSec, cell, gridN, radius, seed) {
+        const numInstances = gridN * gridN;
+        const windData = new F32(numInstances * 2); // 2 floats (x, z) per instance
+        let visibleInstances = 0;
+
+        // This is a simplified approach. A more optimized version would use a separate index buffer
+        // to draw only the visible instances. Here, we calculate for all and the shader culls.
+        // For this implementation, we will calculate wind for all instances in the grid.
+        for (let i = 0; i < numInstances; i++) {
+            const ix = i % gridN - gridN / 2;
+            const iz = Math.floor(i / gridN) - gridN / 2;
+            const camCellF = [Math.floor(camXZ[0] / cell), Math.floor(camXZ[1] / cell)];
+            const cellF = [camCellF[0] + ix, camCellF[1] + iz];
+            const baseCenter = [(cellF[0] + 0.5) * cell, (cellF[1] + 0.5) * cell];
+
+            // Culling check
+            const dist = Math.hypot(baseCenter[0] - camXZ[0], baseCenter[1] - camXZ[1]);
+            if (dist <= radius) {
+                const wind = computeWindVector(baseCenter[0], baseCenter[1], timeSec);
+                windData[i * 2] = wind.x;
+                windData[i * 2 + 1] = wind.z;
+            } else {
+                // For culled instances, send a zero vector.
+                windData[i * 2] = 0;
+                windData[i * 2 + 1] = 0;
+            }
+        }
+        
         gl.useProgram(PGRASS);
         gl.bindVertexArray(vaoGrass);
+        
+        // Upload the per-instance wind data for this frame
+        gl.bindBuffer(gl.ARRAY_BUFFER, vboGrassWind);
+        gl.bufferData(gl.ARRAY_BUFFER, windData, gl.DYNAMIC_DRAW);
+
         gl.uniformMatrix4fv(uVG, false, Vmat);
         gl.uniformMatrix4fv(uPG, false, Pmat);
         gl.uniform2f(uCamXZ, camXZ[0], camXZ[1]);
@@ -1476,7 +1569,8 @@
         gl.uniform1f(uRadius, radius);
         gl.uniform1f(uSeed, seed);
         gl.enable(gl.DEPTH_TEST);
-        gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, GRASS_VCOUNT, gridN * gridN);
+        //gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, GRASS_VCOUNT, gridN * gridN);
+        gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, GRASS_VCOUNT, numInstances);
     }
 
     // Computes the view and projection matrices for desktop mode
