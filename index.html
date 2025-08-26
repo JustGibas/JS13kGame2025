@@ -1819,15 +1819,39 @@
 
                 for (const [px, pz, scale] of PLANT_POSITIONS) {
 
-                    // --- Start of new LOD logic ---
-                    const distSq = (camX - px)**2 + (camZ - pz)**2; // Use squared distance (faster)
-                    let iterations = 101; // Full quality by default
-                    if (distSq < 25) { // If closer than 5 units
-                        iterations = 30; // Low quality
-                    } else if (distSq < 100) { // If closer than 10 units
-                        iterations = 60; // Medium quality
-                    }
-                    // --- End of new LOD logic ---
+                // --- Start of new LOD logic ---
+                // Smooth, stable LOD with temporal smoothing (prevents flicker during animation)
+                if (typeof PLANT_IDX === 'undefined') PLANT_IDX = 0;
+                const i = PLANT_IDX % PLANT_POSITIONS.length;
+                PLANT_IDX++;
+
+                if (typeof PLANT_LODS === 'undefined') {
+                    PLANT_LODS = new Float32Array(PLANT_POSITIONS.length);
+                    PLANT_LODS.fill(14); // start at max quality
+                }
+
+                const dx = camX - px, dz = camZ - pz;
+                const dist = Math.hypot(dx, dz);
+
+                // Artistic LOD parameters
+                const MIN_ITER = 0, MAX_ITER = 10;
+                const NEAR = 2, FAR = 5.0;
+
+                // normalized ease (smoothstep)
+                let tt = (dist - NEAR) / (FAR - NEAR);
+                tt = Math.max(0, Math.min(1, tt));
+                tt = tt * tt * (3 - 2 * tt);
+
+                // target continuous iteration value
+                const target = MIN_ITER + tt * (MAX_ITER - MIN_ITER);
+
+                // temporal smoothing to avoid popping when animated
+                const SMOOTH = 0.12; // 0..1 (higher = faster response)
+                PLANT_LODS[i] += (target - PLANT_LODS[i]) * SMOOTH;
+
+                // integer iterations used by the shader
+                const iterations = Math.max(MIN_ITER, Math.min(MAX_ITER, Math.round(PLANT_LODS[i])));
+                // --- End of new LOD logic ---
 
                     const angle = ATAN2(camX - px, camZ - pz);
                     const MPlants = new DOMMatrix()
