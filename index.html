@@ -1249,6 +1249,7 @@
     in vec2 uv; // UV coordinates received from vertex shader
     out vec4 o; // Output color for this fragment
     uniform float uTime; // Time uniform for animation
+    uniform int uMaxIterations; // Control the quality/complexity
 
     #define PI 3.14159 // Define PI constant for mathematical calculations
 
@@ -1280,7 +1281,7 @@
         float trunk = sdCappedCylinder(pt - vec2(0., 0.), vec2(wid, len)); // Calculate distance to main trunk
         float d = 500.; // Initialize minimum distance to a large value
         int c = 0; // Counter for iterating through L-system nodes
-        for (int count = 0; count <= 100; ++count) { // Loop through all possible L-system branches
+        for (int count = 0; count < uMaxIterations; ++count) { // Loop through all possible L-system branches
             int off = 1; for(int i=0; i<depth; i++) off *= branches; // Calculate offset for current depth level
             vec2 pt_n = pt; // Copy current point for transformation
             for (int i = 1; i <= depth; ++i) { // Iterate through each depth level
@@ -1327,6 +1328,7 @@
     const uVPla = gl.getUniformLocation(PPLANTS, 'V'); // Get location of View matrix uniform
     const uPPla = gl.getUniformLocation(PPLANTS, 'P'); // Get location of Projection matrix uniform
     const uTimePla = gl.getUniformLocation(PPLANTS, 'uTime'); // Get location of time uniform for animation
+    const uMaxIterationsPla = gl.getUniformLocation(PPLANTS, 'uMaxIterations'); // Get location of max iterations uniform
 
     const vboPlants = gl.createBuffer(), vaoPlants = gl.createVertexArray(); // Create vertex buffer and vertex array objects
     gl.bindVertexArray(vaoPlants); // Bind the vertex array object
@@ -1504,6 +1506,17 @@
             const camZ = user.z;
 
             for (const [px, pz, scale] of PLANT_POSITIONS) {
+
+                // --- Start of new LOD logic ---
+                const distSq = (camX - px)**2 + (camZ - pz)**2; // Use squared distance (faster)
+                let iterations = 101; // Full quality by default
+                if (distSq < 25) { // If closer than 5 units
+                    iterations = 30; // Low quality
+                } else if (distSq < 100) { // If closer than 10 units
+                    iterations = 60; // Medium quality
+                }
+                // --- End of new LOD logic ---
+
                 const angle = ATAN2(camX - px, camZ - pz);
                 const MPlants = new DOMMatrix()
                     .translate(px, 0, pz)
@@ -1515,6 +1528,7 @@
                 gl.uniformMatrix4fv(uVPla, false, V);
                 gl.uniformMatrix4fv(uPPla, false, P);
                 gl.uniform1f(uTimePla, t * 0.001);
+                gl.uniform1i(uMaxIterationsPla, iterations);
                 gl.drawArrays(gl.TRIANGLES, 0, 6);
             }
 
@@ -1780,10 +1794,21 @@
                 const camZ = worldFromView[14];
 
                 for (const [px, pz, scale] of PLANT_POSITIONS) {
+
+                    // --- Start of new LOD logic ---
+                    const distSq = (camX - px)**2 + (camZ - pz)**2; // Use squared distance (faster)
+                    let iterations = 101; // Full quality by default
+                    if (distSq < 25) { // If closer than 5 units
+                        iterations = 30; // Low quality
+                    } else if (distSq < 100) { // If closer than 10 units
+                        iterations = 60; // Medium quality
+                    }
+                    // --- End of new LOD logic ---
+
                     const angle = ATAN2(camX - px, camZ - pz);
                     const MPlants = new DOMMatrix()
                         .translate(px, 0, pz)
-                        .rotate(0, angle * 180 / PI, 0)
+                        .rotate(0, angle * 57.295775 /*180 / PI*/, 0)
                         .scale(scale, scale, scale)
                         .toFloat32Array();
                     
