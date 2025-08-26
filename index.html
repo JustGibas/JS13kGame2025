@@ -1398,13 +1398,22 @@
             for (const [px, pz, scale] of PLANT_POSITIONS) {
 
                 // --- Start of new LOD logic ---
-                const distSq = (camX - px)**2 + (camZ - pz)**2; // Use squared distance (faster)
-                let iterations = 101; // Full quality by default
-                if (distSq < 25) { // If closer than 5 units
-                    iterations = 30; // Low quality
-                } else if (distSq < 100) { // If closer than 10 units
-                    iterations = 60; // Medium quality
-                }
+                // --- LOD: smooth artistic falloff ---
+                const dx = camX - px, dz = camZ - pz;
+                const dist = Math.hypot(dx, dz); // distance in world units
+
+                // Artistic parameters (tweak for different "feel")
+                const MIN_ITER = 0;    // bare trunk
+                const MAX_ITER = 14;   // full detail
+                const NEAR = 0.6;      // below this -> trunk-only
+                const FAR = 2.0;      // at/above this -> full detail
+
+                // Normalize and ease for a gentle transition between LODs
+                let t = (dist - NEAR) / (FAR - NEAR);
+                t = Math.max(0, Math.min(1, t));
+                t = t * t * (3 - 2 * t); // smoothstep for soft blending
+
+                const iterations = Math.round(MIN_ITER + t * (MAX_ITER - MIN_ITER));
                 // --- End of new LOD logic ---
 
                 const angle = ATAN2(camX - px, camZ - pz);
