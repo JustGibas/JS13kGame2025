@@ -1820,22 +1820,37 @@
                 for (const [px, pz, scale] of PLANT_POSITIONS) {
 
                 // --- Start of new LOD logic ---
-                // --- LOD: smooth artistic falloff ---
+                // Smooth, stable LOD with temporal smoothing (prevents flicker during animation)
+                if (typeof PLANT_IDX === 'undefined') PLANT_IDX = 0;
+                const i = PLANT_IDX % PLANT_POSITIONS.length;
+                PLANT_IDX++;
+
+                if (typeof PLANT_LODS === 'undefined') {
+                    PLANT_LODS = new Float32Array(PLANT_POSITIONS.length);
+                    PLANT_LODS.fill(14); // start at max quality
+                }
+
                 const dx = camX - px, dz = camZ - pz;
-                const dist = Math.hypot(dx, dz); // distance in world units
+                const dist = Math.hypot(dx, dz);
 
-                // Artistic parameters (tweak for different "feel")
-                const MIN_ITER = 0;    // bare trunk
-                const MAX_ITER = 14;   // full detail
-                const NEAR = 0.6;      // below this -> trunk-only
-                const FAR = 2.0;      // at/above this -> full detail
+                // Artistic LOD parameters
+                const MIN_ITER = 0, MAX_ITER = 10;
+                const NEAR = 2, FAR = 5.0;
 
-                // Normalize and ease for a gentle transition between LODs
-                let t = (dist - NEAR) / (FAR - NEAR);
-                t = Math.max(0, Math.min(1, t));
-                t = t * t * (3 - 2 * t); // smoothstep for soft blending
+                // normalized ease (smoothstep)
+                let tt = (dist - NEAR) / (FAR - NEAR);
+                tt = Math.max(0, Math.min(1, tt));
+                tt = tt * tt * (3 - 2 * tt);
 
-                const iterations = Math.round(MIN_ITER + t * (MAX_ITER - MIN_ITER));
+                // target continuous iteration value
+                const target = MIN_ITER + tt * (MAX_ITER - MIN_ITER);
+
+                // temporal smoothing to avoid popping when animated
+                const SMOOTH = 0.12; // 0..1 (higher = faster response)
+                PLANT_LODS[i] += (target - PLANT_LODS[i]) * SMOOTH;
+
+                // integer iterations used by the shader
+                const iterations = Math.max(MIN_ITER, Math.min(MAX_ITER, Math.round(PLANT_LODS[i])));
                 // --- End of new LOD logic ---
 
                     const angle = ATAN2(camX - px, camZ - pz);
