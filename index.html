@@ -1159,6 +1159,7 @@
     // -- /MODULE: Scene-Grass --
     // -- MODULE: Scene-Plant --
     // --- L-System Plant Shader ---
+    // -- SOLUTION: Scene-Plant--
     // Positions and scales for the scattered L-system plants.
     // later we will generate positions and scatter instances
     const PLANT_POSITIONS = [ // Array of plant positions [x, z, scale] for placing plants in the scene
@@ -1180,7 +1181,7 @@
     void main() { // Main vertex shader function
         uv = uv_in; // Pass through UV coordinates unchanged
         gl_Position = P * V * M * vec4(p, 1.0); // Transform vertex position to clip space
-    }`; // End of vertex shader
+    }`;
 
     const fsPlants = `#version 300 es // Fragment shader for plants using WebGL2
     precision highp float; // Use high precision for all float operations
@@ -1258,7 +1259,7 @@
         if (alpha < 0.05) discard; // Discard fragments that are too transparent
         o = vec4(fg.rgb * alpha, alpha); // Output final color with alpha blending
     } // End of main fragment shader function
-    `; // End of fragment shader
+    `;
 
     const PPLANTS = prog(vsPlants, fsPlants); // Compile and link plant shader program
     const uMPla = gl.getUniformLocation(PPLANTS, 'M'); // Get location of Model matrix uniform
@@ -1275,8 +1276,10 @@
     gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 20, 0); // Set vertex attribute pointer for position: 3 floats, stride 20 bytes, offset 0
     gl.enableVertexAttribArray(1); // Enable vertex attribute array at location 1 (UV)
     gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 20, 12); // Set vertex attribute pointer for UV: 2 floats, stride 20 bytes, offset 12 bytes
-
-    // -- /MODULE: Scene-Plant --    
+    // -- /SOLUTION: Scene-Plant--
+    // -- SOLUTION: Scene-Plant1--
+    // -- /SOLUTION: Scene-Plant1--
+    // -- /MODULE: Scene-Plant --
     
     // -- MODULE: Scene-Reticle --
     // --- Reticle Shader ---
@@ -1394,7 +1397,7 @@
                 const angle = ATAN2(camX - px, camZ - pz);
                 const MPlants = new DOMMatrix()
                     .translate(px, 0, pz)
-                    .rotate(0, angle * 180 / PI, 0) // DOMMatrix uses degrees
+                    .rotate(0, angle * 57.295775 /*180 / PI*/, 0) // DOMMatrix uses degrees
                     .scale(scale, scale, scale)
                     .toFloat32Array();
 
