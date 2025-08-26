@@ -1244,11 +1244,12 @@
         gl_Position = P * V * M * vec4(p, 1.0); // Transform vertex position to clip space
     }`;
 
-    const fsPlants = `#version 300 es
-    precision highp float;
-    in vec2 uv;
-    out vec4 o;
-    uniform float uTime;
+    const fsPlants = `#version 300 es // Fragment shader for plants using WebGL2
+    precision highp float; // Use high precision for all float operations
+    in vec2 uv; // UV coordinates received from vertex shader
+    out vec4 o; // Output color for this fragment
+    uniform float uTime; // Time uniform for animation
+    uniform int uMaxIterations; // Control the quality/complexity
 
     #define PI 3.14159
 
@@ -1268,46 +1269,46 @@
         return min(max(d.x, d.y), 0.0) + length(max(d, 0.0));
     }
 
-    float center(vec2 pt) {
-        mat3 posR = Rot(-(25.7 / 360.) * 2. * PI);
-        mat3 negR = Rot(25.7 / 360. * 2. * PI);
-        const int depth = 7;
-        const int branches = 3;
-        int maxDepth = 1; for(int i=0; i<depth; i++) maxDepth *= branches; // pow() is not const
-        float len = 1.7;
-        float wid = .01;
-        pt = pt + vec2(0, 2);
-        float trunk = sdCappedCylinder(pt - vec2(0., 0.), vec2(wid, len));
-        float d = 500.;
-        int c = 0;
-        for (int count = 0; count <= 100; ++count) {
-            int off = 1; for(int i=0; i<depth; i++) off *= branches;
-            vec2 pt_n = pt;
-            for (int i = 1; i <= depth; ++i) {
-                float l = len / pow(2., float(i));
-                off /= branches;
-                int dec = c / off;
-                int path = dec - branches * (dec / branches);
-                mat3 mx;
-                if (path == 0) {
-                    mx = posR * Disp(vec2(0, -2. * l));
-                } else if (path == 1) {
-                    mat3 wind = Rot(0.2 * sin(uTime + 6.2));
-                    mx = wind * negR * Disp(vec2(0, -2. * l));
-                } else if (path == 2) {
-                    mat3 wind = Rot(0.2 * sin(uTime + 1.));
-                    mx = wind * Disp(vec2(0, -4. * l));
-                }
-                pt_n = (mx * vec3(pt_n, 1)).xy;
-                float y = sdCappedCylinder(pt_n, vec2(wid, l));
-                if (y - 2.0 * l > 0.0) { c += off - 1; break; }
-                d = min(d, y);
-            }
-            ++c;
-            if (c > maxDepth) break;
-        }
-        return min(d, trunk);
-    }
+    float center(vec2 pt) { // Main function to generate L-system plant structure
+        mat3 posR = Rot(-(25.7 / 360.) * 2. * PI); // Create positive rotation matrix (clockwise)
+        mat3 negR = Rot(25.7 / 360. * 2. * PI); // Create negative rotation matrix (counter-clockwise)
+        const int depth = 7; // Maximum recursion depth for L-system
+        const int branches = 3; // Number of branches per node in L-system
+        int maxDepth = 1; for(int i=0; i<depth; i++) maxDepth *= branches; // Calculate maximum number of nodes (pow() is not const)
+        float len = 1.7; // Base length of plant segments
+        float wid = .01; // Width of plant segments
+        pt = pt + vec2(0, 2); // Offset input point vertically
+        float trunk = sdCappedCylinder(pt - vec2(0., 0.), vec2(wid, len)); // Calculate distance to main trunk
+        float d = 500.; // Initialize minimum distance to a large value
+        int c = 0; // Counter for iterating through L-system nodes
+        for (int count = 0; count < uMaxIterations; ++count) { // Loop through all possible L-system branches
+            int off = 1; for(int i=0; i<depth; i++) off *= branches; // Calculate offset for current depth level
+            vec2 pt_n = pt; // Copy current point for transformation
+            for (int i = 1; i <= depth; ++i) { // Iterate through each depth level
+                float l = len / pow(2., float(i)); // Calculate segment length for current depth
+                off /= branches; // Update offset for next level
+                int dec = c / off; // Calculate decision value for branching
+                int path = dec - branches * (dec / branches); // Calculate which branch path to take (0, 1, or 2)
+                mat3 mx; // Matrix for current transformation
+                if (path == 0) { // First branch path
+                    mx = posR * Disp(vec2(0, -2. * l)); // Apply positive rotation and displacement
+                } else if (path == 1) { // Second branch path
+                    mat3 wind = Rot(0.2 * sin(uTime + 6.2)); // Create wind animation with time offset
+                    mx = wind * negR * Disp(vec2(0, -2. * l)); // Apply wind, negative rotation, and displacement
+                } else if (path == 2) { // Third branch path
+                    mat3 wind = Rot(0.2 * sin(uTime + 1.)); // Create wind animation with different time offset
+                    mx = wind * Disp(vec2(0, -4. * l)); // Apply wind and vertical displacement
+                } // End of branch path selection
+                pt_n = (mx * vec3(pt_n, 1)).xy; // Transform point using selected matrix
+                float y = sdCappedCylinder(pt_n, vec2(wid, l)); // Calculate distance to current segment
+                if (y - 2.0 * l > 0.0) { c += off - 1; break; } // If point is too far from segment, skip remaining branches
+                d = min(d, y); // Update minimum distance
+            } // End of depth iteration
+            ++c; // Increment node counter
+            if (c > maxDepth) break; // Exit if all nodes have been processed
+        } // End of L-system iteration
+        return min(d, trunk); // Return minimum distance between branches and trunk
+    } // End of L-system generation function
 
     void main() {
         vec2 p = (uv * 2.0 - 1.0) * 5.0; // Scale and center UVs
@@ -1322,11 +1323,12 @@
     } // End of main fragment shader function
     `;
 
-    const PPLANTS = prog(vsPlants, fsPlants);
-    const uMPla = gl.getUniformLocation(PPLANTS, 'M');
-    const uVPla = gl.getUniformLocation(PPLANTS, 'V');
-    const uPPla = gl.getUniformLocation(PPLANTS, 'P');
-    const uTimePla = gl.getUniformLocation(PPLANTS, 'uTime');
+    const PPLANTS = prog(vsPlants, fsPlants); // Compile and link plant shader program
+    const uMPla = gl.getUniformLocation(PPLANTS, 'M'); // Get location of Model matrix uniform
+    const uVPla = gl.getUniformLocation(PPLANTS, 'V'); // Get location of View matrix uniform
+    const uPPla = gl.getUniformLocation(PPLANTS, 'P'); // Get location of Projection matrix uniform
+    const uTimePla = gl.getUniformLocation(PPLANTS, 'uTime'); // Get location of time uniform for animation
+    const uMaxIterationsPla = gl.getUniformLocation(PPLANTS, 'uMaxIterations'); // Get location of max iterations uniform
 
     const vboPlants = gl.createBuffer(), vaoPlants = gl.createVertexArray();
     gl.bindVertexArray(vaoPlants);
@@ -1504,6 +1506,17 @@
             const camZ = user.z;
 
             for (const [px, pz, scale] of PLANT_POSITIONS) {
+
+                // --- Start of new LOD logic ---
+                const distSq = (camX - px)**2 + (camZ - pz)**2; // Use squared distance (faster)
+                let iterations = 101; // Full quality by default
+                if (distSq < 25) { // If closer than 5 units
+                    iterations = 30; // Low quality
+                } else if (distSq < 100) { // If closer than 10 units
+                    iterations = 60; // Medium quality
+                }
+                // --- End of new LOD logic ---
+
                 const angle = ATAN2(camX - px, camZ - pz);
                 const MPlants = new DOMMatrix()
                     .translate(px, 0, pz)
@@ -1515,6 +1528,7 @@
                 gl.uniformMatrix4fv(uVPla, false, V);
                 gl.uniformMatrix4fv(uPPla, false, P);
                 gl.uniform1f(uTimePla, t * 0.001);
+                gl.uniform1i(uMaxIterationsPla, iterations);
                 gl.drawArrays(gl.TRIANGLES, 0, 6);
             }
 
@@ -1780,10 +1794,21 @@
                 const camZ = worldFromView[14];
 
                 for (const [px, pz, scale] of PLANT_POSITIONS) {
+
+                    // --- Start of new LOD logic ---
+                    const distSq = (camX - px)**2 + (camZ - pz)**2; // Use squared distance (faster)
+                    let iterations = 101; // Full quality by default
+                    if (distSq < 25) { // If closer than 5 units
+                        iterations = 30; // Low quality
+                    } else if (distSq < 100) { // If closer than 10 units
+                        iterations = 60; // Medium quality
+                    }
+                    // --- End of new LOD logic ---
+
                     const angle = ATAN2(camX - px, camZ - pz);
                     const MPlants = new DOMMatrix()
                         .translate(px, 0, pz)
-                        .rotate(0, angle * 180 / PI, 0)
+                        .rotate(0, angle * 57.295775 /*180 / PI*/, 0)
                         .scale(scale, scale, scale)
                         .toFloat32Array();
                     
