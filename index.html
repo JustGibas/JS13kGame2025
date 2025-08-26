@@ -1220,6 +1220,7 @@
     // -- /MODULE: Scene-Grass --
     // -- MODULE: Scene-Plant --
     // --- L-System Plant Shader ---
+    // -- SOLUTION: Scene-Plant--
     // Positions and scales for the scattered L-system plants.
     // later we will generate positions and scatter instances
     const PLANT_POSITIONS = [
@@ -1232,15 +1233,15 @@
         [-15, -9, 1.0]
     ];
 
-    const vsPlants = `#version 300 es
-    precision highp float;
-    layout(location=0) in vec3 p;
-    layout(location=1) in vec2 uv_in;
-    uniform mat4 M, V, P;
-    out vec2 uv;
-    void main() {
-        uv = uv_in;
-        gl_Position = P * V * M * vec4(p, 1.0);
+    const vsPlants = `#version 300 es // Vertex shader for plants using WebGL2
+    precision highp float; // Use high precision for all float operations
+    layout(location=0) in vec3 p; // Input vertex position attribute at location 0
+    layout(location=1) in vec2 uv_in; // Input UV texture coordinate attribute at location 1
+    uniform mat4 M, V, P; // Model, View, and Projection matrices
+    out vec2 uv; // Pass UV coordinates to fragment shader
+    void main() { // Main vertex shader function
+        uv = uv_in; // Pass through UV coordinates unchanged
+        gl_Position = P * V * M * vec4(p, 1.0); // Transform vertex position to clip space
     }`;
 
     const fsPlants = `#version 300 es
@@ -1312,13 +1313,14 @@
         vec2 p = (uv * 2.0 - 1.0) * 5.0; // Scale and center UVs
         p.y += 2.0; // Adjust vertical position
 
-        float d = center(p);
-        float t = clamp(d, 0.0, .04) * 2. * 12.5;
-        vec4 fg = vec4(.8, .9, .8, 1.0);
-        float alpha = 1.0 - t;
-        if (alpha < 0.05) discard;
-        o = vec4(fg.rgb * alpha, alpha);
-    }`;
+        float d = center(p); // Calculate distance to nearest plant structure
+        float t = clamp(d, 0.0, .04) * 2. * 12.5; // Convert distance to alpha value with clamping
+        vec4 fg = vec4(.8, .9, .8, 1.0); // Define plant color (light green)
+        float alpha = 1.0 - t; // Calculate alpha transparency from distance
+        if (alpha < 0.05) discard; // Discard fragments that are too transparent
+        o = vec4(fg.rgb * alpha, alpha); // Output final color with alpha blending
+    } // End of main fragment shader function
+    `;
 
     const PPLANTS = prog(vsPlants, fsPlants);
     const uMPla = gl.getUniformLocation(PPLANTS, 'M');
@@ -1330,13 +1332,15 @@
     gl.bindVertexArray(vaoPlants);
     gl.bindBuffer(gl.ARRAY_BUFFER, vboPlants);
     // Vertex data for a quad (position and UV coordinates).
-    gl.bufferData(gl.ARRAY_BUFFER, new F32([-1,2,0, 0,1,  1,2,0, 1,1,  1,0,0, 1,0,  -1,2,0, 0,1,  1,0,0, 1,0,  -1,0,0, 0,0]), gl.STATIC_DRAW);
-    gl.enableVertexAttribArray(0);
-    gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 20, 0);
-    gl.enableVertexAttribArray(1);
-    gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 20, 12);
-
-    // -- /MODULE: Scene-Plant --    
+    gl.bufferData(gl.ARRAY_BUFFER, new F32([-1,2,0, 0,1,  1,2,0, 1,1,  1,0,0, 1,0,  -1,2,0, 0,1,  1,0,0, 1,0,  -1,0,0, 0,0]), gl.STATIC_DRAW); // Upload vertex data: 6 vertices forming 2 triangles for a quad, each with position (x,y,z) and UV (u,v)
+    gl.enableVertexAttribArray(0); // Enable vertex attribute array at location 0 (position)
+    gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 20, 0); // Set vertex attribute pointer for position: 3 floats, stride 20 bytes, offset 0
+    gl.enableVertexAttribArray(1); // Enable vertex attribute array at location 1 (UV)
+    gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 20, 12); // Set vertex attribute pointer for UV: 2 floats, stride 20 bytes, offset 12 bytes
+    // -- /SOLUTION: Scene-Plant--
+    // -- SOLUTION: Scene-Plant1--
+    // -- /SOLUTION: Scene-Plant1--
+    // -- /MODULE: Scene-Plant --
     
     // -- MODULE: Scene-Reticle --
     // --- Reticle Shader ---
@@ -1503,7 +1507,7 @@
                 const angle = ATAN2(camX - px, camZ - pz);
                 const MPlants = new DOMMatrix()
                     .translate(px, 0, pz)
-                    .rotate(0, angle * 180 / PI, 0) // DOMMatrix uses degrees
+                    .rotate(0, angle * 57.295775 /*180 / PI*/, 0) // DOMMatrix uses degrees
                     .scale(scale, scale, scale)
                     .toFloat32Array();
 
