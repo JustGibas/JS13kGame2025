@@ -161,7 +161,6 @@
 
     // State for the raycast
     let lastHit = null;
-    //ray = null; // delete
     // -- /MODULE: Input-Core --
     
     // -- MODULE: Input-KeyPoint --
@@ -427,6 +426,7 @@
     function initAudio(){
       if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       if (!window.windPlaying) { window.windPlaying = true; playWindSound(); }
+
     }
     // -- SOLUTION: Scene-Audio-Wind --
     function playWindSound(){
@@ -568,36 +568,35 @@
     // -- /SOLUTION: Scene-Audio-Wind --
     // -- SOLUTION: Scene-Audio-Click --
     function playClickSound(){
-      if(!audioCtx) return;
-      const t = audioCtx.currentTime;
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(300, t);
-      gain.gain.setValueAtTime(0.3, t);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.1);
-      osc.start(t);
-      osc.stop(t + 0.1);
+        if(!audioCtx) return;
+        const t = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(300, t);
+        gain.gain.setValueAtTime(0.3, t);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.1);
+        osc.start(t);
+        osc.stop(t + 0.1);    
     }
     // -- /SOLUTION: Scene-Audio-Click --
     // -- SOLUTION: Scene-Audio-Step --
-
     function playStepSound(){
-      if(!audioCtx) return;
-      const t = audioCtx.currentTime;
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(60, t);
-      osc.frequency.exponentialRampToValueAtTime(160, t + 0.2);
-      gain.gain.setValueAtTime(0.3, t);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
-      osc.start(t);
-      osc.stop(t + 0.3);
+        if(!audioCtx) return;
+        const t = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(60, t);
+        osc.frequency.exponentialRampToValueAtTime(160, t + 0.2);
+        gain.gain.setValueAtTime(0.3, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+        osc.start(t);
+        osc.stop(t + 0.3);
     }
     // -- /SOLUTION: Scene-Audio-Step --
     // -- /MODULE: Scene-Audio --
@@ -1525,6 +1524,7 @@
             gl.enable(gl.DEPTH_TEST);
             gl.disable(gl.BLEND);
         }
+
 
         // Render HUD
         const T = getHudTransform();
