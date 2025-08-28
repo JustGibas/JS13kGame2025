@@ -494,30 +494,57 @@
 
                 if (typeof PLANT_LODS === 'undefined') {
                     PLANT_LODS = new Float32Array(PLANT_POSITIONS.length);
-                    PLANT_LODS.fill(14); // start at max quality
+                    PLANT_LODS.fill(0); // start at min  quality
                 }
 
                 const dx = camX - px, dz = camZ - pz;
                 const dist = Math.hypot(dx, dz);
 
-                // Artistic LOD parameters
-                const MIN_ITER = 0, MAX_ITER = 10;
-                const NEAR = 2, FAR = 5.0;
+                // LOD distance bands (tune these)
+                const NEAR_HIDE = 2.0;   // inside: invisible
+                const NEAR_FULL = 5.0;   // reaches full detail
+                const FAR_START = 10.0;   // start reducing detail
+                const FAR_HIDE  = 15.0;  // beyond: invisible
 
-                // normalized ease (smoothstep)
-                let tt = (dist - NEAR) / (FAR - NEAR);
-                tt = Math.max(0, Math.min(1, tt));
-                tt = tt * tt * (3 - 2 * tt);
+                const MIN_ITER = 2;
+                const MAX_ITER = 16;
 
-                // target continuous iteration value
-                const target = MIN_ITER + tt * (MAX_ITER - MIN_ITER);
+                // Early reject if fully hidden (small cheap check)
+                if (dist < NEAR_HIDE || dist > FAR_HIDE) continue;
 
-                // temporal smoothing to avoid popping when animated
-                const SMOOTH = 0.12; // 0..1 (higher = faster response)
-                PLANT_LODS[i] += (target - PLANT_LODS[i]) * SMOOTH;
+                // Smoothstep helpers
+                function sstep(x){ return x*x*(3-2*x); }
 
-                // integer iterations used by the shader
-                const iterations = Math.max(MIN_ITER, Math.min(MAX_ITER, Math.round(PLANT_LODS[i])));
+                // Near factor (0 -> 1)
+                let a = (dist - NEAR_HIDE) / (NEAR_FULL - NEAR_HIDE);
+                a = Math.min(1, Math.max(0, a));
+                a = sstep(a);
+
+                // Far factor (1 -> 0)
+                let b = (FAR_HIDE - dist) / (FAR_HIDE - FAR_START);
+                b = Math.min(1, Math.max(0, b));
+                b = sstep(b);
+
+                // Combined quality (peaks at 1 in mid zone)
+                let q = a * b;
+
+                // Target (float) iteration quality
+                let target = MIN_ITER + q * (MAX_ITER - MIN_ITER);
+
+                // OPTIONAL temporal smoothing (reuse PLANT_LODS array you already set up)
+                if (typeof PLANT_LODS === 'undefined') {
+                    PLANT_LODS = new Float32Array(PLANT_POSITIONS.length);
+                    PLANT_LODS.fill(MIN_ITER);
+                }
+                const idx = i; // already computed earlier
+                PLANT_LODS[idx] += (target - PLANT_LODS[idx]) * 0.25; // lerp
+                let iterations = PLANT_LODS[idx];
+
+                // Clamp & integerize
+                iterations = Math.max(MIN_ITER, Math.min(MAX_ITER, iterations)) | 0;
+
+                // Optional: final skip if iterations collapsed to MIN and quality extremely low
+                if (q < 0.05) continue;
                 // --- End of new LOD logic ---
 
                 const angle = ATAN2(camX - px, camZ - pz);
