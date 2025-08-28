@@ -629,8 +629,6 @@
     // -- /SOLUTION: Scene-Audio-Wind --
     // -- SOLUTION: Scene-Audio-Click --
     function playClickSound(){
-      if(!audioCtx) return;
-      gain.gain.setValueAtTime(0.3, t);
         if(!audioCtx) return;
         const t = audioCtx.currentTime;
         const osc = audioCtx.createOscillator();
