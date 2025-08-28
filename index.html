@@ -33,6 +33,8 @@
     const M4 = (v) => new F32(v || [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]);
     const V3 = (v) => new F32(v || 3);
     const T_V3_A = V3(), T_V3_B = V3(), T_V3_C = V3(); // Reusable temporary V3s
+    const T_V4_A = V3(4), T_V4_B = V3(4); // Reusable temporary V4s
+    const T_V3_RAY_O = V3(), T_V3_RAY_D = V3(); // For raycasting results (Origin, Direction)
     const SUB=(t,n,r)=>(t[0]=n[0]-r[0],t[1]=n[1]-r[1],t[2]=n[2]-r[2],t);
     const DOT=(t,n)=>t[0]*n[0]+t[1]*n[1]+t[2]*n[2];
     const CROSS=(t,n,r)=>(t[0]=n[1]*r[2]-n[2]*r[1],t[1]=n[2]*r[0]-n[0]*r[2],t[2]=n[0]*r[1]-n[1]*r[0],t);
