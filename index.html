@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=yes" />
     <title>'Wild Cats' 13K Game 2025</title>
     <link rel="icon" type="image/svg+xml" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="55%" x="50%" dominant-baseline="middle" text-anchor="middle" font-size="80">🐈‍⬛</text></svg>'>
     <style>
@@ -69,6 +69,8 @@
     const M4 = (v) => new F32(v || [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]);
     const V3 = (v) => new F32(v || 3);
     const T_V3_A = V3(), T_V3_B = V3(), T_V3_C = V3(); // Reusable temporary V3s
+    const T_V4_A = V3(4), T_V4_B = V3(4); // Reusable temporary V4s
+    const T_V3_RAY_O = V3(), T_V3_RAY_D = V3(); // For raycasting results (Origin, Direction)
     const SUB=(t,n,r)=>(t[0]=n[0]-r[0],t[1]=n[1]-r[1],t[2]=n[2]-r[2],t);
     const DOT=(t,n)=>t[0]*n[0]+t[1]*n[1]+t[2]*n[2];
     const CROSS=(t,n,r)=>(t[0]=n[1]*r[2]-n[2]*r[1],t[1]=n[2]*r[0]-n[0]*r[2],t[2]=n[0]*r[1]-n[1]*r[0],t);
@@ -88,7 +90,17 @@
     // Multiplies a 3D direction (w=0) by a 4x4 matrix
     function mulDir(m, d) { const x=d[0],y=d[1],z=d[2],w=0; return [m[0]*x+m[4]*y+m[8]*z+m[12]*w, m[1]*x+m[5]*y+m[9]*z+m[13]*w, m[2]*x+m[6]*y+m[10]*z+m[14]*w]; }
 
-    function mul4(m, v) { return [m[0]*v[0]+m[4]*v[1]+m[8]*v[2]+m[12]*v[3], m[1]*v[0]+m[5]*v[1]+m[9]*v[2]+m[13]*v[3], m[2]*v[0]+m[6]*v[1]+m[10]*v[2]+m[14]*v[3], m[3]*v[0]+m[7]*v[1]+m[11]*v[2]+m[15]*v[3]]; }
+    //function mul4(m, v) { return [m[0]*v[0]+m[4]*v[1]+m[8]*v[2]+m[12]*v[3], m[1]*v[0]+m[5]*v[1]+m[9]*v[2]+m[13]*v[3], m[2]*v[0]+m[6]*v[1]+m[10]*v[2]+m[14]*v[3], m[3]*v[0]+m[7]*v[1]+m[11]*v[2]+m[15]*v[3]]; }
+    const mul4 = (out, m, v) => {
+        const v0=v[0], v1=v[1], v2=v[2], v3=v[3];
+        out[0] = m[0]*v0 + m[4]*v1 + m[8]*v2 + m[12]*v3;
+        out[1] = m[1]*v0 + m[5]*v1 + m[9]*v2 + m[13]*v3;
+        out[2] = m[2]*v0 + m[6]*v1 + m[10]*v2 + m[14]*v3;
+        out[3] = m[3]*v0 + m[7]*v1 + m[11]*v2 + m[15]*v3;
+        return out;
+    };
+    
+
 
     // Creates a translation and scale matrix
     function translateScale(x,y,z,sx,sy,sz) { return new F32([sx,0,0,0, 0,sy,0,0, 0,0,sz,0, x,y,z,1]); }
@@ -149,7 +161,6 @@
 
     // State for the raycast
     let lastHit = null;
-    //ray = null; // delete
     // -- /MODULE: Input-Core --
     
     // -- MODULE: Input-KeyPoint --
@@ -211,7 +222,6 @@
     });
     // -- /MODULE: Input-KeyPoint --
     
-    
     // -- MODULE: Input-Joystick --
     // --- Virtual Joysticks for Touch Devices ---
     function initJoysticks() {
@@ -268,18 +278,39 @@
         const r = canvas.getBoundingClientRect();
         const x = ((px - r.left) / r.width) * 2 - 1;
         const y = 1 - ((py - r.top) / r.height) * 2;
-        const near = [x, y, -1, 1], far = [x, y, 1, 1];
+        //const near = [x, y, -1, 1], far = [x, y, 1, 1];
+        // Use T_V4_A for the 'near' and T_V4_B for the 'far' vector4s
+        T_V4_A[0] = x; T_V4_A[1] = y; T_V4_A[2] = -1; T_V4_A[3] = 1;
+        T_V4_B[0] = x; T_V4_B[1] = y; T_V4_B[2] = 1;  T_V4_B[3] = 1;
 
         // Unproject near and far points from clip space to world space
-        const n4 = mul4(invPV, near),
-              f4 = mul4(invPV, far);
-        const n = [n4[0] / n4[3], n4[1] / n4[3], n4[2] / n4[3]];
-        const f = [f4[0] / f4[3], f4[1] / f4[3], f4[2] / f4[3]];
+        //const n4 = mul4(invPV, near),
+        //      f4 = mul4(invPV, far);
+        //const n = [n4[0] / n4[3], n4[1] / n4[3], n4[2] / n4[3]];
+        //const f = [f4[0] / f4[3], f4[1] / f4[3], f4[2] / f4[3]];
         
+        // Unproject, writing the results back into our temporary V4s
+        mul4(T_V4_A, invPV, T_V4_A);
+        mul4(T_V4_B, invPV, T_V4_B);
+
+        // Convert to 3D points, writing to our dedicated ray vectors
+        T_V3_RAY_O[0] = T_V4_A[0] / T_V4_A[3]; T_V3_RAY_O[1] = T_V4_A[1] / T_V4_A[3]; T_V3_RAY_O[2] = T_V4_A[2] / T_V4_A[3]; // This is 'n' (the origin)
+        T_V3_A[0]    = T_V4_B[0] / T_V4_B[3]; T_V3_A[1]    = T_V4_B[1] / T_V4_B[3]; T_V3_A[2]    = T_V4_B[2] / T_V4_B[3]; // This is 'f' (the far point)
+
+
         // Create a normalized direction vector.
-        const d = [f[0] - n[0], f[1] - n[1], f[2] - n[2]];
-        const il = 1 / HYPOT(d[0], d[1], d[2]);
-        return { o: n, d: [d[0] * il, d[1] * il, d[2] * il] };
+        //const d = [f[0] - n[0], f[1] - n[1], f[2] - n[2]];
+        //const il = 1 / HYPOT(d[0], d[1], d[2]);
+        //return { o: n, d: [d[0] * il, d[1] * il, d[2] * il] };
+
+        
+        // Calculate the direction vector into T_V3_RAY_D
+        SUB(T_V3_RAY_D, T_V3_A, T_V3_RAY_O);
+        NORM(T_V3_RAY_D, T_V3_RAY_D);
+            
+        return { o: T_V3_RAY_O, d: T_V3_RAY_D };
+
+
     }
     // Handles a click/tap interaction in desktop mode
     function interactDesktopAt(px, py) {
@@ -312,12 +343,72 @@
         return null;
     }
 
+    //const d = [-sy * cp, -sp, -cy * cp];
+    //const o = [user.x, user.y, user.z];
+    //return { o, d };
+    //T_V3_RAY_D[0] = -sy * cp; T_V3_RAY_D[1] = -sp; T_V3_RAY_D[2] = -cy * cp;
+    //T_V3_RAY_O[0] = user.x; T_V3_RAY_O[1] = user.y; T_V3_RAY_O[2] = user.z;
+    //return { o: T_V3_RAY_O, d: T_V3_RAY_D };
+
     // -- /MODULE: Input-Ray --
     // -- /FEATURE: Input --
 
     // -- FEATURE: Gameplay --
     let beastMode = false; // toggle beast mode
     // -- MODULE: Gameplay-Movement --
+    // --- Movement Logic ---
+    // Movement and input constants
+    const MOVES = 3;    // Movement speed in meters per second
+    const TURNS = 2;    // Turning speed in radians per second
+
+    // Consolidates input from keyboard, joysticks, and VR controllers into a single movement vector
+    function getMove(session) {
+        let vx = 0, vy = 0, vt = 0;
+        // -- SOLUTION: Gameplay-Movement-Keyboard --
+        // Keyboard input (WASD for move, QE for turn)
+        const kx = (+!!input.keys.d) - (+!!input.keys.a);
+        const ky = (+!!input.keys.w) - (+!!input.keys.s);
+        const kt = (+!!input.keys.q) - (+!!input.keys.e);
+        // -- /SOLUTION: Gameplay-Movement-Keyboard --
+    
+        // -- SOLUTION: Gameplay-Movement-Joystick --
+        // Virtual joystick input
+        const jx = input.joy.left.x;
+        const jy = -input.joy.left.y;
+        const jt = -input.joy.right.x;
+        // -- /SOLUTION: Gameplay-Movement-Joystick --
+
+        // -- SOLUTION: Gameplay-Movement-VR --
+        // -- /SOLUTION: Gameplay-Movement-VR --
+
+        // Return combined movement, prioritizing VR, then keyboard, then joystick
+        return { x: vx || kx || jx, y: vy || ky || jy, t: vt || kt || jt };
+    }
+
+    // -- SOLUTION: Gameplay-Movement-Step --
+    // Updates the user's position and orientation based on movement input and delta time
+    function step(dt, mv) {
+        const now = performance.now();
+        const moveMagnitude = Math.hypot(mv.x, mv.y);
+        if(moveMagnitude > 0.1 && now - lastStepTime > stepInterval){
+            playStepSound();
+            lastStepTime = now;
+        }
+        user.yaw += mv.t * TURNS * dt; // Apply turning
+        
+        // Calculate forward and right vectors based on current yaw
+        const cy = COS(user.yaw);
+        const sy = SIN(user.yaw);
+        T_V3_A[0] = -sy; T_V3_A[1] = 0; T_V3_A[2] = -cy; // 'f' vector
+        T_V3_B[0] = cy;  T_V3_B[1] = 0; T_V3_B[2] = -sy;  // 'r' vector
+        const sp = MOVES * dt;
+        
+        // Apply movement along forward and right vectors
+        user.x += (T_V3_B[0] * mv.x + T_V3_A[0] * mv.y) * sp;
+        user.z += (T_V3_B[2] * mv.x + T_V3_A[2] * mv.y) * sp;
+    }
+    // -- /SOLUTION: Gameplay-Movement-Step --
+    // -- /MODULE: Gameplay-Movement --
     // -- /FEATURE: Gameplay --
     
     // -- FEATURE: Scene --
@@ -325,7 +416,7 @@
     // todo: implement stereo sources to get spatial audio (directional wind sound)
     let audioCtx = null;
     let lastStepTime = 0;
-    const stepInterval = 400; // ms between walking sounds
+    const stepInterval = 500; // ms between walking sounds
     
     function initAudio(){
       if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -614,11 +705,40 @@
 
     // -- /MODULE: Scene-Ground --
     // -- MODULE: Scene-Grass --
+    
     // -- /MODULE: Scene-Grass --
     // -- MODULE: Scene-Plant --
+    
     // -- /MODULE: Scene-Plant --
     
     // -- MODULE: Scene-Reticle --
+    const vsR = `#version 300 es
+    precision highp float;
+    layout(location=0) in vec2 p;
+    uniform mat4 M, V, P;
+    out vec2 uv;
+    void main(){
+        uv = p * 0.5 + 0.5;
+        gl_Position = P * V * M * vec4(p.x, 0.0, p.y, 1.0);
+    }`;
+    const fsR = `#version 300 es
+    precision highp float;
+    in vec2 uv;
+    out vec4 o;
+    void main(){
+        float d = distance(uv, vec2(0.5));
+        float ring = smoothstep(0.5, 0.4, d) - smoothstep(0.4, 0.3, d);
+        o = vec4(0.9, 1.0, 0.9, ring * 0.95);
+        if(o.a < 0.02) discard;
+    }`;
+    const PR = prog(vsR, fsR);
+    const uMR = gl.getUniformLocation(PR, 'M'), uVR = gl.getUniformLocation(PR, 'V'), uPR = gl.getUniformLocation(PR, 'P');
+    const vboR = gl.createBuffer(), vaoR = gl.createVertexArray();
+    gl.bindVertexArray(vaoR);
+    gl.bindBuffer(gl.ARRAY_BUFFER, vboR);
+    gl.bufferData(gl.ARRAY_BUFFER, new F32([-1,-1, 1,-1, 1,1, -1,-1, 1,1, -1,1]), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
     // -- /MODULE: Scene-Reticle --
 
     // -- MODULE: Scene-VR --
@@ -645,10 +765,8 @@
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
         // Render Sky
-    
-
-        // Noise texture for clouds
         
+        // Noise texture for clouds
 
         // Render Grid
         gl.useProgram(PG);
@@ -663,12 +781,25 @@
         gl.drawArrays(gl.TRIANGLES, 0, 6);
 
         // Render Grass in multiple passes for density and LOD
-       
-
+        
         // Render L-System Plants
         
         // Render Reticle if there's a ground hit
-        
+         if (lastHit) {
+            const T = translateScale(lastHit[0], 0.001, lastHit[2], 0.15, 1, 0.15);
+            gl.useProgram(PR);
+            gl.bindVertexArray(vaoR);
+            gl.uniformMatrix4fv(uMR, false, T);
+            gl.uniformMatrix4fv(uVR, false, V);
+            gl.uniformMatrix4fv(uPR, false, P);
+            gl.enable(gl.BLEND);
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+            gl.disable(gl.DEPTH_TEST);
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+            gl.enable(gl.DEPTH_TEST);
+            gl.disable(gl.BLEND);
+        }
+
 
         // Render HUD
         const T = getHudTransform();
@@ -710,7 +841,6 @@
     }
 
     // Helper to submit a grass draw call
-    
 
     // Computes the view and projection matrices for desktop mode
     function buildViewProj() {
@@ -728,6 +858,7 @@
     // -- /CORE: Render --
 
     // -- FEATURE: VR --
+    
     // -- /FEATURE: VR --
     
     // -- FEATURE: CORE --
