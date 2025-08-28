@@ -142,7 +142,7 @@
         return p;
     }
     // -- /FEATURE: Core --
-
+    
     // -- FEATURE: Input --
     // -- MODULE: Input-Core --
     // --- Unified Input Handling ---
@@ -161,10 +161,9 @@
 
     // State for the raycast
     let lastHit = null;
-    //ray = null; // delete
     // -- /MODULE: Input-Core --
     
-    // -- MODULE: Input-KeyPointer --
+    // -- MODULE: Input-KeyPoint --
     // Keyboard event listeners for movement and HUD toggle
     document.addEventListener('keydown', e => {
         const k = e.key.toLowerCase();
@@ -221,8 +220,7 @@
             input.look.id = null;
         }
     });
-    // -- /MODULE: Input-KeyPointer --
-    
+    // -- /MODULE: Input-KeyPoint --
     
     // -- MODULE: Input-Joystick --
     // --- Virtual Joysticks for Touch Devices ---
@@ -396,6 +394,13 @@
         }
         return { o: [0, 0, 0], d: [0, 0, -1] }; // Fallback, ray from Head
     }
+    //const d = [-sy * cp, -sp, -cy * cp];
+    //const o = [user.x, user.y, user.z];
+    //return { o, d };
+    //T_V3_RAY_D[0] = -sy * cp; T_V3_RAY_D[1] = -sp; T_V3_RAY_D[2] = -cy * cp;
+    //T_V3_RAY_O[0] = user.x; T_V3_RAY_O[1] = user.y; T_V3_RAY_O[2] = user.z;
+    //return { o: T_V3_RAY_O, d: T_V3_RAY_D };
+    
     // -- /MODULE: Input-Ray --
     // -- /FEATURE: Input --
 
@@ -623,35 +628,22 @@
     // -- SOLUTION: Scene-Audio-Click --
     function playClickSound(){
       if(!audioCtx) return;
-      const t = audioCtx.currentTime;
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(300, t);
       gain.gain.setValueAtTime(0.3, t);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.1);
-      osc.start(t);
-      osc.stop(t + 0.1);
+        if(!audioCtx) return;
+        const t = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.stop(t + 0.1);    
     }
     // -- /SOLUTION: Scene-Audio-Click --
     // -- SOLUTION: Scene-Audio-Step --
-
     function playStepSound(){
-      if(!audioCtx) return;
-      const t = audioCtx.currentTime;
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(60, t);
-      osc.frequency.exponentialRampToValueAtTime(160, t + 0.2);
-      gain.gain.setValueAtTime(0.3, t);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
-      osc.start(t);
-      osc.stop(t + 0.3);
+        if(!audioCtx) return;
+        const t = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
     }
     // -- /SOLUTION: Scene-Audio-Step --
     // -- /MODULE: Scene-Audio --
@@ -1628,6 +1620,7 @@
             gl.enable(gl.DEPTH_TEST);
             gl.disable(gl.BLEND);
         }
+
 
         // Render HUD
         const T = getHudTransform();
