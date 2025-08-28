@@ -69,6 +69,8 @@
     const M4 = (v) => new F32(v || [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]);
     const V3 = (v) => new F32(v || 3);
     const T_V3_A = V3(), T_V3_B = V3(), T_V3_C = V3(); // Reusable temporary V3s
+    const T_V4_A = V3(4), T_V4_B = V3(4); // Reusable temporary V4s
+    const T_V3_RAY_O = V3(), T_V3_RAY_D = V3(); // For raycasting results (Origin, Direction)
     const SUB=(t,n,r)=>(t[0]=n[0]-r[0],t[1]=n[1]-r[1],t[2]=n[2]-r[2],t);
     const DOT=(t,n)=>t[0]*n[0]+t[1]*n[1]+t[2]*n[2];
     const CROSS=(t,n,r)=>(t[0]=n[1]*r[2]-n[2]*r[1],t[1]=n[2]*r[0]-n[0]*r[2],t[2]=n[0]*r[1]-n[1]*r[0],t);
@@ -88,7 +90,17 @@
     // Multiplies a 3D direction (w=0) by a 4x4 matrix
     function mulDir(m, d) { const x=d[0],y=d[1],z=d[2],w=0; return [m[0]*x+m[4]*y+m[8]*z+m[12]*w, m[1]*x+m[5]*y+m[9]*z+m[13]*w, m[2]*x+m[6]*y+m[10]*z+m[14]*w]; }
 
-    function mul4(m, v) { return [m[0]*v[0]+m[4]*v[1]+m[8]*v[2]+m[12]*v[3], m[1]*v[0]+m[5]*v[1]+m[9]*v[2]+m[13]*v[3], m[2]*v[0]+m[6]*v[1]+m[10]*v[2]+m[14]*v[3], m[3]*v[0]+m[7]*v[1]+m[11]*v[2]+m[15]*v[3]]; }
+    //function mul4(m, v) { return [m[0]*v[0]+m[4]*v[1]+m[8]*v[2]+m[12]*v[3], m[1]*v[0]+m[5]*v[1]+m[9]*v[2]+m[13]*v[3], m[2]*v[0]+m[6]*v[1]+m[10]*v[2]+m[14]*v[3], m[3]*v[0]+m[7]*v[1]+m[11]*v[2]+m[15]*v[3]]; }
+    const mul4 = (out, m, v) => {
+        const v0=v[0], v1=v[1], v2=v[2], v3=v[3];
+        out[0] = m[0]*v0 + m[4]*v1 + m[8]*v2 + m[12]*v3;
+        out[1] = m[1]*v0 + m[5]*v1 + m[9]*v2 + m[13]*v3;
+        out[2] = m[2]*v0 + m[6]*v1 + m[10]*v2 + m[14]*v3;
+        out[3] = m[3]*v0 + m[7]*v1 + m[11]*v2 + m[15]*v3;
+        return out;
+    };
+    
+
 
     // Creates a translation and scale matrix
     function translateScale(x,y,z,sx,sy,sz) { return new F32([sx,0,0,0, 0,sy,0,0, 0,0,sz,0, x,y,z,1]); }
@@ -268,18 +280,39 @@
         const r = canvas.getBoundingClientRect();
         const x = ((px - r.left) / r.width) * 2 - 1;
         const y = 1 - ((py - r.top) / r.height) * 2;
-        const near = [x, y, -1, 1], far = [x, y, 1, 1];
+        //const near = [x, y, -1, 1], far = [x, y, 1, 1];
+        // Use T_V4_A for the 'near' and T_V4_B for the 'far' vector4s
+        T_V4_A[0] = x; T_V4_A[1] = y; T_V4_A[2] = -1; T_V4_A[3] = 1;
+        T_V4_B[0] = x; T_V4_B[1] = y; T_V4_B[2] = 1;  T_V4_B[3] = 1;
 
         // Unproject near and far points from clip space to world space
-        const n4 = mul4(invPV, near),
-              f4 = mul4(invPV, far);
-        const n = [n4[0] / n4[3], n4[1] / n4[3], n4[2] / n4[3]];
-        const f = [f4[0] / f4[3], f4[1] / f4[3], f4[2] / f4[3]];
+        //const n4 = mul4(invPV, near),
+        //      f4 = mul4(invPV, far);
+        //const n = [n4[0] / n4[3], n4[1] / n4[3], n4[2] / n4[3]];
+        //const f = [f4[0] / f4[3], f4[1] / f4[3], f4[2] / f4[3]];
         
+        // Unproject, writing the results back into our temporary V4s
+        mul4(T_V4_A, invPV, T_V4_A);
+        mul4(T_V4_B, invPV, T_V4_B);
+
+        // Convert to 3D points, writing to our dedicated ray vectors
+        T_V3_RAY_O[0] = T_V4_A[0] / T_V4_A[3]; T_V3_RAY_O[1] = T_V4_A[1] / T_V4_A[3]; T_V3_RAY_O[2] = T_V4_A[2] / T_V4_A[3]; // This is 'n' (the origin)
+        T_V3_A[0]    = T_V4_B[0] / T_V4_B[3]; T_V3_A[1]    = T_V4_B[1] / T_V4_B[3]; T_V3_A[2]    = T_V4_B[2] / T_V4_B[3]; // This is 'f' (the far point)
+
+
         // Create a normalized direction vector.
-        const d = [f[0] - n[0], f[1] - n[1], f[2] - n[2]];
-        const il = 1 / HYPOT(d[0], d[1], d[2]);
-        return { o: n, d: [d[0] * il, d[1] * il, d[2] * il] };
+        //const d = [f[0] - n[0], f[1] - n[1], f[2] - n[2]];
+        //const il = 1 / HYPOT(d[0], d[1], d[2]);
+        //return { o: n, d: [d[0] * il, d[1] * il, d[2] * il] };
+
+        
+        // Calculate the direction vector into T_V3_RAY_D
+        SUB(T_V3_RAY_D, T_V3_A, T_V3_RAY_O);
+        NORM(T_V3_RAY_D, T_V3_RAY_D);
+            
+        return { o: T_V3_RAY_O, d: T_V3_RAY_D };
+
+
     }
     // Handles a click/tap interaction in desktop mode
     function interactDesktopAt(px, py) {
@@ -336,9 +369,9 @@
         } else { // Desktop mode
             const cy = COS(user.yaw), sy = SIN(user.yaw);
             const cp = COS(user.pitch), sp = SIN(user.pitch);
-            const d = [-sy * cp, -sp, -cy * cp];
-            const o = [user.x, user.y, user.z];
-            return { o, d };
+            T_V3_RAY_D[0] = -sy * cp; T_V3_RAY_D[1] = -sp; T_V3_RAY_D[2] = -cy * cp;
+            T_V3_RAY_O[0] = user.x; T_V3_RAY_O[1] = user.y; T_V3_RAY_O[2] = user.z;
+            return { o: T_V3_RAY_O, d: T_V3_RAY_D };
         }
         return null;
     }
@@ -1222,17 +1255,48 @@
     // --- L-System Plant Shader ---
     // -- SOLUTION: Scene-Plant--
     // Positions and scales for the scattered L-system plants.
-    // later we will generate positions and scatter instances
-    const PLANT_POSITIONS = [
-        [0, 0, 1],
-        [5, -4, 1.2],
-        [-3, -8, 0.9],
-        [8, 10, 1.1],
-        [-10, 5, 1.3],
-        [12, -12, 0.8],
-        [-15, -9, 1.0]
-    ];
-
+    // --- Procedural plant field (infinite-style) ---
+    const PLANT_CELL = 6.0;          // World size of one plant decision cell
+    const PLANT_PROB = 0.28;         // Spawn probability per cell
+    const PLANT_RADIUS = 55.0;       // Active radius around camera (render window)
+    const PLANT_SCALE_MIN = 1.2;
+    const PLANT_SCALE_MAX = 1.4;
+    
+    // Fast small hash (deterministic)
+    function plantHash(ix, iz, salt){
+        const s = Math.sin(ix*127.1 + iz*311.7 + salt*17.17)*43758.5453;
+        return s - Math.floor(s);
+    }
+    
+    // Generate plants near (cx,cz); returns array of objects
+    function genPlants(cx, cz){
+        const r = PLANT_RADIUS;
+        const c = PLANT_CELL;
+        const minX = Math.floor((cx - r)/c);
+        const maxX = Math.floor((cx + r)/c);
+        const minZ = Math.floor((cz - r)/c);
+        const maxZ = Math.floor((cz + r)/c);
+        const out = [];
+        for(let gz=minZ; gz<=maxZ; gz++){
+            for(let gx=minX; gx<=maxX; gx++){
+                const h = plantHash(gx, gz, 0.0);
+                if(h < PLANT_PROB){
+                    // Stable jitter inside cell
+                    const jx = plantHash(gx, gz, 1.0) - 0.5;
+                    const jz = plantHash(gx, gz, 2.0) - 0.5;
+                    const px = gx*c + (jx * c * 0.85) + c*0.5;
+                    const pz = gz*c + (jz * c * 0.85) + c*0.5;
+                    const dx = px - cx, dz = pz - cz;
+                    if(dx*dx + dz*dz <= r*r){
+                        const sc = PLANT_SCALE_MIN + (plantHash(gx, gz, 3.0) * (PLANT_SCALE_MAX - PLANT_SCALE_MIN));
+                        out.push({px, pz, scale: sc, gx, gz});
+                    }
+                }
+            }
+        }
+        return out;
+    }
+    
     const vsPlants = `#version 300 es // Vertex shader for plants using WebGL2
     precision highp float; // Use high precision for all float operations
     layout(location=0) in vec3 p; // Input vertex position attribute at location 0
@@ -1251,23 +1315,23 @@
     uniform float uTime; // Time uniform for animation
     uniform int uMaxIterations; // Control the quality/complexity
 
-    #define PI 3.14159
+    #define PI 3.14159 // Define PI constant for mathematical calculations
 
-    mat3 Rot(float angle) {
-        float c = cos(angle);
-        float s = sin(angle);
-        return mat3(vec3(c, s, 0), vec3(-s, c, 0), vec3(0, 0, 1));
-    }
+    mat3 Rot(float angle) { // Function to create 2D rotation matrix
+        float c = cos(angle); // Calculate cosine of rotation angle
+        float s = sin(angle); // Calculate sine of rotation angle
+        return mat3(vec3(c, s, 0), vec3(-s, c, 0), vec3(0, 0, 1)); // Return 3x3 rotation matrix
+    } // End of rotation matrix function
 
-    mat3 Disp(vec2 displacement) {
-        return mat3(vec3(1, 0, 0), vec3(0, 1, 0), vec3(displacement, 1));
-    }
+    mat3 Disp(vec2 displacement) { // Function to create 2D displacement matrix
+        return mat3(vec3(1, 0, 0), vec3(0, 1, 0), vec3(displacement, 1)); // Return 3x3 translation matrix
+    } // End of displacement matrix function
 
-    float sdCappedCylinder(vec2 p, vec2 h) {
-        p -= vec2(0., h.y);
-        vec2 d = abs(vec2(length(p.x), p.y)) - h;
-        return min(max(d.x, d.y), 0.0) + length(max(d, 0.0));
-    }
+    float sdCappedCylinder(vec2 p, vec2 h) { // Signed distance function for capped cylinder
+        p -= vec2(0., h.y); // Offset point by cylinder height
+        vec2 d = abs(vec2(length(p.x), p.y)) - h; // Calculate distance to cylinder surface
+        return min(max(d.x, d.y), 0.0) + length(max(d, 0.0)); // Return signed distance to cylinder
+    } // End of capped cylinder distance function
 
     float center(vec2 pt) { // Main function to generate L-system plant structure
         mat3 posR = Rot(-(25.7 / 360.) * 2. * PI); // Create positive rotation matrix (clockwise)
@@ -1310,9 +1374,9 @@
         return min(d, trunk); // Return minimum distance between branches and trunk
     } // End of L-system generation function
 
-    void main() {
-        vec2 p = (uv * 2.0 - 1.0) * 5.0; // Scale and center UVs
-        p.y += 2.0; // Adjust vertical position
+    void main() { // Main fragment shader function
+        vec2 p = (uv * 2.0 - 1.0) * 5.0; // Scale and center UVs to range [-5, 5]
+        p.y += 2.0; // Adjust vertical position upward
 
         float d = center(p); // Calculate distance to nearest plant structure
         float t = clamp(d, 0.0, .04) * 2. * 12.5; // Convert distance to alpha value with clamping
@@ -1330,9 +1394,9 @@
     const uTimePla = gl.getUniformLocation(PPLANTS, 'uTime'); // Get location of time uniform for animation
     const uMaxIterationsPla = gl.getUniformLocation(PPLANTS, 'uMaxIterations'); // Get location of max iterations uniform
 
-    const vboPlants = gl.createBuffer(), vaoPlants = gl.createVertexArray();
-    gl.bindVertexArray(vaoPlants);
-    gl.bindBuffer(gl.ARRAY_BUFFER, vboPlants);
+    const vboPlants = gl.createBuffer(), vaoPlants = gl.createVertexArray(); // Create vertex buffer and vertex array objects
+    gl.bindVertexArray(vaoPlants); // Bind the vertex array object
+    gl.bindBuffer(gl.ARRAY_BUFFER, vboPlants); // Bind the vertex buffer object
     // Vertex data for a quad (position and UV coordinates).
     gl.bufferData(gl.ARRAY_BUFFER, new F32([-1,2,0, 0,1,  1,2,0, 1,1,  1,0,0, 1,0,  -1,2,0, 0,1,  1,0,0, 1,0,  -1,0,0, 0,0]), gl.STATIC_DRAW); // Upload vertex data: 6 vertices forming 2 triangles for a quad, each with position (x,y,z) and UV (u,v)
     gl.enableVertexAttribArray(0); // Enable vertex attribute array at location 0 (position)
@@ -1504,42 +1568,31 @@
 
             const camX = user.x;
             const camZ = user.z;
+            const plants = genPlants(camX, camZ);
 
-            for (const [px, pz, scale] of PLANT_POSITIONS) {
+            for(const p of plants){
+                const px = p.px, pz = p.pz, scale = p.scale;
 
-                // --- Start of new LOD logic ---
-                // Smooth, stable LOD with temporal smoothing (prevents flicker during animation)
-                if (typeof PLANT_IDX === 'undefined') PLANT_IDX = 0;
-                const i = PLANT_IDX % PLANT_POSITIONS.length;
-                PLANT_IDX++;
-
-                if (typeof PLANT_LODS === 'undefined') {
-                    PLANT_LODS = new Float32Array(PLANT_POSITIONS.length);
-                    PLANT_LODS.fill(14); // start at max quality
-                }
-
+                // Distance & LOD
                 const dx = camX - px, dz = camZ - pz;
                 const dist = Math.hypot(dx, dz);
 
-                // Artistic LOD parameters
-                const MIN_ITER = 0, MAX_ITER = 10;
-                const NEAR = 2, FAR = 5.0;
+                const NEAR_HIDE = 2.0;
+                const NEAR_FULL = 6.0;
+                const FAR_START = 18.0;
+                const FAR_HIDE  = 28.0;
+                if(dist < NEAR_HIDE || dist > FAR_HIDE) continue;
 
-                // normalized ease (smoothstep)
-                let tt = (dist - NEAR) / (FAR - NEAR);
-                tt = Math.max(0, Math.min(1, tt));
-                tt = tt * tt * (3 - 2 * tt);
+                const MIN_ITER = 2, MAX_ITER = 16;
+                const sstep = x => x*x*(3-2*x);
+                let a = (dist - NEAR_HIDE)/(NEAR_FULL-NEAR_HIDE); a = sstep(Math.min(1, Math.max(0,a)));
+                let b = (FAR_HIDE - dist)/(FAR_HIDE - FAR_START); b = sstep(Math.min(1, Math.max(0,b)));
+                let q = a * b;
+                if(q < 0.05) continue;
 
-                // target continuous iteration value
-                const target = MIN_ITER + tt * (MAX_ITER - MIN_ITER);
-
-                // temporal smoothing to avoid popping when animated
-                const SMOOTH = 0.12; // 0..1 (higher = faster response)
-                PLANT_LODS[i] += (target - PLANT_LODS[i]) * SMOOTH;
-
-                // integer iterations used by the shader
-                const iterations = Math.max(MIN_ITER, Math.min(MAX_ITER, Math.round(PLANT_LODS[i])));
-                // --- End of new LOD logic ---
+                const key = p.gx + ',' + p.gz;
+                const target = MIN_ITER + q*(MAX_ITER - MIN_ITER);
+                const iterations = Math.max(MIN_ITER, Math.min(MAX_ITER, target)) | 0;
 
                 const angle = ATAN2(camX - px, camZ - pz);
                 const MPlants = new DOMMatrix()
@@ -1559,6 +1612,7 @@
             gl.depthMask(true);
             gl.disable(gl.BLEND);
         }
+
         // Render Reticle if there's a ground hit
         if (lastHit) {
             const T = translateScale(lastHit[0], 0.001, lastHit[2], 0.15, 1, 0.15);
@@ -1811,66 +1865,55 @@
                 gl.bindVertexArray(vaoPlants);
                 gl.enable(gl.BLEND);
                 gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-                gl.depthMask(false);
+                gl.depthMask(false); // Render transparent objects without writing to depth buffer
 
                 const worldFromView = v.transform.matrix;
                 const camX = worldFromView[12];
                 const camZ = worldFromView[14];
+                const plants = genPlants(camX, camZ);
 
-                for (const [px, pz, scale] of PLANT_POSITIONS) {
+            for(const p of plants){
+                const px = p.px, pz = p.pz, scale = p.scale;
 
-                // --- Start of new LOD logic ---
-                // Smooth, stable LOD with temporal smoothing (prevents flicker during animation)
-                if (typeof PLANT_IDX === 'undefined') PLANT_IDX = 0;
-                const i = PLANT_IDX % PLANT_POSITIONS.length;
-                PLANT_IDX++;
-
-                if (typeof PLANT_LODS === 'undefined') {
-                    PLANT_LODS = new Float32Array(PLANT_POSITIONS.length);
-                    PLANT_LODS.fill(14); // start at max quality
-                }
-
+                // Distance & LOD
                 const dx = camX - px, dz = camZ - pz;
                 const dist = Math.hypot(dx, dz);
 
-                // Artistic LOD parameters
-                const MIN_ITER = 0, MAX_ITER = 10;
-                const NEAR = 2, FAR = 5.0;
+                const NEAR_HIDE = 2.0;
+                const NEAR_FULL = 6.0;
+                const FAR_START = 18.0;
+                const FAR_HIDE  = 28.0;
+                if(dist < NEAR_HIDE || dist > FAR_HIDE) continue;
 
-                // normalized ease (smoothstep)
-                let tt = (dist - NEAR) / (FAR - NEAR);
-                tt = Math.max(0, Math.min(1, tt));
-                tt = tt * tt * (3 - 2 * tt);
+                const MIN_ITER = 2, MAX_ITER = 16;
+                const sstep = x => x*x*(3-2*x);
+                let a = (dist - NEAR_HIDE)/(NEAR_FULL-NEAR_HIDE); a = sstep(Math.min(1, Math.max(0,a)));
+                let b = (FAR_HIDE - dist)/(FAR_HIDE - FAR_START); b = sstep(Math.min(1, Math.max(0,b)));
+                let q = a * b;
+                if(q < 0.05) continue;
 
-                // target continuous iteration value
-                const target = MIN_ITER + tt * (MAX_ITER - MIN_ITER);
+                const key = p.gx + ',' + p.gz;
+                const target = MIN_ITER + q*(MAX_ITER - MIN_ITER);
+                const iterations = Math.max(MIN_ITER, Math.min(MAX_ITER, target)) | 0;
 
-                // temporal smoothing to avoid popping when animated
-                const SMOOTH = 0.12; // 0..1 (higher = faster response)
-                PLANT_LODS[i] += (target - PLANT_LODS[i]) * SMOOTH;
+                const angle = ATAN2(camX - px, camZ - pz);
+                const MPlants = new DOMMatrix()
+                    .translate(px, 0, pz)
+                    .rotate(0, angle * 57.295775 /*180 / PI*/, 0) // DOMMatrix uses degrees
+                    .scale(scale, scale, scale)
+                    .toFloat32Array();
 
-                // integer iterations used by the shader
-                const iterations = Math.max(MIN_ITER, Math.min(MAX_ITER, Math.round(PLANT_LODS[i])));
-                // --- End of new LOD logic ---
-
-                    const angle = ATAN2(camX - px, camZ - pz);
-                    const MPlants = new DOMMatrix()
-                        .translate(px, 0, pz)
-                        .rotate(0, angle * 57.295775 /*180 / PI*/, 0)
-                        .scale(scale, scale, scale)
-                        .toFloat32Array();
-                    
-                    gl.uniformMatrix4fv(uMPla, false, MPlants);
-                    gl.uniformMatrix4fv(uVPla, false, v.transform.inverse.matrix);
-                    gl.uniformMatrix4fv(uPPla, false, v.projectionMatrix);
-                    gl.uniform1f(uTimePla, t * 0.001);
-                    gl.drawArrays(gl.TRIANGLES, 0, 6);
-                }
-
-                gl.depthMask(true);
-                gl.disable(gl.BLEND);
+                gl.uniformMatrix4fv(uMPla, false, MPlants);
+                gl.uniformMatrix4fv(uVPla, false, v.transform.inverse.matrix);
+                gl.uniformMatrix4fv(uPPla, false, v.projectionMatrix);
+                gl.uniform1f(uTimePla, t * 0.001);
+                gl.uniform1i(uMaxIterationsPla, iterations);
+                gl.drawArrays(gl.TRIANGLES, 0, 6);
             }
 
+            gl.depthMask(true);
+            gl.disable(gl.BLEND);
+            }
 
             // Render Reticle
             if (lastHit) {
