@@ -90,7 +90,17 @@
     // Multiplies a 3D direction (w=0) by a 4x4 matrix
     function mulDir(m, d) { const x=d[0],y=d[1],z=d[2],w=0; return [m[0]*x+m[4]*y+m[8]*z+m[12]*w, m[1]*x+m[5]*y+m[9]*z+m[13]*w, m[2]*x+m[6]*y+m[10]*z+m[14]*w]; }
 
-    function mul4(m, v) { return [m[0]*v[0]+m[4]*v[1]+m[8]*v[2]+m[12]*v[3], m[1]*v[0]+m[5]*v[1]+m[9]*v[2]+m[13]*v[3], m[2]*v[0]+m[6]*v[1]+m[10]*v[2]+m[14]*v[3], m[3]*v[0]+m[7]*v[1]+m[11]*v[2]+m[15]*v[3]]; }
+    //function mul4(m, v) { return [m[0]*v[0]+m[4]*v[1]+m[8]*v[2]+m[12]*v[3], m[1]*v[0]+m[5]*v[1]+m[9]*v[2]+m[13]*v[3], m[2]*v[0]+m[6]*v[1]+m[10]*v[2]+m[14]*v[3], m[3]*v[0]+m[7]*v[1]+m[11]*v[2]+m[15]*v[3]]; }
+    const mul4 = (out, m, v) => {
+        const v0=v[0], v1=v[1], v2=v[2], v3=v[3];
+        out[0] = m[0]*v0 + m[4]*v1 + m[8]*v2 + m[12]*v3;
+        out[1] = m[1]*v0 + m[5]*v1 + m[9]*v2 + m[13]*v3;
+        out[2] = m[2]*v0 + m[6]*v1 + m[10]*v2 + m[14]*v3;
+        out[3] = m[3]*v0 + m[7]*v1 + m[11]*v2 + m[15]*v3;
+        return out;
+    };
+    
+
 
     // Creates a translation and scale matrix
     function translateScale(x,y,z,sx,sy,sz) { return new F32([sx,0,0,0, 0,sy,0,0, 0,0,sz,0, x,y,z,1]); }
@@ -268,18 +278,39 @@
         const r = canvas.getBoundingClientRect();
         const x = ((px - r.left) / r.width) * 2 - 1;
         const y = 1 - ((py - r.top) / r.height) * 2;
-        const near = [x, y, -1, 1], far = [x, y, 1, 1];
+        //const near = [x, y, -1, 1], far = [x, y, 1, 1];
+        // Use T_V4_A for the 'near' and T_V4_B for the 'far' vector4s
+        T_V4_A[0] = x; T_V4_A[1] = y; T_V4_A[2] = -1; T_V4_A[3] = 1;
+        T_V4_B[0] = x; T_V4_B[1] = y; T_V4_B[2] = 1;  T_V4_B[3] = 1;
 
         // Unproject near and far points from clip space to world space
-        const n4 = mul4(invPV, near),
-              f4 = mul4(invPV, far);
-        const n = [n4[0] / n4[3], n4[1] / n4[3], n4[2] / n4[3]];
-        const f = [f4[0] / f4[3], f4[1] / f4[3], f4[2] / f4[3]];
+        //const n4 = mul4(invPV, near),
+        //      f4 = mul4(invPV, far);
+        //const n = [n4[0] / n4[3], n4[1] / n4[3], n4[2] / n4[3]];
+        //const f = [f4[0] / f4[3], f4[1] / f4[3], f4[2] / f4[3]];
         
+        // Unproject, writing the results back into our temporary V4s
+        mul4(T_V4_A, invPV, T_V4_A);
+        mul4(T_V4_B, invPV, T_V4_B);
+
+        // Convert to 3D points, writing to our dedicated ray vectors
+        T_V3_RAY_O[0] = T_V4_A[0] / T_V4_A[3]; T_V3_RAY_O[1] = T_V4_A[1] / T_V4_A[3]; T_V3_RAY_O[2] = T_V4_A[2] / T_V4_A[3]; // This is 'n' (the origin)
+        T_V3_A[0]    = T_V4_B[0] / T_V4_B[3]; T_V3_A[1]    = T_V4_B[1] / T_V4_B[3]; T_V3_A[2]    = T_V4_B[2] / T_V4_B[3]; // This is 'f' (the far point)
+
+
         // Create a normalized direction vector.
-        const d = [f[0] - n[0], f[1] - n[1], f[2] - n[2]];
-        const il = 1 / HYPOT(d[0], d[1], d[2]);
-        return { o: n, d: [d[0] * il, d[1] * il, d[2] * il] };
+        //const d = [f[0] - n[0], f[1] - n[1], f[2] - n[2]];
+        //const il = 1 / HYPOT(d[0], d[1], d[2]);
+        //return { o: n, d: [d[0] * il, d[1] * il, d[2] * il] };
+
+        
+        // Calculate the direction vector into T_V3_RAY_D
+        SUB(T_V3_RAY_D, T_V3_A, T_V3_RAY_O);
+        NORM(T_V3_RAY_D, T_V3_RAY_D);
+            
+        return { o: T_V3_RAY_O, d: T_V3_RAY_D };
+
+
     }
     // Handles a click/tap interaction in desktop mode
     function interactDesktopAt(px, py) {
@@ -819,6 +850,14 @@
     // -- /CORE: Render --
 
     // -- FEATURE: VR --
+
+    //const d = [-sy * cp, -sp, -cy * cp];
+    //const o = [user.x, user.y, user.z];
+    //return { o, d };
+    //T_V3_RAY_D[0] = -sy * cp; T_V3_RAY_D[1] = -sp; T_V3_RAY_D[2] = -cy * cp;
+    //T_V3_RAY_O[0] = user.x; T_V3_RAY_O[1] = user.y; T_V3_RAY_O[2] = user.z;
+    //return { o: T_V3_RAY_O, d: T_V3_RAY_D };
+    
     // -- /FEATURE: VR --
     
     // -- FEATURE: CORE --
