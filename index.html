@@ -1865,94 +1865,55 @@
                 gl.bindVertexArray(vaoPlants);
                 gl.enable(gl.BLEND);
                 gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-                gl.depthMask(false);
+                gl.depthMask(false); // Render transparent objects without writing to depth buffer
 
                 const worldFromView = v.transform.matrix;
                 const camX = worldFromView[12];
                 const camZ = worldFromView[14];
+                const plants = genPlants(camX, camZ);
 
-                for (const [px, pz, scale] of PLANT_POSITIONS) {
+            for(const p of plants){
+                const px = p.px, pz = p.pz, scale = p.scale;
 
-                // --- Start of new LOD logic ---
-                // Smooth, stable LOD with temporal smoothing (prevents flicker during animation)
-                if (typeof PLANT_IDX === 'undefined') PLANT_IDX = 0;
-                const i = PLANT_IDX % PLANT_POSITIONS.length;
-                PLANT_IDX++;
-
-                if (typeof PLANT_LODS === 'undefined') {
-                    PLANT_LODS = new Float32Array(PLANT_POSITIONS.length);
-                    PLANT_LODS.fill(14); // start at max quality
-                }
-
+                // Distance & LOD
                 const dx = camX - px, dz = camZ - pz;
                 const dist = Math.hypot(dx, dz);
 
-                // LOD distance bands (tune these)
-                const NEAR_HIDE = 2.0;   // inside: invisible
-                const NEAR_FULL = 5.0;   // reaches full detail
-                const FAR_START = 10.0;   // start reducing detail
-                const FAR_HIDE  = 15.0;  // beyond: invisible
+                const NEAR_HIDE = 2.0;
+                const NEAR_FULL = 6.0;
+                const FAR_START = 18.0;
+                const FAR_HIDE  = 28.0;
+                if(dist < NEAR_HIDE || dist > FAR_HIDE) continue;
 
-                const MIN_ITER = 2;
-                const MAX_ITER = 16;
-
-                // Early reject if fully hidden (small cheap check)
-                if (dist < NEAR_HIDE || dist > FAR_HIDE) continue;
-
-                // Smoothstep helpers
-                function sstep(x){ return x*x*(3-2*x); }
-
-                // Near factor (0 -> 1)
-                let a = (dist - NEAR_HIDE) / (NEAR_FULL - NEAR_HIDE);
-                a = Math.min(1, Math.max(0, a));
-                a = sstep(a);
-
-                // Far factor (1 -> 0)
-                let b = (FAR_HIDE - dist) / (FAR_HIDE - FAR_START);
-                b = Math.min(1, Math.max(0, b));
-                b = sstep(b);
-
-                // Combined quality (peaks at 1 in mid zone)
+                const MIN_ITER = 2, MAX_ITER = 16;
+                const sstep = x => x*x*(3-2*x);
+                let a = (dist - NEAR_HIDE)/(NEAR_FULL-NEAR_HIDE); a = sstep(Math.min(1, Math.max(0,a)));
+                let b = (FAR_HIDE - dist)/(FAR_HIDE - FAR_START); b = sstep(Math.min(1, Math.max(0,b)));
                 let q = a * b;
+                if(q < 0.05) continue;
 
-                // Target (float) iteration quality
-                let target = MIN_ITER + q * (MAX_ITER - MIN_ITER);
+                const key = p.gx + ',' + p.gz;
+                const target = MIN_ITER + q*(MAX_ITER - MIN_ITER);
+                const iterations = Math.max(MIN_ITER, Math.min(MAX_ITER, target)) | 0;
 
-                // OPTIONAL temporal smoothing (reuse PLANT_LODS array you already set up)
-                if (typeof PLANT_LODS === 'undefined') {
-                    PLANT_LODS = new Float32Array(PLANT_POSITIONS.length);
-                    PLANT_LODS.fill(MIN_ITER);
-                }
-                const idx = i; // already computed earlier
-                PLANT_LODS[idx] += (target - PLANT_LODS[idx]) * 0.25; // lerp
-                let iterations = PLANT_LODS[idx];
+                const angle = ATAN2(camX - px, camZ - pz);
+                const MPlants = new DOMMatrix()
+                    .translate(px, 0, pz)
+                    .rotate(0, angle * 57.295775 /*180 / PI*/, 0) // DOMMatrix uses degrees
+                    .scale(scale, scale, scale)
+                    .toFloat32Array();
 
-                // Clamp & integerize
-                iterations = Math.max(MIN_ITER, Math.min(MAX_ITER, iterations)) | 0;
-
-                // Optional: final skip if iterations collapsed to MIN and quality extremely low
-                if (q < 0.05) continue;
-                // --- End of new LOD logic ---
-
-                    const angle = ATAN2(camX - px, camZ - pz);
-                    const MPlants = new DOMMatrix()
-                        .translate(px, 0, pz)
-                        .rotate(0, angle * 57.295775 /*180 / PI*/, 0)
-                        .scale(scale, scale, scale)
-                        .toFloat32Array();
-                    
-                    gl.uniformMatrix4fv(uMPla, false, MPlants);
-                    gl.uniformMatrix4fv(uVPla, false, v.transform.inverse.matrix);
-                    gl.uniformMatrix4fv(uPPla, false, v.projectionMatrix);
-                    gl.uniform1f(uTimePla, t * 0.001);
-                    gl.uniform1i(uMaxIterationsPla, iterations);
-                    gl.drawArrays(gl.TRIANGLES, 0, 6);
-                }
-
-                gl.depthMask(true);
-                gl.disable(gl.BLEND);
+                gl.uniformMatrix4fv(uMPla, false, MPlants);
+                gl.uniformMatrix4fv(uVPla, false, v.transform.inverse.matrix);
+                gl.uniformMatrix4fv(uPPla, false, v.projectionMatrix);
+                gl.uniform1f(uTimePla, t * 0.001);
+                gl.uniform1i(uMaxIterationsPla, iterations);
+                gl.drawArrays(gl.TRIANGLES, 0, 6);
             }
 
+            gl.depthMask(true);
+            gl.disable(gl.BLEND);
+            }
 
             // Render Reticle
             if (lastHit) {
