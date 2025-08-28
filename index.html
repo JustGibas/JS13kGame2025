@@ -394,6 +394,7 @@
         }
         return { o: [0, 0, 0], d: [0, 0, -1] }; // Fallback, ray from Head
     }
+
     //const d = [-sy * cp, -sp, -cy * cp];
     //const o = [user.x, user.y, user.z];
     //return { o, d };
@@ -486,6 +487,7 @@
     function initAudio(){
       if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       if (!window.windPlaying) { window.windPlaying = true; playWindSound(); }
+
     }
     // -- SOLUTION: Scene-Audio-Wind --
     function playWindSound(){
@@ -633,6 +635,13 @@
         const t = audioCtx.currentTime;
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(300, t);
+        gain.gain.setValueAtTime(0.3, t);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.1);
+        osc.start(t);
         osc.stop(t + 0.1);    
     }
     // -- /SOLUTION: Scene-Audio-Click --
@@ -644,6 +653,13 @@
         const gain = audioCtx.createGain();
         osc.connect(gain);
         gain.connect(audioCtx.destination);
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(60, t);
+        osc.frequency.exponentialRampToValueAtTime(160, t + 0.2);
+        gain.gain.setValueAtTime(0.3, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+        osc.start(t);
+        osc.stop(t + 0.3);
     }
     // -- /SOLUTION: Scene-Audio-Step --
     // -- /MODULE: Scene-Audio --
