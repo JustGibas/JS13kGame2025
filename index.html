@@ -1646,6 +1646,9 @@
     // --- Main Render Loop (Desktop) ---
 
     function loop(t) {
+        // If an immersive XR session is active, stop the desktop loop chain.
+        if (xr) return;  // prevents scheduling the next frame; XR loop takes over
+        
         // Calculate delta time
         const dt = ((t - last) / 1000) || 0;
         last = t;
