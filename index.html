@@ -359,7 +359,7 @@
 
     // -- FEATURE: Gameplay --
     let beastMode = false; // toggle beast mode
-    // --- NEW: Gameplay-SpeedBoost / Items / Obstacles / Capsule Collision ---
+    // -- MODULE: Gameplay-Item --
     const BOOST_DURATION = 15;          // seconds per pickup
     const BOOST_AMOUNT  = 0.5;        // +50% per stack
     const MAX_BOOSTS    = 100;           // safety cap
@@ -438,8 +438,7 @@
         // Ground collision (keep eye at least capsule height above 0)
         if (user.y - playerCapsule.eyeOffset < 0) user.y = playerCapsule.eyeOffset;
     }
-    // --- /NEW ---
-
+    // -- /MODULE: Gameplay-Items --
 
     // -- MODULE: Gameplay-Movement --
     // --- Movement Logic ---
