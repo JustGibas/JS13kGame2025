@@ -407,6 +407,87 @@
 
     // -- FEATURE: Gameplay --
     let beastMode = false; // toggle beast mode
+    // -- MODULE: Gameplay-Item --
+    const BOOST_DURATION = 15;          // seconds per pickup
+    const BOOST_AMOUNT  = 0.5;        // +50% per stack
+    const MAX_BOOSTS    = 100;           // safety cap
+    const speedBoosts = [];            // {timeLeft, amount}
+    const items = [];                  // pickup spheres {x,y,z,r,active:true}
+    const obstacles = [];              // solid spheres for collision {x,y,z,r}
+    const playerCapsule = { radius: 0.3, height: 1.6, eyeOffset: 1.6 };
+
+    function spawnTestContent(){
+        // Pickup items
+        for (let i=0;i<26;i++){
+            items.push({ x: i*2 - 5, y: 0.5, z: -4 - i*2, r:0.4, active:true });
+        }
+        // One obstacle sphere to demonstrate collision
+        obstacles.push({ x: 0, y: 0.8, z: -2, r: 0.8 });
+    }
+    spawnTestContent();
+
+    function currentSpeedMult(){
+        let m = 1;
+        for (const b of speedBoosts) m += b.amount;
+        return m;
+    }
+
+    function updateBoosts(dt){
+        for (let i=speedBoosts.length-1;i>=0;i--){
+            speedBoosts[i].timeLeft -= dt;
+            if (speedBoosts[i].timeLeft<=0) speedBoosts.splice(i,1);
+        }
+    }
+
+    function tryPickupItems(){
+        // Closest point on capsule (horizontal only since player moves on XZ)
+        const baseY = user.y - playerCapsule.eyeOffset;
+        const topY  = baseY + playerCapsule.height;
+        for (const itm of items){
+            if (!itm.active) continue;
+            // Nearest Y on capsule segment
+            const ny = Math.max(baseY, Math.min(topY, itm.y));
+            const dx = itm.x - user.x;
+            const dy = itm.y - ny;
+            const dz = itm.z - user.z;
+            const dist = Math.hypot(dx,dy,dz);
+            if (dist < itm.r + playerCapsule.radius){
+                itm.active = false;
+                if (speedBoosts.length < MAX_BOOSTS){
+                    speedBoosts.push({ timeLeft: BOOST_DURATION, amount: BOOST_AMOUNT });
+                }
+                playClickSound && playClickSound();
+            }
+        }
+    }
+
+    function resolveCollisions(prevX, prevZ){
+        // Capsule vs sphere obstacles
+        const baseY = user.y - playerCapsule.eyeOffset;
+        const topY  = baseY + playerCapsule.height;
+        for (const o of obstacles){
+            const ny = Math.max(baseY, Math.min(topY, o.y));
+            let dx = user.x - o.x;
+            let dy = ny - o.y;
+            let dz = user.z - o.z;
+            const dist = Math.hypot(dx,dy,dz);
+            const minDist = playerCapsule.radius + o.r;
+            if (dist < minDist){
+                if (dist < 1e-4){ // avoid division by zero
+                    user.x = prevX; user.z = prevZ;
+                } else {
+                    const push = (minDist - dist);
+                    dx /= dist; dz /= dist; // horizontal push preferred
+                    user.x += dx * push;
+                    user.z += dz * push;
+                }
+            }
+        }
+        // Ground collision (keep eye at least capsule height above 0)
+        if (user.y - playerCapsule.eyeOffset < 0) user.y = playerCapsule.eyeOffset;
+    }
+    // -- /MODULE: Gameplay-Items --
+
     // -- MODULE: Gameplay-Movement --
     // --- Movement Logic ---
     // Movement and input constants
@@ -454,6 +535,10 @@
     // -- SOLUTION: Gameplay-Movement-Step --
     // Updates the user's position and orientation based on movement input and delta time
     function step(dt, mv) {
+        // New movement logic
+        updateBoosts(dt);
+        const speed = MOVES * (currentSpeedMult());
+        // Apply movement
         const now = performance.now();
         const moveMagnitude = Math.hypot(mv.x, mv.y);
         if(moveMagnitude > 0.1 && now - lastStepTime > stepInterval){
@@ -467,11 +552,18 @@
         const sy = SIN(user.yaw);
         T_V3_A[0] = -sy; T_V3_A[1] = 0; T_V3_A[2] = -cy; // 'f' vector
         T_V3_B[0] = cy;  T_V3_B[1] = 0; T_V3_B[2] = -sy;  // 'r' vector
-        const sp = MOVES * dt;
-        
+        //const sp = MOVES * dt;
+        const sp = speed * dt;
+        // collision resolution
+        const prevX = user.x, prevZ = user.z;
+
         // Apply movement along forward and right vectors
         user.x += (T_V3_B[0] * mv.x + T_V3_A[0] * mv.y) * sp;
         user.z += (T_V3_B[2] * mv.x + T_V3_A[2] * mv.y) * sp;
+        // Resolve collisions with obstacles
+        resolveCollisions(prevX, prevZ);
+        tryPickupItems();
+
     }
     // -- /SOLUTION: Gameplay-Movement-Step --
     // -- /MODULE: Gameplay-Movement --
@@ -1149,6 +1241,58 @@
     gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
 
     // -- /MODULE: Scene-Ground --
+    
+    // -- MODULE: Gameplay-item --
+    // NEW: Sphere (items/obstacles) minimal shader + geometry
+    const vsSphere = `#version 300 es
+    layout(location=0) in vec3 p;
+    uniform mat4 V,P;
+    uniform vec3 uPos;
+    uniform float uS;
+    void main(){
+        vec3 wp = p * uS + uPos;
+        gl_Position = P * V * vec4(wp,1.0);
+    }`;
+    const fsSphere = `#version 300 es
+    precision highp float;
+    uniform vec3 uColor;
+    out vec4 o;
+    void main(){ o = vec4(uColor,1.0); }`;
+
+    function buildSphere(lat=10, lon=12){
+        const v=[];
+        for(let i=0;i<lat;i++){
+            const t1=PI*i/lat, t2=PI*(i+1)/lat;
+            for(let j=0;j<lon;j++){
+                const p1=2*PI*j/lon, p2=2*PI*(j+1)/lon;
+                const quad=[
+                    sph(t1,p1),sph(t2,p1),sph(t2,p2),
+                    sph(t1,p1),sph(t2,p2),sph(t1,p2)
+                ];
+                for(const q of quad) v.push(q[0],q[1],q[2]);
+            }
+        }
+        return new Float32Array(v);
+    }
+    function sph(t,p){ return [SIN(t)*COS(p), COS(t), SIN(t)*SIN(p)]; }
+
+    const PS = prog(vsSphere, fsSphere);
+    const sphereVao = gl.createVertexArray();
+    const sphereBuf = gl.createBuffer();
+    gl.bindVertexArray(sphereVao);
+    gl.bindBuffer(gl.ARRAY_BUFFER, sphereBuf);
+    const sphereVerts = buildSphere();
+    gl.bufferData(gl.ARRAY_BUFFER, sphereVerts, gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0,3,gl.FLOAT,false,0,0);
+    const uS_V = gl.getUniformLocation(PS,'V');
+    const uS_P = gl.getUniformLocation(PS,'P');
+    const uS_Pos = gl.getUniformLocation(PS,'uPos');
+    const uS_S = gl.getUniformLocation(PS,'uS');
+    const uS_Color = gl.getUniformLocation(PS,'uColor');
+
+    // -- /MODULE: Gameplay-item --
+
     // -- MODULE: Scene-Grass --
     // --- Grass Shaders ---
     // Grass rendering constants.
@@ -1502,7 +1646,6 @@
     // --- Main Render Loop (Desktop) ---
 
     function loop(t) {
-        if (xr) return; // Don't run if an XR session is active
         // Calculate delta time
         const dt = ((t - last) / 1000) || 0;
         last = t;
@@ -1553,6 +1696,10 @@
         gl.cullFace(gl.FRONT)}
         else {gl.disable(gl.CULL_FACE);};
         gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+        // --- NEW: Render Items & Obstacles (now works because drawSphere exists) ---
+        for(const itm of items) if (itm.active) drawSphere(V,P,itm.x,itm.y,itm.z,itm.r,[0.2,1.0,0.3]);
+        for(const o of obstacles) drawSphere(V,P,o.x,o.y,o.z,o.r,[0.9,0.2,0.2]);
 
         // Render Grass in multiple passes for density and LOD
         {
@@ -1673,6 +1820,18 @@
     // Helper to update the HUD canvas content
     function updHUD(mode, hit, uiSet, dt) {
         drawHUDCanvas(mode, hit, uiSet, dt);
+    }
+
+    // Helper to submit a sphere draw call
+    function drawSphere(Vmat, Pmat, x,y,z,r,col){
+        gl.useProgram(PS);
+        gl.bindVertexArray(sphereVao);
+        gl.uniformMatrix4fv(uS_V,false,Vmat);
+        gl.uniformMatrix4fv(uS_P,false,Pmat);
+        gl.uniform3f(uS_Pos,x,y,z);
+        gl.uniform1f(uS_S,r);
+        gl.uniform3f(uS_Color,col[0],col[1],col[2]);
+        gl.drawArrays(gl.TRIANGLES,0,sphereVerts.length/3);
     }
 
     // Helper to submit a grass draw call
@@ -1854,6 +2013,10 @@
             gl.uniformMatrix4fv(uV, false, v.transform.inverse.matrix);
             gl.uniformMatrix4fv(uP, false, v.projectionMatrix);
             gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+            // --- NEW: Render Items & Obstacles (now works because drawSphere exists) ---
+            for(const itm of items) if (itm.active) drawSphere(v.transform.inverse.matrix,v.projectionMatrix,itm.x,itm.y,itm.z,itm.r,[0.2,1.0,0.3]);
+            for(const o of obstacles) drawSphere(v.transform.inverse.matrix,v.projectionMatrix,o.x,o.y,o.z,o.r,[0.9,0.2,0.2]);
 
             // Render Grass
             {
