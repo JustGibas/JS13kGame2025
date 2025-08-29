@@ -1886,6 +1886,7 @@
     async function toggleXRFromUI() {
         try {
             if (xr) {
+                //cancelAnimationFrame(loop); // Stop desktop loop
                 await xr.end(); // End the current session
                 return;
             }
@@ -1898,9 +1899,10 @@
             ref = await xr.requestReferenceSpace('local-floor');
 
             xr.addEventListener('end', () => {
+                //cancelAnimationFrame(onXR); // Stop XR loop
                 xr = null;
                 uiEnterLabel = 'Enter VR';
-                requestAnimationFrame(loop); // Resume the desktop loop
+                requestAnimationFrame(loop); // Resume desktop loop
             });
 
             last = 0;
@@ -1908,12 +1910,14 @@
 
         } catch (e) {
             log('XR start fail: ' + e.message);
+            //requestAnimationFrame(loop); // Resume desktop loop
         }
     }
 
     // -- Main Render Loop (WebXR) --
 
     function onXR(t, frame) {
+        //if (!xr) return;
         const s = frame.session;
         s.requestAnimationFrame(onXR);
 
