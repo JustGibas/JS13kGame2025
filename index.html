@@ -1646,6 +1646,9 @@
     // --- Main Render Loop (Desktop) ---
 
     function loop(t) {
+        // If an immersive XR session is active, stop the desktop loop chain.
+        if (xr) return;  // prevents scheduling the next frame; XR loop takes over
+        
         // Calculate delta time
         const dt = ((t - last) / 1000) || 0;
         last = t;
@@ -1883,6 +1886,7 @@
     async function toggleXRFromUI() {
         try {
             if (xr) {
+                //cancelAnimationFrame(loop); // Stop desktop loop
                 await xr.end(); // End the current session
                 return;
             }
@@ -1895,9 +1899,12 @@
             ref = await xr.requestReferenceSpace('local-floor');
 
             xr.addEventListener('end', () => {
+                //cancelAnimationFrame(onXR); // Stop XR loop
                 xr = null;
                 uiEnterLabel = 'Enter VR';
-                requestAnimationFrame(loop); // Resume the desktop loop
+                gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+                gl.viewport(0,0,canvas.width,canvas.height);
+                requestAnimationFrame(loop); // Resume desktop loop
             });
 
             last = 0;
@@ -1905,6 +1912,7 @@
 
         } catch (e) {
             log('XR start fail: ' + e.message);
+            //requestAnimationFrame(loop); // Resume desktop loop
         }
     }
 
@@ -1912,6 +1920,7 @@
 
     function onXR(t, frame) {
         const s = frame.session;
+        //if (s !== xr) return;
         s.requestAnimationFrame(onXR);
 
         const dt = ((t - last) / 1000) || 0;
