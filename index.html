@@ -1180,7 +1180,8 @@
     gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
 
     // -- /MODULE: Scene-Ground --
-
+    
+    // -- MODULE: Gameplay-item --
     // NEW: Sphere (items/obstacles) minimal shader + geometry
     const vsSphere = `#version 300 es
     layout(location=0) in vec3 p;
@@ -1229,17 +1230,7 @@
     const uS_S = gl.getUniformLocation(PS,'uS');
     const uS_Color = gl.getUniformLocation(PS,'uColor');
 
-    function drawSphere(x,y,z,r,col){
-        gl.useProgram(PS);
-        gl.bindVertexArray(sphereVao);
-        gl.uniformMatrix4fv(uS_V,false,V);
-        gl.uniformMatrix4fv(uS_P,false,P);
-        gl.uniform3f(uS_Pos,x,y,z);
-        gl.uniform1f(uS_S,r);
-        gl.uniform3f(uS_Color,col[0],col[1],col[2]);
-        gl.drawArrays(gl.TRIANGLES,0,sphereVerts.length/3);
-    }
-    // /NEW
+    // -- /MODULE: Gameplay-item --
 
     // -- MODULE: Scene-Grass --
     // --- Grass Shaders ---
@@ -1720,6 +1711,18 @@
     // Helper to update the HUD canvas content
     function updHUD(mode, hit, uiSet, dt) {
         drawHUDCanvas(mode, hit, uiSet, dt);
+    }
+
+    // Helper to submit a sphere draw call
+    function drawSphere(x,y,z,r,col){
+        gl.useProgram(PS);
+        gl.bindVertexArray(sphereVao);
+        gl.uniformMatrix4fv(uS_V,false,V);
+        gl.uniformMatrix4fv(uS_P,false,P);
+        gl.uniform3f(uS_Pos,x,y,z);
+        gl.uniform1f(uS_S,r);
+        gl.uniform3f(uS_Color,col[0],col[1],col[2]);
+        gl.drawArrays(gl.TRIANGLES,0,sphereVerts.length/3);
     }
 
     // Helper to submit a grass draw call
