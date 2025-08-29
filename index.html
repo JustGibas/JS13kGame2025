@@ -1902,6 +1902,8 @@
                 //cancelAnimationFrame(onXR); // Stop XR loop
                 xr = null;
                 uiEnterLabel = 'Enter VR';
+                gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+                gl.viewport(0,0,canvas.width,canvas.height);
                 requestAnimationFrame(loop); // Resume desktop loop
             });
 
@@ -1917,8 +1919,8 @@
     // -- Main Render Loop (WebXR) --
 
     function onXR(t, frame) {
-        //if (!xr) return;
         const s = frame.session;
+        //if (s !== xr) return;
         s.requestAnimationFrame(onXR);
 
         const dt = ((t - last) / 1000) || 0;
