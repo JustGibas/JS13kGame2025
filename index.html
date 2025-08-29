@@ -2175,23 +2175,35 @@
                     
                     const S = new DOMMatrix([w,0,0,0, 0,w,0,0, 0,0,-len,0, 0,0,0,1]);
                     const Mbeam = new DOMMatrix(targ.transform.matrix).multiply(S).toFloat32Array();
-                    gl.useProgram(PBeam); gl.bindVertexArray(vaoBeam);
-                    gl.uniformMatrix4fv(uMBeam, false, Mbeam); gl.uniformMatrix4fv(uVBeam, false, v.transform.inverse.matrix); gl.uniformMatrix4fv(uPBeam, false, v.projectionMatrix);
+                    gl.useProgram(PBeam); 
+                    gl.bindVertexArray(vaoBeam);
+                    gl.uniformMatrix4fv(uMBeam, false, Mbeam); 
+                    gl.uniformMatrix4fv(uVBeam, false, v.transform.inverse.matrix); 
+                    gl.uniformMatrix4fv(uPBeam, false, v.projectionMatrix);
                     gl.uniform4f(uColBeam, col[0], col[1], col[2], 0.8);
-                    gl.disable(gl.DEPTH_TEST); gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+                    gl.disable(gl.DEPTH_TEST); 
+                    gl.enable(gl.BLEND); 
+                    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
                     gl.drawArrays(gl.TRIANGLES, 0, 6);
-                    gl.disable(gl.BLEND); gl.enable(gl.DEPTH_TEST);
+                    gl.disable(gl.BLEND); 
+                    gl.enable(gl.DEPTH_TEST);
 
                     // Ground hit indicator for the controller ray
                     const g = rayHitGround(r);
                     if (g) {
                         const Mhit = translateScale(g[0], 0.001, g[2], 0.09, 1, 0.09);
-                        gl.useProgram(PDisc); gl.bindVertexArray(vaoR);
-                        gl.uniformMatrix4fv(uMDisc, false, Mhit); gl.uniformMatrix4fv(uVDisc, false, v.transform.inverse.matrix); gl.uniformMatrix4fv(uPDisc, false, v.projectionMatrix);
+                        gl.useProgram(PDisc); 
+                        gl.bindVertexArray(vaoR);
+                        gl.uniformMatrix4fv(uMDisc, false, Mhit); 
+                        gl.uniformMatrix4fv(uVDisc, false, v.transform.inverse.matrix); 
+                        gl.uniformMatrix4fv(uPDisc, false, v.projectionMatrix);
                         gl.uniform4f(uColDisc, 1.0, 0.95, 0.3, 0.95);
-                        gl.disable(gl.DEPTH_TEST); gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+                        gl.disable(gl.DEPTH_TEST); 
+                        gl.enable(gl.BLEND); 
+                        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
                         gl.drawArrays(gl.TRIANGLES, 0, 6);
-                        gl.disable(gl.BLEND); gl.enable(gl.DEPTH_TEST);
+                        gl.disable(gl.BLEND); 
+                        gl.enable(gl.DEPTH_TEST);
                     }
                 }
             }
