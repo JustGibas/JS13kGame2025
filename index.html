@@ -1959,9 +1959,10 @@
                 const r = rayFrom('VR', frame, src);
                 const viewer = frame.getViewerPose(off);
                 if (viewer) {
-                    const worldFromView = viewer.transform.matrix;
                     const T = getHudTransform();
-                    const WH = new DOMMatrix(worldFromView).multiply(new DOMMatrix(T)).toFloat32Array();
+                    // World-from-viewer in offset space (consistent for both eyes)
+                    const WH = new DOMMatrix(rel.transform.matrix).multiply(new DOMMatrix(T)).toFloat32Array();
+                    //HUD_WH_world = WH;
                     const h = HUD_pick(WH, r, currentUI());
 
                     if (h && h.button) {
@@ -2112,9 +2113,9 @@
             }
             
             // Render HUD
-            const worldFromView = v.transform.matrix;
             const T = getHudTransform();
-            const WH = new DOMMatrix(worldFromView).multiply(new DOMMatrix(T)).toFloat32Array();
+            // World-from-viewer in offset space (consistent for both eyes)
+            const WH = new DOMMatrix(rel.transform.matrix).multiply(new DOMMatrix(T)).toFloat32Array(); // Hud snaped to eyes, bad
             HUD_WH_world = WH;
             hoverBtn = null;
             for (const src of s.inputSources) {
