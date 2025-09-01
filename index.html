@@ -2034,9 +2034,9 @@
                 const camXZ = [worldFromView[12], worldFromView[14]];
                 const camRight = [worldFromView[0], worldFromView[1], worldFromView[2]];
                 const timeSec = t * 0.001;
-                drawGrassPass(v.transform.inverse.matrix, v.projectionMatrix, camXZ, camRight, timeSec, 0.8, 64, 30.0, 1.0); 
-                drawGrassPass(v.transform.inverse.matrix, v.projectionMatrix, camXZ, camRight, timeSec, 0.4, 64, 20.0, 1.0);
-                drawGrassPass(v.transform.inverse.matrix, v.projectionMatrix, camXZ, camRight, timeSec, 0.4, 40, 10.0, 2.0);
+                drawGrassPass(v.transform.inverse.matrix, v.projectionMatrix, camXZ, camRight, timeSec, 0.8, 170, /*30.0,*/ 1.0); 
+                drawGrassPass(v.transform.inverse.matrix, v.projectionMatrix, camXZ, camRight, timeSec, 0.3, 170, /*20.0,*/ 2.0);
+                drawGrassPass(v.transform.inverse.matrix, v.projectionMatrix, camXZ, camRight, timeSec, 0.1, 170, /*10.0,*/ 3.0);
             }
 
             // Render L-System Plants
