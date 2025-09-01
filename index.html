@@ -2062,10 +2062,10 @@
                 const dx = camX - px, dz = camZ - pz;
                 const dist = Math.hypot(dx, dz);
 
-                const NEAR_HIDE = 2.0;
+                const NEAR_HIDE = 4.0;
                 const NEAR_FULL = 6.0;
                 const FAR_START = 18.0;
-                const FAR_HIDE  = 28.0;
+                const FAR_HIDE  = 80.0;
                 if(dist < NEAR_HIDE || dist > FAR_HIDE) continue;
 
                 const MIN_ITER = 2, MAX_ITER = 16;
