@@ -1346,10 +1346,10 @@
     // Positions and scales for the scattered L-system plants.
     // --- Procedural plant field (infinite-style) ---
     const PLANT_CELL = 6.0;          // World size of one plant decision cell
-    const PLANT_PROB = 0.28;         // Spawn probability per cell
+    const PLANT_PROB = 0.3;         // Spawn probability per cell
     const PLANT_RADIUS = 55.0;       // Active radius around camera (render window)
-    const PLANT_SCALE_MIN = 1.2;
-    const PLANT_SCALE_MAX = 1.4;
+    const PLANT_SCALE_MIN = 1.8;
+    const PLANT_SCALE_MAX = 3.0;
     
     // Fast small hash (deterministic)
     function plantHash(ix, iz, salt){
@@ -1428,8 +1428,8 @@
         const int depth = 7; // Maximum recursion depth for L-system
         const int branches = 3; // Number of branches per node in L-system
         int maxDepth = 1; for(int i=0; i<depth; i++) maxDepth *= branches; // Calculate maximum number of nodes (pow() is not const)
-        float len = 1.7; // Base length of plant segments
-        float wid = .01; // Width of plant segments
+        float len = 1.5; // Base length of plant segments
+        float wid = .02; // Width of plant segments
         pt = pt + vec2(0, 2); // Offset input point vertically
         float trunk = sdCappedCylinder(pt - vec2(0., 0.), vec2(wid, len)); // Calculate distance to main trunk
         float d = 500.; // Initialize minimum distance to a large value
@@ -1465,11 +1465,14 @@
 
     void main() { // Main fragment shader function
         vec2 p = (uv * 2.0 - 1.0) * 5.0; // Scale and center UVs to range [-5, 5]
-        p.y += 2.0; // Adjust vertical position upward
+        p.y += 3.0; // Adjust vertical position upward
 
         float d = center(p); // Calculate distance to nearest plant structure
         float t = clamp(d, 0.0, .04) * 2. * 12.5; // Convert distance to alpha value with clamping
-        vec4 fg = vec4(.8, .9, .8, 1.0); // Define plant color (light green)
+        //vec4 fg = vec4(.8, .9, .8, 1.0); // Define plant color (light green)
+        vec4 c0 = vec4(.2, .2, .1, 1.0);
+        vec4 c1 = vec4(.7, .7, .3, 1.0);
+        vec4 fg = mix(c0, c1, smoothstep(.0, 1., d*1000.));
         float alpha = 1.0 - t; // Calculate alpha transparency from distance
         if (alpha < 0.05) discard; // Discard fragments that are too transparent
         o = vec4(fg.rgb * alpha, alpha); // Output final color with alpha blending
@@ -1621,10 +1624,10 @@
                 const dx = camX - px, dz = camZ - pz;
                 const dist = Math.hypot(dx, dz);
 
-                const NEAR_HIDE = 2.0;
+                const NEAR_HIDE = 4.0;
                 const NEAR_FULL = 6.0;
                 const FAR_START = 18.0;
-                const FAR_HIDE  = 28.0;
+                const FAR_HIDE  = 80.0;
                 if(dist < NEAR_HIDE || dist > FAR_HIDE) continue;
 
                 const MIN_ITER = 2, MAX_ITER = 16;
