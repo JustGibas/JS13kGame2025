@@ -1248,7 +1248,7 @@
     uniform float uTime;      // Time for wind animation.
     uniform float uCell;      // Size of the grid cell for this pass.
     uniform int uGridN;       // Number of cells in the grid (N x N).
-    uniform float uRadius;    // Culling radius.
+    //uniform float uRadius;    // Culling radius.
     uniform float uSeed;      // Seed for randomization to allow multiple passes.
     out vec3 vCol;
 
@@ -1270,14 +1270,14 @@
         // Per-cell randomization for grass placement, height, width, etc.
         vec2 tileKey = floor(baseCenter / uCell) + vec2(uSeed);   // integer cell used for randomnes
         //vec2 tileKey = cellF + vec2(uSeed);
-        vec2 jitter = (hash22(tileKey) - 0.5) * (uCell * 0.9);
+        vec2 jitter = (hash22(tileKey) - 0.5) * (uCell * 90.9);
         float hRand = hash12(tileKey * 3.1);
         float wRand = hash12(tileKey * 7.7);
         float ph = hash12(tileKey * 5.3) * 6.2831853; // Phase for wind sway.
 
         // Cull instances outside the radius.
-        float dist = length(baseCenter - uCamXZ);
-        float inRadius = step(dist, uRadius);
+        //float dist = length(baseCenter - uCamXZ);
+        //float inRadius = step(dist, uRadius);
 
         // Define the shape of a single grass blade (a triangle strip).
         float H = mix(0.6, 0.9, hRand);
@@ -1285,7 +1285,7 @@
         float side = (gl_VertexID % 2 == 0) ? -1.0 : 1.0;
         
         // Make blades wider when close to the camera to hide gaps.
-        float nearWScale = mix(1.9, 1.0, smoothstep(0.0, uRadius, dist));
+        float nearWScale = mix(1.9, 1.0, smoothstep(0.0, 2.0/*uRadius*/, 1.0/*dist*/));
         float width = 0.05 * (1.0 - t) * (0.6 + 0.6 * wRand) * nearWScale;
 
         // Animate wind using a coherent noise field.
@@ -1309,8 +1309,8 @@
         //pos.y -= (1.0 - inRadius) * 1.0;   
 
         // Color the grass with a vertical gradient and slight random tint.
-        vec3 c0 = vec3(0.14, 0.32, 0.10);
-        vec3 c1 = vec3(0.25, 0.70, 0.20);
+        vec3 c0 = vec3(0.1, 0.1, 0.01);
+        vec3 c1 = vec3(0.3, 0.6, 0.2);
         vCol = mix(c0, c1, smoothstep(0.0, 1.0, t)) * (0.85 + 0.15 * hash12(tileKey * 11.1));
 
         gl_Position = P * V * vec4(pos, 1.0);
@@ -1328,7 +1328,7 @@
     const uTimeG = gl.getUniformLocation(PGRASS, 'uTime');
     const uCell = gl.getUniformLocation(PGRASS, 'uCell');
     const uGridN = gl.getUniformLocation(PGRASS, 'uGridN');
-    const uRadius = gl.getUniformLocation(PGRASS, 'uRadius');
+    //const uRadius = gl.getUniformLocation(PGRASS, 'uRadius');
     const uSeed = gl.getUniformLocation(PGRASS, 'uSeed');
 
     // The grass VAO is minimal since all vertex data is generated procedurally in the shader
@@ -1597,9 +1597,9 @@
             const cy = COS(user.yaw), sy = SIN(user.yaw);
             const camRight = [cy, 0, -sy];
             const timeSec = t * 0.001;
-            drawGrassPass(V, P, [user.x, user.z], camRight, timeSec, 0.8, 64, 30.0, 1.0); // Cell size, Strands number, Radius, Seed
-            drawGrassPass(V, P, [user.x, user.z], camRight, timeSec, 0.4, 64, 20.0, 1.0);
-            drawGrassPass(V, P, [user.x, user.z], camRight, timeSec, 0.4, 40, 10.0, 2.0);
+            drawGrassPass(V, P, [user.x, user.z], camRight, timeSec, 0.8, 170, /*30.0,*/ 1.0); // Cell size, Strands number, Radius(bad), Seed
+            drawGrassPass(V, P, [user.x, user.z], camRight, timeSec, 0.3, 170, /*20.0,*/ 2.0);
+            drawGrassPass(V, P, [user.x, user.z], camRight, timeSec, 0.1, 170, /*10.0,*/ 3.0);
         }
 
         // Render L-System Plants
@@ -1726,7 +1726,7 @@
     }
 
     // Helper to submit a grass draw call
-    function drawGrassPass(Vmat, Pmat, camXZ, camRight, timeSec, cell, gridN, radius, seed) {
+    function drawGrassPass(Vmat, Pmat, camXZ, camRight, timeSec, cell, gridN, /*radius,*/ seed) {
         gl.useProgram(PGRASS);
         gl.bindVertexArray(vaoGrass);
         gl.uniformMatrix4fv(uVG, false, Vmat);
@@ -1736,7 +1736,7 @@
         gl.uniform1f(uTimeG, timeSec);
         gl.uniform1f(uCell, cell);
         gl.uniform1i(uGridN, gridN | 0);
-        gl.uniform1f(uRadius, radius);
+        //gl.uniform1f(uRadius, radius);
         gl.uniform1f(uSeed, seed);
         gl.enable(gl.DEPTH_TEST);
         gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, GRASS_VCOUNT, gridN * gridN);
