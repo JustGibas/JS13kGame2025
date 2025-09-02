@@ -1579,88 +1579,106 @@
 
     #define PI 3.14159 // Define PI constant for mathematical calculations
 
-    mat3 Rot(float angle) { // Function to create 2D rotation matrix
-        float c = cos(angle); // Calculate cosine of rotation angle
-        float s = sin(angle); // Calculate sine of rotation angle
-        return mat3(vec3(c, s, 0), vec3(-s, c, 0), vec3(0, 0, 1)); // Return 3x3 rotation matrix
-    } // End of rotation matrix function
+    mat3 Rot(float angle) { float c = cos(angle); float s = sin(angle); return mat3(vec3(c, s, 0), vec3(-s, c, 0), vec3(0, 0, 1)); }
+    mat3 Disp(vec2 displacement) { return mat3(vec3(1, 0, 0), vec3(0, 1, 0), vec3(displacement, 1)); }
 
-    mat3 Disp(vec2 displacement) { // Function to create 2D displacement matrix
-        return mat3(vec3(1, 0, 0), vec3(0, 1, 0), vec3(displacement, 1)); // Return 3x3 translation matrix
-    } // End of displacement matrix function
+    float sdCappedCylinder(vec2 p, vec2 h) {
+        p -= vec2(0., h.y);
+        vec2 d = abs(vec2(length(p.x), p.y)) - h;
+        return min(max(d.x, d.y), 0.0) + length(max(d, 0.0));
+    }
 
-    float sdCappedCylinder(vec2 p, vec2 h) { // Signed distance function for capped cylinder
-        p -= vec2(0., h.y); // Offset point by cylinder height
-        vec2 d = abs(vec2(length(p.x), p.y)) - h; // Calculate distance to cylinder surface
-        return min(max(d.x, d.y), 0.0) + length(max(d, 0.0)); // Return signed distance to cylinder
-    } // End of capped cylinder distance function
+    // small hash helper inside shader
+    float hashf(float x){ return fract(sin(x)*43758.5453); }
+    float hash2(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
 
-    float center(vec2 pt) { // Main function to generate L-system plant structure
-        float baseAngle = 25.7 + uPlantSeed * 10.0; // 25.7 to 35.7
-        mat3 posR = Rot(-(baseAngle / 360.) * 2. * PI); // Create positive rotation matrix (clockwise)
-        mat3 negR = Rot(baseAngle / 360. * 2. * PI); // Create negative rotation matrix (counter-clockwise)
-        
-        // Vary depth based on plant seed (3 to 7)
-        int depth = 3 + int(uPlantSeed * 4.0); // Convert seed to range 3-7
-        const int branches = 3; // Number of branches per node in L-system
-        int maxDepth = 1; for(int i=0; i<7; i++) maxDepth *= (i < depth ? branches : 1); // Calculate maximum nodes, capped at depth
-        float len = 1.5; // Base length of plant segments
-        float wid = .02; // Width of plant segments
-        pt = pt + vec2(0, 2); // Offset input point vertically
-        float trunk = sdCappedCylinder(pt - vec2(0., 0.), vec2(wid, len)); // Calculate distance to main trunk
-        float d = 500.; // Initialize minimum distance to a large value
-        int c = 0; // Counter for iterating through L-system nodes
+    float center(vec2 pt) {
+        float baseAngle = 25.7 + uPlantSeed * 10.0;
+        mat3 posR = Rot(-(baseAngle / 360.) * 2. * PI);
+        mat3 negR = Rot(baseAngle / 360. * 2. * PI);
 
-        // Wind calculation from grass shader
+        // Vary depth using seed (3..7)
+        int depth = 3 + int(uPlantSeed * 4.0);
+        const int branches = 3;
+        int maxDepth = 1; for(int i=0;i<depth;i++) maxDepth *= branches;
+        float len = 1.5;
+        float wid = .02;
+        pt = pt + vec2(0, 2);
+        float trunk = sdCappedCylinder(pt - vec2(0., 0.), vec2(wid, len));
+        float d = 500.;
+        int c = 0;
+
+        // Wind like grass
         vec2 w1 = vec2(0.07, 0.05);
         vec2 w2 = vec2(-0.03, 0.04);
         float gust = 0.6 * sin(dot(uPlantPos.xz, w1) + uTime * 0.7) + 0.4 * sin(dot(uPlantPos.xz, w2) - uTime * 1.2);
-        float ph = fract(sin(dot(uPlantPos.xz, vec2(12.9898, 78.233))) * 43758.5453) * 6.283;
+        float ph = fract(sin(dot(uPlantPos.xz, vec2(12.9898,78.233))) * 43758.5453) * 6.283;
         float sway = (0.25 * gust) + 0.07 * sin(uTime * 1.7 + ph);
         mat3 windMatrix = Rot(sway * 0.5);
 
-        for (int count = 0; count < uMaxIterations; ++count) { // Loop through all possible L-system branches
-            int off = 1; for(int i=0; i<depth; i++) off *= branches; // Calculate offset for current depth level
-            vec2 pt_n = pt; // Copy current point for transformation
-            for (int i = 1; i <= depth; ++i) { // Iterate through each depth level
-                float l = len / pow(2., float(i)); // Calculate segment length for current depth
-                off /= branches; // Update offset for next level
-                int dec = c / off; // Calculate decision value for branching
-                int path = dec - branches * (dec / branches); // Calculate which branch path to take (0, 1, or 2)
-                mat3 mx; // Matrix for current transformation
-                if (path == 0) { // First branch path
-                    mx = posR * Disp(vec2(0, -2. * l)); // Apply positive rotation and displacement
-                } else if (path == 1) { // Second branch path
-                    mx = windMatrix * negR * Disp(vec2(0, -2. * l)); // Apply wind, negative rotation, and displacement
-                } else if (path == 2) { // Third branch path
-                    mx = windMatrix * Disp(vec2(0, -4. * l)); // Apply wind and vertical displacement
-                } // End of branch path selection
-                pt_n = (mx * vec3(pt_n, 1)).xy; // Transform point using selected matrix
-                float y = sdCappedCylinder(pt_n, vec2(wid, l)); // Calculate distance to current segment
-                if (y - 2.0 * l > 0.0) { c += off - 1; break; } // If point is too far from segment, skip remaining branches
-                d = min(d, y); // Update minimum distance
-            } // End of depth iteration
-            ++c; // Increment node counter
-            if (c > maxDepth) break; // Exit if all nodes have been processed
-        } // End of L-system iteration
-        return min(d, trunk); // Return minimum distance between branches and trunk
-    } // End of L-system generation function
+        for (int count = 0; count <  uMaxIterations; ++count) {
+            int off = 1; for(int i=0;i<depth;i++) off *= branches;
+            vec2 pt_n = pt;
+            for (int i = 1; i <= depth; ++i) {
+                float l = len / pow(2., float(i));
+                off /= branches;
+                int dec = c / off;
+                int path = dec - branches * (dec / branches);
+                mat3 mx;
+                if (path == 0) {
+                    mx = posR * Disp(vec2(0, -2. * l));
+                } else if (path == 1) {
+                    mx = windMatrix * negR * Disp(vec2(0, -2. * l));
+                } else {
+                    mx = windMatrix * Disp(vec2(0, -4. * l));
+                }
+                pt_n = (mx * vec3(pt_n, 1)).xy;
+                float y = sdCappedCylinder(pt_n, vec2(wid, l));
+                if (y - 2.0 * l > 0.0) { c += off - 1; break; }
+                d = min(d, y);
+            }
+            ++c;
+            if (c > maxDepth) break;
+        }
+        return min(d, trunk);
+    }
 
-    void main() { // Main fragment shader function
-        vec2 p = (uv * 2.0 - 1.0) * 5.0; // Scale and center UVs to range [-5, 5]
-        p.y += 3.0; // Adjust vertical position
+    void main() {
+        // compute distance field
+        vec2 p = (uv * 2.0 - 1.0) * 5.0;
+        p.y += 3.0;
+        float d = center(p);
 
-        float d = center(p); // Calculate distance to nearest plant structure
-        float t = clamp(d, 0.0, .04) * 2. * 12.5; // Convert distance to alpha value with clamping
-        vec4 fg = vec4(.4, .4, .1, 1.0); // Define plant color (light green)
-        //vec4 c0 = vec4(.2, .2, .1, 1.0);
-        //vec4 c1 = vec4(.7, .7, .3, 1.0);
-        //vec4 fg = mix(c0, c1, smoothstep(.0, 1., d*1000.));
-        float alpha = 1.0 - t; // Calculate alpha transparency from distance
-        if (alpha < 0.05) discard; // Discard fragments that are too transparent
-        o = vec4(fg.rgb * alpha, alpha); // Output final color with alpha blending
-    } // End of main fragment shader function
-    `;
+        // alpha from distance (same approach as before)
+        float t = clamp(d, 0.0, .04) * 2. * 12.5;
+        float alpha = 1.0 - t;
+        if (alpha < 0.05) discard;
+
+        // vertical gradient factor from vertex UV (0..1)
+        float height = clamp(uv.y, 0.0, 1.0);
+
+        // base green and orange palettes
+        vec3 green = vec3(0.3, 0.4, 0.1);
+        vec3 orange = vec3(0.5, 0.4, 0.2);
+
+        // random tint 0..1 from seed -> bias towards green or orange
+        float tint = hashf(uPlantSeed * 37.17);
+
+        // per-plant subtle brightness variation
+        float varb = 0.85 + 0.3 * hash2(uPlantPos.xz + vec2(uPlantSeed));
+
+        // mix base color between green and orange, then apply vertical gradient
+        vec3 base = mix(green, orange, smoothstep(0.0, 1.0, tint));
+        vec3 top = base * 1.;
+        vec3 bottom = base * 0.4;
+        vec3 col = mix(bottom, top, smoothstep(0.0, 1.0, height)) * varb;
+
+        // slight per-pixel noise to avoid banding
+        float n = hash2(uPlantPos.xz + uv*12.34);
+        col *= (0.97 + 0.06 * n);
+
+        o = vec4(col * alpha, alpha);
+    }`;
 
     const PPLANTS = prog(vsPlants, fsPlants); // Compile and link plant shader program
     const uMPla = gl.getUniformLocation(PPLANTS, 'M'); // Get location of Model matrix uniform
