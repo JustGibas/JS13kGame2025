@@ -1294,6 +1294,112 @@
     // -- /MODULE: Gameplay-item --
 
     // -- MODULE: Scene-Rocks --
+    // Stylized low-poly rocks: deterministic placement, flat-ish shading, and collision integration
+    const rocks = []; // currently active rock descriptors {x,y,z,r,seed}
+
+    // Simple deterministic hash for rock placement
+    function rockHash(ix, iz, salt){
+        const s = Math.sin(ix*127.1 + iz*311.7 + salt*13.13) * 43758.5453;
+        return s - Math.floor(s);
+    }
+
+    // Build a low-res sphere for rock base (coarse facets)
+    const rockVerts = buildSphere(6, 8); // fewer subdivisions -> larger facets
+    const PRock_vs = `#version 300 es
+    layout(location=0) in vec3 p;
+    uniform mat4 V, P;
+    uniform vec3 uPos;
+    uniform float uS;
+    uniform float uSeed;
+    out vec3 vLocal;
+    // cheap hash noise
+    float h(float x){ return fract(sin(x)*43758.5453); }
+    void main(){
+        // Displace vertex along its normal-ish direction using a cheap noise based on seed and vertex
+        vec3 local = p * uS;
+        float n = h((local.x + local.y*1.7 + local.z*2.3) * (uSeed + 1.0));
+        float off = (n - 0.5) * (0.5 * uS); // displacement magnitude
+        // push outward roughly by position vector (acts like normal)
+        vec3 wp = (local + normalize(local) * off) + uPos;
+        vLocal = local;
+        gl_Position = P * V * vec4(wp, 1.0);
+    }`;
+
+    const PRock_fs = `#version 300 es
+    precision highp float;
+    in vec3 vLocal;
+    out vec4 o;
+    uniform float uSeed;
+    // quantize shading to get flat bands
+    void main(){
+        vec3 baseA = vec3(0.35, 0.3, 0.2);
+        vec3 baseB = vec3(0.15, 0.1, 0.1);
+        // fake normal from position
+        vec3 n = normalize(vLocal + vec3(0.0,0.0,-2.5));
+        float shade = dot(n, normalize(vec3(0.0,0.1,-0.5)));
+        shade = clamp(shade, 0.0, 1.0);
+        // quantize into 4 levels
+        float q = floor(shade * 4.0) / 4.0;
+        // subtle pattern variation
+        //float grain = fract(sin((vLocal.x+vLocal.y*7.7+vLocal.z*13.3) * (uSeed+1.0)) * 43758.5453) * 0.06;
+        vec3 col = mix(baseB, baseA, q);// + grain;
+        o = vec4(col, 1.0);
+    }`;
+
+    const PROCK = prog(PRock_vs, PRock_fs);
+    const rockVao = gl.createVertexArray();
+    const rockBuf = gl.createBuffer();
+    gl.bindVertexArray(rockVao);
+    gl.bindBuffer(gl.ARRAY_BUFFER, rockBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, rockVerts, gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+    const uR_V = gl.getUniformLocation(PROCK, 'V');
+    const uR_P = gl.getUniformLocation(PROCK, 'P');
+    const uR_Pos = gl.getUniformLocation(PROCK, 'uPos');
+    const uR_S = gl.getUniformLocation(PROCK, 'uS');
+    const uR_Seed = gl.getUniformLocation(PROCK, 'uSeed');
+
+    // Parameters for rock field
+    const ROCK_CELL = 5;
+    const ROCK_RADIUS = 200.0; // generation radius
+    const ROCK_PROB = 0.01;   // spawn probability per cell
+
+    // Update rocks around camera and sync to obstacles array (mark obstacles with _isRock)
+    function updateRocks(camX, camZ){
+        // remove previous rock-marked obstacles
+        for (let i = obstacles.length - 1; i >= 0; i--) {
+            if (obstacles[i]._isRock) obstacles.splice(i, 1);
+        }
+        rocks.length = 0;
+        const c = ROCK_CELL; const r = ROCK_RADIUS;
+        const minX = Math.floor((camX - r)/c);
+        const maxX = Math.floor((camX + r)/c);
+        const minZ = Math.floor((camZ - r)/c);
+        const maxZ = Math.floor((camZ + r)/c);
+        for(let gz=minZ; gz<=maxZ; gz++){
+            for(let gx=minX; gx<=maxX; gx++){
+                const h = rockHash(gx, gz, 0.0);
+                if (h < ROCK_PROB){
+                    const jx = rockHash(gx, gz, 1.0) - 0.5;
+                    const jz = rockHash(gx, gz, 2.0) - 0.5;
+                    const px = gx*c + (jx * c * 0.6) + c*0.5;
+                    const pz = gz*c + (jz * c * 0.6) + c*0.5;
+                    const dx = px - camX, dz = pz - camZ;
+                    if (dx*dx + dz*dz <= r*r){
+                        const seed = rockHash(gx, gz, -7.0) * 1000.0;
+                        const scale = 1.0 + rockHash(gx, gz, 2.0) * 5.; // 1.0 .. 6.0 meters
+                        const rx = px, rz = pz, ry = scale * 0.45; // small y offset
+                        const radius = scale * 1.0; // collision radius
+                        const rock = { x: rx, y: ry, z: rz, r: radius, seed, scale };
+                        rocks.push(rock);
+                        // also add to obstacles so collision code picks it up
+                        obstacles.push({ x: rx, y: ry, z: rz, r: radius, _isRock: true });
+                    }
+                }
+            }
+        }
+    }
 
     // -- /MODULE: Scene-Rocks --
 
@@ -1659,6 +1765,8 @@
         // Calculate delta time
         const dt = ((t - last) / 1000) || 0;
         last = t;
+        // Ensure rocks near the player are generated and present in obstacles for collision resolution
+        updateRocks && updateRocks(user.x, user.z);
 
         // Update user position
         const mv = getMove();
@@ -1709,10 +1817,21 @@
 
         // --- NEW: Render Items & Obstacles (now works because drawSphere exists) ---
         for(const itm of items) if (itm.active) drawSphere(V,P,itm.x,itm.y,itm.z,itm.r,[0.2,1.0,0.3]);
-        for(const o of obstacles) drawSphere(V,P,o.x,o.y,o.z,o.r,[0.9,0.2,0.2]);
+        for(const o of obstacles) if(!o._isRock) drawSphere(V,P,o.x,o.y,o.z,o.r,[0.9,0.2,0.2]);
 
         // Draw procedural rocks (flat-shaded, stylized)
-
+        for(const r of rocks)
+        gl.useProgram(PROCK);
+        gl.bindVertexArray(rockVao);
+        gl.uniformMatrix4fv(uR_V, false, V);
+        gl.uniformMatrix4fv(uR_P, false, P);
+        for(const rk of rocks){
+            gl.uniform3f(uR_Pos, rk.x, rk.y, rk.z);
+            gl.uniform1f(uR_S, rk.scale);
+            gl.uniform1f(uR_Seed, rk.seed);
+            gl.drawArrays(gl.TRIANGLES, 0, rockVerts.length / 3);
+            gl.enable(gl.DEPTH_TEST);
+        }
 
         // Render Grass in multiple passes for density and LOD
         {
@@ -1836,11 +1955,11 @@
     }
 
     // Helper to submit a sphere draw call
-    function drawSphere(Vmat, Pmat, x,y,z,r,col){
+    function drawSphere(V,P,x,y,z,r,col){
         gl.useProgram(PS);
         gl.bindVertexArray(sphereVao);
-        gl.uniformMatrix4fv(uS_V,false,Vmat);
-        gl.uniformMatrix4fv(uS_P,false,Pmat);
+        gl.uniformMatrix4fv(uS_V,false,V);
+        gl.uniformMatrix4fv(uS_P,false,P);
         gl.uniform3f(uS_Pos,x,y,z);
         gl.uniform1f(uS_S,r);
         gl.uniform3f(uS_Color,col[0],col[1],col[2]);
@@ -2036,7 +2155,22 @@
 
             // --- NEW: Render Items & Obstacles (now works because drawSphere exists) ---
             for(const itm of items) if (itm.active) drawSphere(v.transform.inverse.matrix,v.projectionMatrix,itm.x,itm.y,itm.z,itm.r,[0.2,1.0,0.3]);
-            for(const o of obstacles) drawSphere(v.transform.inverse.matrix,v.projectionMatrix,o.x,o.y,o.z,o.r,[0.9,0.2,0.2]);
+            for(const o of obstacles)  if(!o._isRock) drawSphere(v.transform.inverse.matrix,v.projectionMatrix,o.x,o.y,o.z,o.r,[0.9,0.2,0.2]);
+
+            // Draw procedural rocks (flat-shaded, stylized)
+            for(const r of rocks)
+            gl.useProgram(PROCK);
+            gl.bindVertexArray(rockVao);
+            gl.uniformMatrix4fv(uR_V, false, v.transform.inverse.matrix);
+            gl.uniformMatrix4fv(uR_P, false, v.projectionMatrix);
+            for(const rk of rocks){
+                gl.uniform3f(uR_Pos, rk.x, rk.y, rk.z);
+                gl.uniform1f(uR_S, rk.scale);
+                gl.uniform1f(uR_Seed, rk.seed);
+                gl.drawArrays(gl.TRIANGLES, 0, rockVerts.length / 3);
+                gl.enable(gl.DEPTH_TEST);
+            }
+
 
             // Render Grass
             {
