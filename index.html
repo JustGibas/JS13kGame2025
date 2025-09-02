@@ -1414,13 +1414,15 @@
     precision highp float;
     #define NORMALIZE normalize
     uniform mat4 V, P;
-    uniform vec2 uCamXZ;      // Camera's XZ position for LOD and culling.
-    uniform vec3 uCamRight;   // Camera's right vector for billboarding.
-    uniform float uTime;      // Time for wind animation.
-    uniform float uCell;      // Size of the grid cell for this pass.
-    uniform int uGridN;       // Number of cells in the grid (N x N).
-    //uniform float uRadius;    // Culling radius.
-    uniform float uSeed;      // Seed for randomization to allow multiple passes.
+    uniform vec2 uCamXZ;
+    uniform vec3 uCamRight;
+    uniform float uTime;
+    uniform float uCell;
+    uniform int uGridN;
+    uniform float uSeed;
+    // NEW: biome noise
+    uniform sampler2D uNoise;
+    uniform float uNoiseScale;
     out vec3 vCol;
 
     // Simple hash functions for procedural generation.
@@ -1439,12 +1441,14 @@
         vec2 baseCenter = (cellF + vec2(0.5)) * uCell;
 
         // Per-cell randomization for grass placement, height, width, etc.
-        vec2 tileKey = floor(baseCenter / uCell) + vec2(uSeed);   // integer cell used for randomnes
-        //vec2 tileKey = cellF + vec2(uSeed);
+        vec2 tileKey = floor(baseCenter / uCell) + vec2(uSeed);
         vec2 jitter = (hash22(tileKey) - 0.5) * (uCell * 90.9);
         float hRand = hash12(tileKey * 3.1);
         float wRand = hash12(tileKey * 7.7);
         float ph = hash12(tileKey * 5.3) * 6.2831853; // Phase for wind sway.
+
+        // NEW: sample biome noise (0..1) - low values = dry, high = lush
+        float biome = texture(uNoise, baseCenter * uNoiseScale).r;
 
         // Cull instances outside the radius.
         //float dist = length(baseCenter - uCamXZ);
@@ -1456,7 +1460,7 @@
         float side = (gl_VertexID % 2 == 0) ? -1.0 : 1.0;
         
         // Make blades wider when close to the camera to hide gaps.
-        float nearWScale = mix(1.9, 1.0, smoothstep(0.0, 2.0/*uRadius*/, 1.0/*dist*/));
+        float nearWScale = mix(1.9, 1.0, smoothstep(0.0, 2.0, 1.0));
         float width = 0.05 * (1.0 - t) * (0.6 + 0.6 * wRand) * nearWScale;
 
         // Animate wind using a coherent noise field.
@@ -1476,12 +1480,14 @@
         vec3 bendOff = vec3(windDir.x, 0.0, windDir.y) * bend * H;
         vec3 pos = base + right * (side * width) + vec3(0.0, t * H, 0.0) + bendOff;
 
-        // Hide culled instances by moving them below the ground.
-        //pos.y -= (1.0 - inRadius) * 1.0;   
-
-        // Color the grass with a vertical gradient and slight random tint.
-        vec3 c0 = vec3(0.1, 0.1, 0.01);
-        vec3 c1 = vec3(0.3, 0.6, 0.2);
+        // Biome-based color gradients
+        vec3 dry_c0 = vec3(0.12, 0.10, 0.01);
+        vec3 dry_c1 = vec3(0.45, 0.38, 0.05);
+        vec3 lush_c0 = vec3(0.05, 0.12, 0.02);
+        vec3 lush_c1 = vec3(0.30, 0.70, 0.22);
+        vec3 c0 = mix(dry_c0, lush_c0, biome);
+        vec3 c1 = mix(dry_c1, lush_c1, biome);
+        // Preserve original vertical gradient & slight random tint
         vCol = mix(c0, c1, smoothstep(0.0, 1.0, t)) * (0.85 + 0.15 * hash12(tileKey * 11.1));
 
         gl_Position = P * V * vec4(pos, 1.0);
@@ -1501,6 +1507,9 @@
     const uGridN = gl.getUniformLocation(PGRASS, 'uGridN');
     //const uRadius = gl.getUniformLocation(PGRASS, 'uRadius');
     const uSeed = gl.getUniformLocation(PGRASS, 'uSeed');
+    // NEW biome uniforms
+    const uNoise = gl.getUniformLocation(PGRASS, 'uNoise');
+    const uNoiseScale = gl.getUniformLocation(PGRASS, 'uNoiseScale');
 
     // The grass VAO is minimal since all vertex data is generated procedurally in the shader
     const vaoGrass = gl.createVertexArray(), vboGrass = gl.createBuffer();
@@ -1871,8 +1880,8 @@
             const camRight = [cy, 0, -sy];
             const timeSec = t * 0.001;
             drawGrassPass(V, P, [user.x, user.z], camRight, timeSec, 0.8, 170, /*30.0,*/ 1.0); // Cell size, Strands number, Radius(bad), Seed
-            drawGrassPass(V, P, [user.x, user.z], camRight, timeSec, 0.3, 170, /*20.0,*/ 2.0);
-            drawGrassPass(V, P, [user.x, user.z], camRight, timeSec, 0.1, 170, /*10.0,*/ 3.0);
+            drawGrassPass(V, P, [user.x, user.z], camRight, timeSec, 0.3, 130, /*20.0,*/ 2.0);
+            drawGrassPass(V, P, [user.x, user.z], camRight, timeSec, 0.1, 100, /*10.0,*/ 3.0);
         }
 
         // Render L-System Plants
@@ -2012,8 +2021,12 @@
         gl.uniform1f(uTimeG, timeSec);
         gl.uniform1f(uCell, cell);
         gl.uniform1i(uGridN, gridN | 0);
-        //gl.uniform1f(uRadius, radius);
         gl.uniform1f(uSeed, seed);
+        // Bind noise texture once per pass
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, noiseTex);
+        gl.uniform1i(uNoise, 0);
+        gl.uniform1f(uNoiseScale, 0.0002); // adjust for biome size (smaller = larger biomes)
         gl.enable(gl.DEPTH_TEST);
         gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, GRASS_VCOUNT, gridN * gridN);
     }
