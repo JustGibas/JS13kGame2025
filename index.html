@@ -1388,7 +1388,7 @@
                     const dx = px - camX, dz = pz - camZ;
                     if (dx*dx + dz*dz <= r*r){
                         const seed = rockHash(gx, gz, -7.0) * 1000.0;
-                        const scale = 1.0 + rockHash(gx, gz, 2.0) * 5.; // 1.0 .. 6.0 meters
+                        const scale = 4.0 + rockHash(gx, gz, 5.0) * 2.; // 1.0 .. 6.0 meters
                         const rx = px, rz = pz, ry = scale * 0.45; // small y offset
                         const radius = scale * 1.2; // collision radius
                         const rock = { x: rx, y: ry, z: rz, r: radius, seed, scale };
