@@ -1708,7 +1708,7 @@
         for(const o of obstacles) if(!o._isRock) drawSphere(o.x,o.y,o.z,o.r,[0.9,0.2,0.2]);
 
         // Draw procedural rocks (flat-shaded, stylized)
-        for(const r of rocks) drawSphere(r.x,r.y,r.z,r.r,[0.5,0.5,0.5]);// Draw procedural rocks (flat-shaded, stylized)
+        for(const r of rocks)
         gl.useProgram(PROCK);
         gl.bindVertexArray(rockVao);
         gl.uniformMatrix4fv(uR_V, false, V);
