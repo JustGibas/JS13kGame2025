@@ -2236,6 +2236,7 @@
                 const key = p.gx + ',' + p.gz;
                 const target = MIN_ITER + q*(MAX_ITER - MIN_ITER);
                 const iterations = Math.max(MIN_ITER, Math.min(MAX_ITER, target)) | 0;
+                const plantSeed = plantHash(p.gx, p.gz, 4.0);
 
                 const angle = ATAN2(camX - px, camZ - pz);
                 const MPlants = new DOMMatrix()
