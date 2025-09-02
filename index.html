@@ -365,6 +365,8 @@
     out vec4 o; // Output color for this fragment
     uniform float uTime; // Time uniform for animation
     uniform int uMaxIterations; // Control the quality/complexity
+    uniform vec3 uPlantPos; // World position of the plant
+    uniform float uPlantSeed; // Seed for this plant
 
     #define PI 3.14159 // Define PI constant for mathematical calculations
 
@@ -385,17 +387,29 @@
     } // End of capped cylinder distance function
 
     float center(vec2 pt) { // Main function to generate L-system plant structure
-        mat3 posR = Rot(-(25.7 / 360.) * 2. * PI); // Create positive rotation matrix (clockwise)
-        mat3 negR = Rot(25.7 / 360. * 2. * PI); // Create negative rotation matrix (counter-clockwise)
-        const int depth = 7; // We want to have it vary from 3 to 6
+        float baseAngle = 25.7 + uPlantSeed * 10.0; // 25.7 to 35.7
+        mat3 posR = Rot(-(baseAngle / 360.) * 2. * PI); // Create positive rotation matrix (clockwise)
+        mat3 negR = Rot(baseAngle / 360. * 2. * PI); // Create negative rotation matrix (counter-clockwise)
+        
+        // Vary depth based on plant seed (3 to 7)
+        int depth = 3 + int(uPlantSeed * 4.0); // Convert seed to range 3-7
         const int branches = 3; // Number of branches per node in L-system
-        int maxDepth = 1; for(int i=0; i<depth; i++) maxDepth *= branches; // Calculate maximum number of nodes (pow() is not const)
+        int maxDepth = 1; for(int i=0; i<7; i++) maxDepth *= (i < depth ? branches : 1); // Calculate maximum nodes, capped at depth
         float len = 1.5; // Base length of plant segments
         float wid = .02; // Width of plant segments
         pt = pt + vec2(0, 2); // Offset input point vertically
         float trunk = sdCappedCylinder(pt - vec2(0., 0.), vec2(wid, len)); // Calculate distance to main trunk
         float d = 500.; // Initialize minimum distance to a large value
         int c = 0; // Counter for iterating through L-system nodes
+
+        // Wind calculation from grass shader
+        vec2 w1 = vec2(0.07, 0.05);
+        vec2 w2 = vec2(-0.03, 0.04);
+        float gust = 0.6 * sin(dot(uPlantPos.xz, w1) + uTime * 0.7) + 0.4 * sin(dot(uPlantPos.xz, w2) - uTime * 1.2);
+        float ph = fract(sin(dot(uPlantPos.xz, vec2(12.9898, 78.233))) * 43758.5453) * 6.283;
+        float sway = (0.25 * gust) + 0.07 * sin(uTime * 1.7 + ph);
+        mat3 windMatrix = Rot(sway * 0.5);
+
         for (int count = 0; count < uMaxIterations; ++count) { // Loop through all possible L-system branches
             int off = 1; for(int i=0; i<depth; i++) off *= branches; // Calculate offset for current depth level
             vec2 pt_n = pt; // Copy current point for transformation
@@ -408,11 +422,9 @@
                 if (path == 0) { // First branch path
                     mx = posR * Disp(vec2(0, -2. * l)); // Apply positive rotation and displacement
                 } else if (path == 1) { // Second branch path
-                    mat3 wind = Rot(0.2 * sin(uTime + 6.2)); // Create wind animation with time offset
-                    mx = wind * negR * Disp(vec2(0, -2. * l)); // Apply wind, negative rotation, and displacement
+                    mx = windMatrix * negR * Disp(vec2(0, -2. * l)); // Apply wind, negative rotation, and displacement
                 } else if (path == 2) { // Third branch path
-                    mat3 wind = Rot(0.2 * sin(uTime + 1.)); // Create wind animation with different time offset
-                    mx = wind * Disp(vec2(0, -4. * l)); // Apply wind and vertical displacement
+                    mx = windMatrix * Disp(vec2(0, -4. * l)); // Apply wind and vertical displacement
                 } // End of branch path selection
                 pt_n = (mx * vec3(pt_n, 1)).xy; // Transform point using selected matrix
                 float y = sdCappedCylinder(pt_n, vec2(wid, l)); // Calculate distance to current segment
@@ -447,6 +459,8 @@
     const uPPla = gl.getUniformLocation(PPLANTS, 'P'); // Get location of Projection matrix uniform
     const uTimePla = gl.getUniformLocation(PPLANTS, 'uTime'); // Get location of time uniform for animation
     const uMaxIterationsPla = gl.getUniformLocation(PPLANTS, 'uMaxIterations'); // Get location of max iterations uniform
+    const uPlantPosPla = gl.getUniformLocation(PPLANTS, 'uPlantPos');
+    const uPlantSeedPla = gl.getUniformLocation(PPLANTS, 'uPlantSeed');
 
     const vboPlants = gl.createBuffer(), vaoPlants = gl.createVertexArray(); // Create vertex buffer and vertex array objects
     gl.bindVertexArray(vaoPlants); // Bind the vertex array object
@@ -544,6 +558,7 @@
                 const key = p.gx + ',' + p.gz;
                 const target = MIN_ITER + q*(MAX_ITER - MIN_ITER);
                 const iterations = Math.max(MIN_ITER, Math.min(MAX_ITER, target)) | 0;
+                const plantSeed = plantHash(p.gx, p.gz, 4.0);
 
                 const angle = ATAN2(camX - px, camZ - pz);
                 const MPlants = new DOMMatrix()
@@ -557,6 +572,8 @@
                 gl.uniformMatrix4fv(uPPla, false, P);
                 gl.uniform1f(uTimePla, t * 0.001);
                 gl.uniform1i(uMaxIterationsPla, iterations);
+                gl.uniform3f(uPlantPosPla, px, 0, pz);
+                gl.uniform1f(uPlantSeedPla, plantSeed);
                 gl.drawArrays(gl.TRIANGLES, 0, 6);
             }
 
