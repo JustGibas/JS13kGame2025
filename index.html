@@ -256,6 +256,60 @@
     // -- MODULE: Scene-HUD --
     // -- /MODULE: Scene-HUD --
     // -- MODULE: Scene-Sky --
+    function makeTileableNoise(size) {
+
+        const n = size|0;
+        // make a small random grid then bilinearly sample with wrap to create smooth tileable texture
+        const grid = new Float32Array(n * n);
+        for (let i = 0; i < grid.length; i++) grid[i] = Math.random();
+
+        // bilinear sampling helper with wrap
+        function sampleGrid(u, v) {
+            const x = u * n;
+            const y = v * n;
+            const x0 = ((x|0) + n) % n;
+            const y0 = ((y|0) + n) % n;
+            const x1 = (x0 + 1) % n;
+            const y1 = (y0 + 1) % n;
+            const fx = x - Math.floor(x);
+            const fy = y - Math.floor(y);
+            const a = grid[y0 * n + x0];
+            const b = grid[y0 * n + x1];
+            const c = grid[y1 * n + x0];
+            const d = grid[y1 * n + x1];
+            const ab = a * (1 - fx) + b * fx;
+            const cd = c * (1 - fx) + d * fx;
+            return ab * (1 - fy) + cd * fy;
+        }
+
+        const img = new Uint8Array(n * n * 4);
+        for (let y = 0; y < n; y++) {
+            for (let x = 0; x < n; x++) {
+                const u = (x + 0.5) / n;
+                const v = (y + 0.5) / n;
+                // sample at multiple fractional offsets then combine to get smoother noise
+                const v0 = sampleGrid(u, v);
+                const v1 = sampleGrid(u + 0.5 / n, v + 0.3 / n);
+                const val = Math.max(0, Math.min(1, (v0 * 0.6 + v1 * 0.4)));
+                const idx = (y * n + x) * 4;
+                const c = (val * 255) | 0;
+                img[idx + 0] = c;
+                img[idx + 1] = c;
+                img[idx + 2] = c;
+                img[idx + 3] = 255;
+            }
+        }
+
+        gl.bindTexture(gl.TEXTURE_2D, noiseTex);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, n, n, 0, gl.RGBA, gl.UNSIGNED_BYTE, img);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+        gl.bindTexture(gl.TEXTURE_2D, null);
+    }
+    // Try: makeTileableNoise(256) or (512) for crisper small-scale details (optional)
+    makeTileableNoise(128);
     
     // -- /MODULE: Scene-Sky --
     // -- MODULE: Scene-Ground --
