@@ -1232,6 +1232,10 @@
 
     // -- /MODULE: Gameplay-item --
 
+    // -- MODULE: Scene-Rocks --
+
+    // -- /MODULE: Scene-Rocks --
+
     // -- MODULE: Scene-Grass --
     // --- Grass Shaders ---
     // Grass rendering constants.
@@ -1594,6 +1598,9 @@
         // --- NEW: Render Items & Obstacles (now works because drawSphere exists) ---
         for(const itm of items) if (itm.active) drawSphere(itm.x,itm.y,itm.z,itm.r,[0.2,1.0,0.3]);
         for(const o of obstacles) drawSphere(o.x,o.y,o.z,o.r,[0.9,0.2,0.2]);
+
+        // Draw procedural rocks (flat-shaded, stylized)
+
 
         // Render Grass in multiple passes for density and LOD
         {
