@@ -2249,6 +2249,8 @@
                 gl.uniformMatrix4fv(uPPla, false, v.projectionMatrix);
                 gl.uniform1f(uTimePla, t * 0.001);
                 gl.uniform1i(uMaxIterationsPla, iterations);
+                gl.uniform3f(uPlantPosPla, px, 0, pz);
+                gl.uniform1f(uPlantSeedPla, plantSeed);
                 gl.drawArrays(gl.TRIANGLES, 0, 6);
             }
 
