@@ -1557,8 +1557,8 @@
         return out;
     }
     
-    const vsPlants = `#version 300 es // Vertex shader for plants using WebGL2
-    precision highp float; // Use high precision for all float operations
+    const vsPlants = `#version 300 es
+    precision lowp float; // Use low precision for all float operations
     layout(location=0) in vec3 p; // Input vertex position attribute at location 0
     layout(location=1) in vec2 uv_in; // Input UV texture coordinate attribute at location 1
     uniform mat4 M, V, P; // Model, View, and Projection matrices
@@ -1568,8 +1568,8 @@
         gl_Position = P * V * M * vec4(p, 1.0); // Transform vertex position to clip space
     }`;
 
-    const fsPlants = `#version 300 es // Fragment shader for plants using WebGL2
-    precision highp float; // Use high precision for all float operations
+    const fsPlants = `#version 300 es
+    precision lowp float; // Use low precision for all float operations
     in vec2 uv; // UV coordinates received from vertex shader
     out vec4 o; // Output color for this fragment
     uniform float uTime; // Time uniform for animation
