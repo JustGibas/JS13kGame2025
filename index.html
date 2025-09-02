@@ -1558,7 +1558,7 @@
     }
     
     const vsPlants = `#version 300 es
-    precision lowp float; // Use low precision for all float operations
+    precision highp float; // Use high precision for all float operations
     layout(location=0) in vec3 p; // Input vertex position attribute at location 0
     layout(location=1) in vec2 uv_in; // Input UV texture coordinate attribute at location 1
     uniform mat4 M, V, P; // Model, View, and Projection matrices
@@ -1569,7 +1569,7 @@
     }`;
 
     const fsPlants = `#version 300 es
-    precision lowp float; // Use low precision for all float operations
+    precision highp float; // Use high precision for all float operations
     in vec2 uv; // UV coordinates received from vertex shader
     out vec4 o; // Output color for this fragment
     uniform float uTime; // Time uniform for animation
@@ -1596,7 +1596,7 @@
     float center(vec2 pt) { // Main function to generate L-system plant structure
         mat3 posR = Rot(-(25.7 / 360.) * 2. * PI); // Create positive rotation matrix (clockwise)
         mat3 negR = Rot(25.7 / 360. * 2. * PI); // Create negative rotation matrix (counter-clockwise)
-        const int depth = 7; // Maximum recursion depth for L-system
+        const int depth = 7; // We want to have it vary from 3 to 6
         const int branches = 3; // Number of branches per node in L-system
         int maxDepth = 1; for(int i=0; i<depth; i++) maxDepth *= branches; // Calculate maximum number of nodes (pow() is not const)
         float len = 1.5; // Base length of plant segments
@@ -1636,14 +1636,14 @@
 
     void main() { // Main fragment shader function
         vec2 p = (uv * 2.0 - 1.0) * 5.0; // Scale and center UVs to range [-5, 5]
-        p.y += 3.0; // Adjust vertical position upward
+        p.y += 3.0; // Adjust vertical position
 
         float d = center(p); // Calculate distance to nearest plant structure
         float t = clamp(d, 0.0, .04) * 2. * 12.5; // Convert distance to alpha value with clamping
-        //vec4 fg = vec4(.8, .9, .8, 1.0); // Define plant color (light green)
-        vec4 c0 = vec4(.2, .2, .1, 1.0);
-        vec4 c1 = vec4(.7, .7, .3, 1.0);
-        vec4 fg = mix(c0, c1, smoothstep(.0, 1., d*1000.));
+        vec4 fg = vec4(.4, .4, .1, 1.0); // Define plant color (light green)
+        //vec4 c0 = vec4(.2, .2, .1, 1.0);
+        //vec4 c1 = vec4(.7, .7, .3, 1.0);
+        //vec4 fg = mix(c0, c1, smoothstep(.0, 1., d*1000.));
         float alpha = 1.0 - t; // Calculate alpha transparency from distance
         if (alpha < 0.05) discard; // Discard fragments that are too transparent
         o = vec4(fg.rgb * alpha, alpha); // Output final color with alpha blending
@@ -1865,10 +1865,10 @@
                 const NEAR_HIDE = 4.0;
                 const NEAR_FULL = 6.0;
                 const FAR_START = 18.0;
-                const FAR_HIDE  = 80.0;
+                const FAR_HIDE  = 50.0;
                 if(dist < NEAR_HIDE || dist > FAR_HIDE) continue;
 
-                const MIN_ITER = 2, MAX_ITER = 16;
+                const MIN_ITER = 2, MAX_ITER = 14;
                 const sstep = x => x*x*(3-2*x);
                 let a = (dist - NEAR_HIDE)/(NEAR_FULL-NEAR_HIDE); a = sstep(Math.min(1, Math.max(0,a)));
                 let b = (FAR_HIDE - dist)/(FAR_HIDE - FAR_START); b = sstep(Math.min(1, Math.max(0,b)));
