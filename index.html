@@ -1704,8 +1704,8 @@
         gl.drawArrays(gl.TRIANGLES, 0, 6);
 
         // --- NEW: Render Items & Obstacles (now works because drawSphere exists) ---
-        for(const itm of items) if (itm.active) drawSphere(itm.x,itm.y,itm.z,itm.r,[0.2,1.0,0.3]);
-        for(const o of obstacles) if(!o._isRock) drawSphere(o.x,o.y,o.z,o.r,[0.9,0.2,0.2]);
+        for(const itm of items) if (itm.active) drawSphere(V,P,itm.x,itm.y,itm.z,itm.r,[0.2,1.0,0.3]);
+        for(const o of obstacles) if(!o._isRock) drawSphere(V,P,o.x,o.y,o.z,o.r,[0.9,0.2,0.2]);
 
         // Draw procedural rocks (flat-shaded, stylized)
         for(const r of rocks)
@@ -1843,7 +1843,7 @@
     }
 
     // Helper to submit a sphere draw call
-    function drawSphere(x,y,z,r,col){
+    function drawSphere(V,P,x,y,z,r,col){
         gl.useProgram(PS);
         gl.bindVertexArray(sphereVao);
         gl.uniformMatrix4fv(uS_V,false,V);
