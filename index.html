@@ -367,6 +367,7 @@
     uniform int uMaxIterations; // Control the quality/complexity
     uniform vec3 uPlantPos; // World position of the plant
     uniform float uPlantSeed; // Seed for this plant
+    uniform float uStipple; // Stipple factor for performance saving
 
     #define PI 3.14159 // Define PI constant for mathematical calculations
 
@@ -435,6 +436,14 @@
     }
 
     void main() {
+        // Stipple pattern to discard fragments up close for performance
+        if (uStipple > 0.0) {
+            float stipplePattern = mod(gl_FragCoord.x + gl_FragCoord.y, 2.0);
+            if (stipplePattern < uStipple) {
+                discard;
+            }
+        }
+
         // compute distance field
         vec2 p = (uv * 2.0 - 1.0) * 5.0;
         p.y += 3.0;
@@ -479,6 +488,7 @@
     const uMaxIterationsPla = gl.getUniformLocation(PPLANTS, 'uMaxIterations'); // Get location of max iterations uniform
     const uPlantPosPla = gl.getUniformLocation(PPLANTS, 'uPlantPos');
     const uPlantSeedPla = gl.getUniformLocation(PPLANTS, 'uPlantSeed');
+    const uStipplePla = gl.getUniformLocation(PPLANTS, 'uStipple');
 
     const vboPlants = gl.createBuffer(), vaoPlants = gl.createVertexArray(); // Create vertex buffer and vertex array objects
     gl.bindVertexArray(vaoPlants); // Bind the vertex array object
@@ -563,8 +573,17 @@
                 const NEAR_HIDE = 4.0;
                 const NEAR_FULL = 6.0;
                 const FAR_START = 18.0;
-                const FAR_HIDE  = 50.0;
+                const FAR_HIDE  = 80.0;
                 if(dist < NEAR_HIDE || dist > FAR_HIDE) continue;
+
+                // Stipple/dither when very close to save fill-rate on mobile
+                const STIPPLE_START = 50.0;
+                const STIPPLE_FULL = 3.0;
+                let stipple = 0.0;
+                if (dist < STIPPLE_START) {
+                    stipple = 1.0 - (dist - STIPPLE_FULL) / (STIPPLE_START - STIPPLE_FULL);
+                    stipple = Math.max(0.0, Math.min(1.0, stipple)) * 0.1; // stipple up to 50%
+                }
 
                 const MIN_ITER = 2, MAX_ITER = 14;
                 const sstep = x => x*x*(3-2*x);
@@ -592,6 +611,7 @@
                 gl.uniform1i(uMaxIterationsPla, iterations);
                 gl.uniform3f(uPlantPosPla, px, 0, pz);
                 gl.uniform1f(uPlantSeedPla, plantSeed);
+                gl.uniform1f(uStipplePla, stipple);
                 gl.drawArrays(gl.TRIANGLES, 0, 6);
             }
 
