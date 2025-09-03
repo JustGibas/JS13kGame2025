@@ -1645,9 +1645,9 @@
                 float y = sdCappedCylinder(pt_n, vec2(wid, l));
                 if (y - 2.0 * l > 0.0) { c += off - 1; break; }
                 d = min(d, y);
-                if (d < 0.001) break; // Early exit if we are inside a shape
+                if (d < 0.01) break; // Early exit if we are inside a shape
             }
-            if (d < 0.001) break; // And check again here to exit outer loop
+            if (d < 0.01) break; // And check again here to exit outer loop
             ++c;
             if (c > maxDepth) break;
         }
