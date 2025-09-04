@@ -111,6 +111,8 @@
     
    // State variables for the user/camera, rendering loop, and WebGL/WebXR contexts
     let user = { x: 0, y: 1.6, z: 2, yaw: 0, pitch: 0 }; // User position and orientation
+    let prevUserX = user.x, prevUserZ = user.z; // previous frame planar position
+    let userVelX = 0, userVelZ = 0;             // planar velocity for cat pursuit
     let last = 0; // Timestamp of the last frame for calculating delta time
     let gl, xr = null, ref = null, off = null; // WebGL and WebXR objects
 
@@ -357,12 +359,161 @@
     let beastMode = false; // toggle beast mode
     // -- MODULE: Gameplay-Item --
     const BOOST_DURATION = 15;          // seconds per pickup
-    const BOOST_AMOUNT  = 0.5;        // +50% per stack
+    const BOOST_AMOUNT  = 0.3;        // +30% per stack
     const MAX_BOOSTS    = 100;           // safety cap
     const speedBoosts = [];            // {timeLeft, amount}
     const items = [];                  // pickup spheres {x,y,z,r,active:true}
     const obstacles = [];              // solid spheres for collision {x,y,z,r}
     const playerCapsule = { radius: 0.5, height: 1.6, eyeOffset: 1.6 };
+    let playerMoveMag = 0;             // cached player movement magnitude (for chase detection)
+
+    // -- MODULE: Gameplay-Cat --
+    // Stylized Black Cat entity the player must catch. Cat roams near center, avoids player, drops boosts & obstacles.
+    const cat = { x:0, y:0.6, z:0, vx:0, vz:0, caught:0, drop:1.2, baseS:3, anim:0, evade:0, yaw:0 };
+    const CAT_MAX_R = 590;        // Hard clamp so cat never wanders too far
+    const CAT_PREF_R = 30;       // Preferred roaming radius from origin
+    const CAT_CATCH_R = 0.5;     // Distance threshold to count as caught
+    const CAT_FLEE_R = 10;       // Start fleeing if player within this distance
+    const CAT_SEEK_R = 50;      // Begin seeking player if beyond this distance
+    const CAT_EVADE_R = 3;     // Distance to trigger perpendicular dodge
+    const CAT_DROP_MIN = 1.9;    // Min seconds between drops (only while chased)
+    const CAT_DROP_VAR = 0.8;    // Added random variance
+    function resetCatPosition(){
+        // Random point within preferred radius
+        const a = Math.random()*PI*2; const r = Math.random()*CAT_PREF_R*0.8;
+        cat.x = Math.cos(a)*r; cat.z = Math.sin(a)*r; cat.vx = cat.vz = 0;
+    }
+    function spawnDrop(x,z){
+        // Respect existing weighting (boost scarce), tweak slightly
+        if(Math.random()<0.4){
+            items.push({x, y:0.5, z, r:0.4, active:true});
+        }else{
+            obstacles.push({x, y:0.6, z, r:0.6});
+        }
+        if(items.length>2) items.splice(0, items.length-2);
+        if(obstacles.length>5) obstacles.splice(0, obstacles.length-3);
+    }
+    function updateCat(dt){
+        const dxP = user.x - cat.x, dzP = user.z - cat.z;
+        const dP2 = dxP*dxP + dzP*dzP;
+        let fx = 0, fz = 0;
+        const dist = Math.sqrt(dP2)||1;
+        // Behavior tiers:
+        // 1. Seek (player far) -> move toward predicted position
+        // 2. Orbit (mid range) -> tangential movement
+        // 3. Flee (close) -> run away + evasive handled below
+        if(dist > CAT_SEEK_R){
+            // Predictive pursuit: estimate lead time proportional to distance & relative speed
+            const relSpeed = Math.hypot(userVelX, userVelZ) + 0.01;
+            const lead = Math.min(3, dist / (cat.baseS + 2));
+            const targetX = user.x + userVelX * lead;
+            const targetZ = user.z + userVelZ * lead;
+            const tx = targetX - cat.x, tz = targetZ - cat.z;
+            const td = Math.hypot(tx, tz)||1;
+            fx += (tx/td)*5; fz += (tz/td)*5;
+        } else if(dist > CAT_FLEE_R){
+            // Orbit band: push slightly toward player but add strong perpendicular drift
+            const nx = dxP/dist, nz = dzP/dist;
+            // Toward component keeps it from drifting away too much
+            fx += nx*1.1; fz += nz*1.1;
+            // Perpendicular (choose deterministic side using sign of sin of position sum)
+            const sign = Math.sin((cat.x+cat.z)*0.2) > 0 ? 1 : -1;
+            fx += (-nz*sign)*4; fz += (nx*sign)*4;
+        } else {
+            // Flee when very close
+            fx -= (dxP/dist)*5; fz -= (dzP/dist)*5;
+        }
+        // Centering band
+        const dc2 = cat.x*cat.x + cat.z*cat.z; const dc = Math.sqrt(dc2)||1;
+        if(dc > CAT_PREF_R){ fx += (-cat.x/dc)*((dc-CAT_PREF_R)*1.0); fz += (-cat.z/dc)*((dc-CAT_PREF_R)*1.0); }
+        else if(dc < CAT_PREF_R*0.55){ fx += (cat.x/dc)*0.5; fz += (cat.z/dc)*0.5; }
+        // Obstacle avoidance (proximity repulsion + simple forward ray)
+        const spd = Math.hypot(cat.vx, cat.vz) + 0.1;
+        const dirx = cat.vx/spd, dirz = cat.vz/spd;
+        const look = 2 + spd*0.6;
+        for(const ob of obstacles){
+            const ox = ob.x - cat.x, oz = ob.z - cat.z;
+            const dist2 = ox*ox + oz*oz; const rad = ob.r + 0.7;
+            if(dist2 < rad*rad){ // proximity push
+                const d = Math.sqrt(dist2)||1; fx -= (ox/d)*2.4; fz -= (oz/d)*2.4;
+            } else if(dist2 < (look*look)){ // forward ray influence
+                const ahead = (ox*dirx + oz*dirz); // projection length
+                if(ahead>0 && ahead<look){
+                    const perpX = ox - dirx*ahead, perpZ = oz - dirz*ahead; // lateral offset
+                    const pd2 = perpX*perpX + perpZ*perpZ;
+                    if(pd2 < rad*rad){ // steer away
+                        const pd = Math.sqrt(pd2)||1; fx -= (perpX/pd)*2; fz -= (perpZ/pd)*2; }
+                }
+            }
+        }
+        // Mild noise
+        fx += (Math.random()*2-1)*0.9; fz += (Math.random()*2-1)*0.9;
+        // Evasive perpendicular burst if very close
+        cat.evade -= dt;
+        if(dP2 < CAT_EVADE_R*CAT_EVADE_R && cat.evade<=0){
+            const d = Math.sqrt(dP2)||1; const nx = dxP/d, nz = dzP/d;
+            // pick perpendicular sign based on random
+            const sign = (Math.random()<0.5)?1:-1;
+            fx += (-nz*sign)*20; fz += (nx*sign)*20; // impulse-like
+            cat.evade = 0.2; // cooldown seconds
+        }
+        // Integrate velocity
+        cat.vx += fx*dt; cat.vz += fz*dt;
+        const maxS = cat.baseS + cat.caught*1.5;
+        let sp = Math.hypot(cat.vx, cat.vz)||1;
+        if(sp>maxS){ cat.vx = cat.vx/sp*maxS; cat.vz = cat.vz/sp*maxS; sp = maxS; }
+        cat.x += cat.vx*dt; cat.z += cat.vz*dt;
+        // Face movement direction (only if moving sufficiently)
+        if(sp > 0.1){
+            const targetYaw = Math.atan2(cat.vx, cat.vz); // note swapped to align forward with +Z
+            // Smooth interpolation
+            let dy = targetYaw - cat.yaw;
+            // wrap to [-PI,PI]
+            if(dy > Math.PI) dy -= 2*Math.PI; else if(dy < -Math.PI) dy += 2*Math.PI;
+            cat.yaw += dy * Math.min(1, dt*10); // turn speed factor
+        }
+        const r2 = cat.x*cat.x + cat.z*cat.z; if(r2>CAT_MAX_R*CAT_MAX_R){ const r=Math.sqrt(r2); cat.x*=CAT_MAX_R/r; cat.z*=CAT_MAX_R/r; }
+        // Friction
+        cat.vx *= (1 - 1.1*dt); cat.vz *= (1 - 1.1*dt);
+        // Chase detection (player near & moving)
+        const chased = (dP2 < CAT_FLEE_R*CAT_FLEE_R && playerMoveMag>0.15);
+        if(chased){ cat.drop -= dt; if(cat.drop<=0){ spawnDrop(cat.x, cat.z); cat.drop = CAT_DROP_MIN + Math.random()*CAT_DROP_VAR; } }
+        // Animation clock
+        cat.anim += sp*dt*3.5;
+        // Catch detection
+        if(dP2 < (CAT_CATCH_R+playerCapsule.radius)*(CAT_CATCH_R+playerCapsule.radius)){
+            cat.caught++; log('Cat caught #' + cat.caught); playClickSound && playClickSound();
+            if(speedBoosts.length < MAX_BOOSTS) speedBoosts.push({timeLeft:BOOST_DURATION, amount:BOOST_AMOUNT});
+            resetCatPosition();
+            for(let i=0;i<4;i++); //spawnDrop(cat.x + (Math.random()*2-1), cat.z + (Math.random()*2-1));
+        }
+    }
+    function drawCat(){
+        const c=[0.02,0.02,0.02];
+        const yaw = cat.yaw-20; const cy = Math.cos(yaw), sy = Math.sin(yaw);
+        // helper to rotate local offsets (forward = +Z local)
+        function place(lx, ly, lz, r){
+            const wx = cat.x + lx*cy + lz*sy;
+            const wz = cat.z + lz*cy - lx*sy;
+            drawSphere(wx, cat.y + ly, wz, r, c);
+        }
+        // Body core (chain)
+        place(0.10,0,0,0.25); place(-0.05,0,0,0.25); place(-0.20,0,0,0.24);
+        // Head
+        place(0.38,0.18,0,0.20);
+        // Legs (animated)
+        const amp=0.08, a=cat.anim, cyc=(v)=>Math.sin(v)*amp, cy0=cyc(a), cy1=cyc(a+Math.PI), baseY=-0.30;
+        place(0.15, baseY + cy0, 0.14, 0.09); // FR
+        place(0.15, baseY + cy1,-0.14, 0.09); // FL
+        place(-0.25, baseY + cy1, 0.15, 0.09); // BR
+        place(-0.25, baseY + cy0,-0.15, 0.09); // BL
+        // Tail segments (use leg phases for subtle motion)
+        place(-0.40,0.15, cy0*0.4,0.14);
+        place(-0.55,0.25, 0,0.12);
+        place(-0.70,0.30, cy1*0.5,0.11);
+    }
+    resetCatPosition();
+    // -- /MODULE: Gameplay-Cat --
 
     function spawnTestContent(){
         // Pickup items
@@ -372,7 +523,7 @@
         // One obstacle sphere to demonstrate collision
         obstacles.push({ x: 0, y: 0.8, z: -2, r: 0.8 });
     }
-    spawnTestContent();
+    //spawnTestContent();
 
     function currentSpeedMult(){
         let m = 1;
@@ -475,8 +626,8 @@
         const speed = MOVES * (currentSpeedMult());
         // Apply movement
         const now = performance.now();
-        const moveMagnitude = Math.hypot(mv.x, mv.y);
-        if(moveMagnitude > 0.1 && now - lastStepTime > stepInterval){
+    const moveMagnitude = Math.hypot(mv.x, mv.y); playerMoveMag = moveMagnitude;
+    if(moveMagnitude > 0.1 && now - lastStepTime > stepInterval){
             playStepSound();
             lastStepTime = now;
         }
@@ -495,6 +646,10 @@
         // Apply movement along forward and right vectors
         user.x += (T_V3_B[0] * mv.x + T_V3_A[0] * mv.y) * sp;
         user.z += (T_V3_B[2] * mv.x + T_V3_A[2] * mv.y) * sp;
+    // Update velocity using previous stored position
+    userVelX = (user.x - prevUserX) / dt;
+    userVelZ = (user.z - prevUserZ) / dt;
+    prevUserX = user.x; prevUserZ = user.z;
         // Resolve collisions with obstacles
         resolveCollisions(prevX, prevZ);
         tryPickupItems();
@@ -807,8 +962,10 @@
             hudCtx.fillText(`MS: ${dt.toFixed(3)}`, 100, 80);
             hudCtx.fillText(`Pos: (${user.x.toFixed(1)}, ${user.z.toFixed(1)})`, 100, 100);
             hudCtx.fillText(`Yaw: ${(user.yaw * 180 / PI | 0)}°`, 20, 100);
+            hudCtx.fillText(`Cat Caught: ${cat.caught}`, 20, 120);
+            hudCtx.fillText(`Boosts: ${speedBoosts.length}`, 150, 120);
             if (hit) { hudCtx.fillStyle = '#afa';
-            hudCtx.fillText(`Hit @ ground: (${hit[0].toFixed(2)}, ${hit[2].toFixed(2)})`, 20, 120); }
+            hudCtx.fillText(`Hit @ ground: (${hit[0].toFixed(2)}, ${hit[2].toFixed(2)})`, 20, 140); }
 
             // Log box
             if (logVisible) {
@@ -1067,6 +1224,8 @@
         // Update user position
         const mv = getMove();
         step(dt, mv);
+        // Update black cat AI & drops
+        updateCat(dt);
 
         // Update camera matrices
         buildViewProj();
@@ -1096,6 +1255,8 @@
         // --- NEW: Render Items & Obstacles (now works because drawSphere exists) ---
         for(const itm of items) if (itm.active) drawSphere(itm.x,itm.y,itm.z,itm.r,[0.2,1.0,0.3]);
         for(const o of obstacles) drawSphere(o.x,o.y,o.z,o.r,[0.9,0.2,0.2]);
+        // Render Black Cat
+        drawCat();
 
         // Render Grass in multiple passes for density and LOD
         
