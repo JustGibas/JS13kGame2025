@@ -416,6 +416,7 @@
     const speedBoosts = [];            // {timeLeft, amount}
     const items = [];                  // pickup spheres {x,y,z,r,active:true}
     const obstacles = [];              // solid spheres for collision {x,y,z,r}
+    const traps = [];                  // spheres spawnned by cat {x,y,z,r}
     const playerCapsule = { radius: 0.5, height: 1.6, eyeOffset: 1.6 };
     let playerMoveMag = 0;             // cached player movement magnitude (for chase detection)
 
@@ -439,11 +440,13 @@
         // Respect existing weighting (boost scarce), tweak slightly
         if(Math.random()<0.4){
             items.push({x, y:0.5, z, r:0.4, active:true});
+            playClickSound();
         }else{
-            obstacles.push({x, y:0.6, z, r:0.6});
+            traps.push({x, y:0.6, z, r:0.6});
+            playClickSound();
         }
         if(items.length>2) items.splice(0, items.length-2);
-        if(obstacles.length>3) obstacles.splice(0, obstacles.length-3);
+        if(traps.length>3) traps.splice(0, traps.length-3);
     }
     function updateCat(dt){
         const dxP = user.x - cat.x, dzP = user.z - cat.z;
@@ -592,7 +595,7 @@
         // Capsule vs sphere obstacles
         const baseY = user.y - playerCapsule.eyeOffset;
         const topY  = baseY + playerCapsule.height;
-        for (const o of obstacles){
+        for (const o of obstacles.concat(traps)){
             const ny = Math.max(baseY, Math.min(topY, o.y));
             let dx = user.x - o.x;
             let dy = ny - o.y;
@@ -1997,6 +2000,7 @@
         // --- NEW: Render Items & Obstacles (now works because drawSphere exists) ---
         for(const itm of items) if (itm.active) drawSphere(V,P,itm.x,itm.y,itm.z,itm.r,[0.2,1.0,0.3]);
         for(const o of obstacles) if(!o._isRock) drawSphere(V,P,o.x,o.y,o.z,o.r,[0.9,0.2,0.2]);
+        for(const t of traps) drawSphere(t.x,t.y,t.z,t.r,[0.8,0.5,0.1]);
         // Render Black Cat
         const c=[0.02,0.02,0.02];
         const yaw = cat.yaw-20; const cy = Math.cos(yaw), sy = Math.sin(yaw);
