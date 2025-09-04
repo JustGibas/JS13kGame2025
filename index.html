@@ -547,7 +547,7 @@
         function place(lx, ly, lz, r){
             const wx = cat.x + lx*cy + lz*sy;
             const wz = cat.z + lz*cy - lx*sy;
-            drawSphere(wx, cat.y + ly, wz, r, c);
+            drawSphere(V,P,wx, cat.y + ly, wz, r, c);
         }
         // Body core (chain)
         place(0.10,0,0,0.25); place(-0.05,0,0,0.25); place(-0.20,0,0,0.24);
