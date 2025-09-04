@@ -2277,6 +2277,8 @@
         // Apply movement based on controller input
         const mv = getMove(s);
         step(dt, mv);
+        // Update black cat AI & drops
+        updateCat(dt);
 
         // Create an offset reference space to account for user-controlled movement
         const half = -user.yaw * 0.5;
@@ -2369,6 +2371,31 @@
             // --- NEW: Render Items & Obstacles (now works because drawSphere exists) ---
             for(const itm of items) if (itm.active) drawSphere(v.transform.inverse.matrix,v.projectionMatrix,itm.x,itm.y,itm.z,itm.r,[0.2,1.0,0.3]);
             for(const o of obstacles)  if(!o._isRock) drawSphere(v.transform.inverse.matrix,v.projectionMatrix,o.x,o.y,o.z,o.r,[0.9,0.2,0.2]);
+            for(const t of traps) drawSphere(v.transform.inverse.matrix,v.projectionMatrix,t.x,t.y,t.z,t.r,[0.8,0.5,0.1]);
+
+            // Render Black Cat
+            const c=[0.02,0.02,0.02];
+            const yaw = cat.yaw-20; const cy = Math.cos(yaw), sy = Math.sin(yaw);
+            // helper to rotate local offsets (forward = +Z local)
+            function place(lx, ly, lz, r){
+                const wx = cat.x + lx*cy + lz*sy;
+                const wz = cat.z + lz*cy - lx*sy;
+                drawSphere(v.transform.inverse.matrix,v.projectionMatrix, wx, cat.y + ly, wz, r, c);
+            }
+            // Body core (chain)
+            place(0.10,0,0,0.25); place(-0.05,0,0,0.25); place(-0.20,0,0,0.24);
+            // Head
+            place(0.38,0.18,0,0.20);
+            // Legs (animated)
+            const amp=0.08, a=cat.anim, cyc=(v)=>Math.sin(v)*amp, cy0=cyc(a), cy1=cyc(a+Math.PI), baseY=-0.30;
+            place(0.15, baseY + cy0, 0.14, 0.09); // FR
+            place(0.15, baseY + cy1,-0.14, 0.09); // FL
+            place(-0.25, baseY + cy1, 0.15, 0.09); // BR
+            place(-0.25, baseY + cy0,-0.15, 0.09); // BL
+            // Tail segments (use leg phases for subtle motion)
+            place(-0.40,0.15, cy0*0.4,0.14);
+            place(-0.55,0.25, 0,0.12);
+            place(-0.70,0.30, cy1*0.5,0.11);
 
             // Draw procedural rocks (flat-shaded, stylized)
             for(const r of rocks)
