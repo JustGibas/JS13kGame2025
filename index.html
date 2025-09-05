@@ -64,7 +64,7 @@
     // Expose Math functions to global scope
     Object.getOwnPropertyNames(Math).forEach(n => window[n.toUpperCase()] = Math[n]);
     // --- Math Library ---
-    const D2R = 0.0174532925 // or Math.PI / 180;
+    const D2R = 0.0174532925 // or PI / 180;
     const F32 = Float32Array;
     const M4 = (v) => new F32(v || [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]);
     const V3 = (v) => new F32(v || 3);
@@ -394,11 +394,11 @@
         for (const itm of items){
             if (!itm.active) continue;
             // Nearest Y on capsule segment
-            const ny = Math.max(baseY, Math.min(topY, itm.y));
+            const ny = MAX(baseY, MIN(topY, itm.y));
             const dx = itm.x - user.x;
             const dy = itm.y - ny;
             const dz = itm.z - user.z;
-            const dist = Math.hypot(dx,dy,dz);
+            const dist = HYPOT(dx,dy,dz);
             if (dist < itm.r + playerCapsule.radius){
                 itm.active = false;
                 if (speedBoosts.length < MAX_BOOSTS){
@@ -414,11 +414,11 @@
         const baseY = user.y - playerCapsule.eyeOffset;
         const topY  = baseY + playerCapsule.height;
         for (const o of obstacles){
-            const ny = Math.max(baseY, Math.min(topY, o.y));
+            const ny = MAX(baseY, MIN(topY, o.y));
             let dx = user.x - o.x;
             let dy = ny - o.y;
             let dz = user.z - o.z;
-            const dist = Math.hypot(dx,dy,dz);
+            const dist = HYPOT(dx,dy,dz);
             const minDist = playerCapsule.radius + o.r;
             if (dist < minDist){
                 if (dist < 1e-4){ // avoid division by zero
@@ -475,7 +475,7 @@
         const speed = MOVES * (currentSpeedMult());
         // Apply movement
         const now = performance.now();
-        const moveMagnitude = Math.hypot(mv.x, mv.y);
+        const moveMagnitude = HYPOT(mv.x, mv.y);
         if(moveMagnitude > 0.1 && now - lastStepTime > stepInterval){
             playStepSound();
             lastStepTime = now;
@@ -528,7 +528,7 @@
         // Generate brown noise (filtered white noise for wind-like sound)
         let lastOut = 0;
         for (let i = 0; i < bufferSize; i++) {
-            const white = Math.random() * 2 - 1;
+            const white = RANDOM() * 2 - 1;
             const brown = (lastOut + (0.01 * white)) / 1.03;
             data[i] = brown; //  *3 Amplify
             lastOut = brown;
@@ -585,9 +585,9 @@
             const dot1 = x * w1x + z * w1y;
             const dot2 = x * w2x + z * w2y;
 
-            const g = 0.6 * Math.sin(dot1 + timeSec * 0.7) + 0.4 * Math.sin(dot2 - timeSec * 1.2);
+            const g = 0.6 * SIN(dot1 + timeSec * 0.7) + 0.4 * SIN(dot2 - timeSec * 1.2);
             // small global phase term similar to per-blade phase in shader
-            const sway = 0.25 * g + 0.07 * Math.sin(timeSec * 1.7 + 0.0);
+            const sway = 0.25 * g + 0.07 * SIN(timeSec * 1.7 + 0.0);
             return { gust: g, sway: sway };
         }
 
@@ -604,11 +604,11 @@
         // Flow taken perpendicular to gradient (simulate flow along isobars)
         let vx = -gz;
         let vz =  gx;
-        const len = Math.hypot(vx, vz) || 1;
+        const len = HYPOT(vx, vz) || 1;
         vx /= len; vz /= len;
         // Slowly rotate vector for variety
-        const rot = 0.2 * Math.sin(timeSec * 0.05);
-        const cr = Math.cos(rot), sr = Math.sin(rot);
+        const rot = 0.2 * SIN(timeSec * 0.05);
+        const cr = COS(rot), sr = SIN(rot);
         const rvx = vx*cr - vz*sr;
         const rvz = vx*sr + vz*cr;
         return {x:rvx, z:rvz, speed: len};
@@ -624,7 +624,7 @@
         const baseGain = 0.08;
         const gainScale = 0.6;
         let targetGain = baseGain + gainScale * s.sway;
-        targetGain = Math.max(0.01, Math.min(1.0, targetGain));
+        targetGain = MAX(0.01, MIN(1.0, targetGain));
         audioCtx.windMaster.gain.setTargetAtTime(targetGain, now, 0.25);
         // Filter brightness from sway
         const baseFreq = 200;
@@ -633,10 +633,10 @@
         audioCtx.windFilter.frequency.setTargetAtTime(freq, now, 0.25);
         // --- Stereo cues ---
         // Relative angle: wind vector vs listener forward (yaw)
-        const relAngle = Math.atan2(wind.x, wind.z) - yaw;
+        const relAngle = ATAN2(wind.x, wind.z) - yaw;
         // Wrap to [-PI, PI]
-        const a = Math.atan2(Math.sin(relAngle), Math.cos(relAngle));
-        const pan = Math.sin(a); // -1 (left) .. +1 (right)
+        const a = ATAN2(SIN(relAngle), COS(relAngle));
+        const pan = SIN(a); // -1 (left) .. +1 (right)
         // ILD (small): modify per-ear gains
         const ildAmt = 0.3; // strength of level difference
         const leftLevel = 1 - ildAmt * pan;
@@ -803,7 +803,7 @@
             hudCtx.fillStyle = '#fff';
             hudCtx.font = '16px system-ui';
             hudCtx.fillText(`Mode: ${mode}${isMobile ? ' (Touch)' : ''}`, 20, 60);
-            hudCtx.fillText(`FPS: ${Math.round(1/dt)}`, 20, 80);
+            hudCtx.fillText(`FPS: ${ROUND(1/dt)}`, 20, 80);
             hudCtx.fillText(`MS: ${dt.toFixed(3)}`, 100, 80);
             hudCtx.fillText(`Pos: (${user.x.toFixed(1)}, ${user.z.toFixed(1)})`, 100, 100);
             hudCtx.fillText(`Yaw: ${(user.yaw * 180 / PI | 0)}°`, 20, 100);
