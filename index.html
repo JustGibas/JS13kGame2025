@@ -64,7 +64,7 @@
     // Expose Math functions to global scope
     Object.getOwnPropertyNames(Math).forEach(n => window[n.toUpperCase()] = Math[n]);
     // --- Math Library ---
-    const D2R = 0.0174532925 // or Math.PI / 180;
+    const D2R = 0.0174532925 // or PI / 180;
     const F32 = Float32Array;
     const M4 = (v) => new F32(v || [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]);
     const V3 = (v) => new F32(v || 3);
@@ -433,12 +433,12 @@
     const CAT_DROP_VAR = 0.8;    // Added random variance
     function resetCatPosition(){
         // Random point within preferred radius
-        const a = Math.random()*PI*2; const r = Math.random()*CAT_PREF_R*0.8;
-        cat.x = Math.cos(a)*r; cat.z = Math.sin(a)*r; cat.vx = cat.vz = 0;
+        const a = RANDOM()*PI*2; const r = RANDOM()*CAT_PREF_R*0.8;
+        cat.x = COS(a)*r; cat.z = SIN(a)*r; cat.vx = cat.vz = 0;
     }
     function spawnDrop(x,z){
         // Respect existing weighting (boost scarce), tweak slightly
-        if(Math.random()<0.4){
+        if(RANDOM()<0.4){
             items.push({x, y:0.5, z, r:0.4, active:true});
             playClickSound();
         }else{
@@ -452,19 +452,19 @@
         const dxP = user.x - cat.x, dzP = user.z - cat.z;
         const dP2 = dxP*dxP + dzP*dzP;
         let fx = 0, fz = 0;
-        const dist = Math.sqrt(dP2)||1;
+        const dist = SQRT(dP2)||1;
         // Behavior tiers:
         // 1. Seek (player far) -> move toward predicted position
         // 2. Orbit (mid range) -> tangential movement
         // 3. Flee (close) -> run away + evasive handled below
         if(dist > CAT_SEEK_R){
             // Predictive pursuit: estimate lead time proportional to distance & relative speed
-            const relSpeed = Math.hypot(userVelX, userVelZ) + 0.01;
-            const lead = Math.min(3, dist / (cat.baseS + 2));
+            const relSpeed = HYPOT(userVelX, userVelZ) + 0.01;
+            const lead = MIN(3, dist / (cat.baseS + 2));
             const targetX = user.x + userVelX * lead;
             const targetZ = user.z + userVelZ * lead;
             const tx = targetX - cat.x, tz = targetZ - cat.z;
-            const td = Math.hypot(tx, tz)||1;
+            const td = HYPOT(tx, tz)||1;
             fx += (tx/td)*5; fz += (tz/td)*5;
         } else if(dist > CAT_FLEE_R){
             // Orbit band: push slightly toward player but add strong perpendicular drift
@@ -472,67 +472,67 @@
             // Toward component keeps it from drifting away too much
             fx += nx*1.1; fz += nz*1.1;
             // Perpendicular (choose deterministic side using sign of sin of position sum)
-            const sign = Math.sin((cat.x+cat.z)*0.2) > 0 ? 1 : -1;
+            const sign = SIN((cat.x+cat.z)*0.2) > 0 ? 1 : -1;
             fx += (-nz*sign)*4; fz += (nx*sign)*4;
         } else {
             // Flee when very close
             fx -= (dxP/dist)*5; fz -= (dzP/dist)*5;
         }
         // Centering band
-        const dc2 = cat.x*cat.x + cat.z*cat.z; const dc = Math.sqrt(dc2)||1;
+        const dc2 = cat.x*cat.x + cat.z*cat.z; const dc = SQRT(dc2)||1;
         if(dc > CAT_PREF_R){ fx += (-cat.x/dc)*((dc-CAT_PREF_R)*1.0); fz += (-cat.z/dc)*((dc-CAT_PREF_R)*1.0); }
         else if(dc < CAT_PREF_R*0.55){ fx += (cat.x/dc)*0.5; fz += (cat.z/dc)*0.5; }
         // Obstacle avoidance (proximity repulsion + simple forward ray)
-        const spd = Math.hypot(cat.vx, cat.vz) + 0.1;
+        const spd = HYPOT(cat.vx, cat.vz) + 0.1;
         const dirx = cat.vx/spd, dirz = cat.vz/spd;
         const look = 2 + spd*0.6;
         for(const ob of obstacles){
             const ox = ob.x - cat.x, oz = ob.z - cat.z;
             const dist2 = ox*ox + oz*oz; const rad = ob.r + 0.7;
             if(dist2 < rad*rad){ // proximity push
-                const d = Math.sqrt(dist2)||1; fx -= (ox/d)*2.4; fz -= (oz/d)*2.4;
+                const d = SQRT(dist2)||1; fx -= (ox/d)*2.4; fz -= (oz/d)*2.4;
             } else if(dist2 < (look*look)){ // forward ray influence
                 const ahead = (ox*dirx + oz*dirz); // projection length
                 if(ahead>0 && ahead<look){
                     const perpX = ox - dirx*ahead, perpZ = oz - dirz*ahead; // lateral offset
                     const pd2 = perpX*perpX + perpZ*perpZ;
                     if(pd2 < rad*rad){ // steer away
-                        const pd = Math.sqrt(pd2)||1; fx -= (perpX/pd)*2; fz -= (perpZ/pd)*2; }
+                        const pd = SQRT(pd2)||1; fx -= (perpX/pd)*2; fz -= (perpZ/pd)*2; }
                 }
             }
         }
         // Mild noise
-        fx += (Math.random()*2-1)*0.9; fz += (Math.random()*2-1)*0.9;
+        fx += (RANDOM()*2-1)*0.9; fz += (RANDOM()*2-1)*0.9;
         // Evasive perpendicular burst if very close
         cat.evade -= dt;
         if(dP2 < CAT_EVADE_R*CAT_EVADE_R && cat.evade<=0){
-            const d = Math.sqrt(dP2)||1; const nx = dxP/d, nz = dzP/d;
+            const d = SQRT(dP2)||1; const nx = dxP/d, nz = dzP/d;
             // pick perpendicular sign based on random
-            const sign = (Math.random()<0.5)?1:-1;
+            const sign = (RANDOM()<0.5)?1:-1;
             fx += (-nz*sign)*20; fz += (nx*sign)*20; // impulse-like
             cat.evade = 0.2; // cooldown seconds
         }
         // Integrate velocity
         cat.vx += fx*dt; cat.vz += fz*dt;
         const maxS = cat.baseS + cat.caught*1.5;
-        let sp = Math.hypot(cat.vx, cat.vz)||1;
+        let sp = HYPOT(cat.vx, cat.vz)||1;
         if(sp>maxS){ cat.vx = cat.vx/sp*maxS; cat.vz = cat.vz/sp*maxS; sp = maxS; }
         cat.x += cat.vx*dt; cat.z += cat.vz*dt;
         // Face movement direction (only if moving sufficiently)
         if(sp > 0.1){
-            const targetYaw = Math.atan2(cat.vx, cat.vz); // note swapped to align forward with +Z
+            const targetYaw = ATAN2(cat.vx, cat.vz); // note swapped to align forward with +Z
             // Smooth interpolation
             let dy = targetYaw - cat.yaw;
             // wrap to [-PI,PI]
-            if(dy > Math.PI) dy -= 2*Math.PI; else if(dy < -Math.PI) dy += 2*Math.PI;
-            cat.yaw += dy * Math.min(1, dt*10); // turn speed factor
+            if(dy > PI) dy -= 2*PI; else if(dy < -PI) dy += 2*PI;
+            cat.yaw += dy * MIN(1, dt*10); // turn speed factor
         }
-        const r2 = cat.x*cat.x + cat.z*cat.z; if(r2>CAT_MAX_R*CAT_MAX_R){ const r=Math.sqrt(r2); cat.x*=CAT_MAX_R/r; cat.z*=CAT_MAX_R/r; }
+        const r2 = cat.x*cat.x + cat.z*cat.z; if(r2>CAT_MAX_R*CAT_MAX_R){ const r=SQRT(r2); cat.x*=CAT_MAX_R/r; cat.z*=CAT_MAX_R/r; }
         // Friction
         cat.vx *= (1 - 1.1*dt); cat.vz *= (1 - 1.1*dt);
         // Chase detection (player near & moving)
         const chased = (dP2 < CAT_FLEE_R*CAT_FLEE_R && playerMoveMag>0.15);
-        if(chased){ cat.drop -= dt; if(cat.drop<=0){ spawnDrop(cat.x, cat.z); cat.drop = CAT_DROP_MIN + Math.random()*CAT_DROP_VAR; } }
+        if(chased){ cat.drop -= dt; if(cat.drop<=0){ spawnDrop(cat.x, cat.z); cat.drop = CAT_DROP_MIN + RANDOM()*CAT_DROP_VAR; } }
         // Animation clock
         cat.anim += sp*dt*3.5;
         // Catch detection
@@ -540,7 +540,7 @@
             cat.caught++; log('Cat caught #' + cat.caught); playClickSound && playClickSound();
             if(speedBoosts.length < MAX_BOOSTS) speedBoosts.push({timeLeft:BOOST_DURATION, amount:BOOST_AMOUNT});
             resetCatPosition();
-            for(let i=0;i<4;i++); //spawnDrop(cat.x + (Math.random()*2-1), cat.z + (Math.random()*2-1));
+            for(let i=0;i<4;i++); //spawnDrop(cat.x + (RANDOM()*2-1), cat.z + (RANDOM()*2-1));
         }
     }
     resetCatPosition();
@@ -576,11 +576,11 @@
         for (const itm of items){
             if (!itm.active) continue;
             // Nearest Y on capsule segment
-            const ny = Math.max(baseY, Math.min(topY, itm.y));
+            const ny = MAX(baseY, MIN(topY, itm.y));
             const dx = itm.x - user.x;
             const dy = itm.y - ny;
             const dz = itm.z - user.z;
-            const dist = Math.hypot(dx,dy,dz);
+            const dist = HYPOT(dx,dy,dz);
             if (dist < itm.r + playerCapsule.radius){
                 itm.active = false;
                 if (speedBoosts.length < MAX_BOOSTS){
@@ -596,11 +596,11 @@
         const baseY = user.y - playerCapsule.eyeOffset;
         const topY  = baseY + playerCapsule.height;
         for (const o of obstacles.concat(traps)){
-            const ny = Math.max(baseY, Math.min(topY, o.y));
+            const ny = MAX(baseY, MIN(topY, o.y));
             let dx = user.x - o.x;
             let dy = ny - o.y;
             let dz = user.z - o.z;
-            const dist = Math.hypot(dx,dy,dz);
+            const dist = HYPOT(dx,dy,dz);
             const minDist = playerCapsule.radius + o.r;
             if (dist < minDist){
                 if (dist < 1e-4){ // avoid division by zero
@@ -670,9 +670,10 @@
         const speed = MOVES * (currentSpeedMult());
         // Apply movement
         const now = performance.now();
-    const moveMagnitude = Math.hypot(mv.x, mv.y); playerMoveMag = moveMagnitude;
-    if(moveMagnitude > 0.1 && now - lastStepTime > stepInterval){
-            playStepSound();
+        const moveMagnitude = HYPOT(mv.x, mv.y); playerMoveMag = moveMagnitude;
+        // Trigger movement music activation (only sets flag / lazy init)
+        if(moveMagnitude > 0.1 && now - lastStepTime > stepInterval){
+            playStepSound(); // now activates loop system
             lastStepTime = now;
         }
         user.yaw += mv.t * TURNS * dt; // Apply turning
@@ -727,7 +728,7 @@
         // Generate brown noise (filtered white noise for wind-like sound)
         let lastOut = 0;
         for (let i = 0; i < bufferSize; i++) {
-            const white = Math.random() * 2 - 1;
+            const white = RANDOM() * 2 - 1;
             const brown = (lastOut + (0.01 * white)) / 1.03;
             data[i] = brown; //  *3 Amplify
             lastOut = brown;
@@ -784,9 +785,9 @@
             const dot1 = x * w1x + z * w1y;
             const dot2 = x * w2x + z * w2y;
 
-            const g = 0.6 * Math.sin(dot1 + timeSec * 0.7) + 0.4 * Math.sin(dot2 - timeSec * 1.2);
+            const g = 0.6 * SIN(dot1 + timeSec * 0.7) + 0.4 * SIN(dot2 - timeSec * 1.2);
             // small global phase term similar to per-blade phase in shader
-            const sway = 0.25 * g + 0.07 * Math.sin(timeSec * 1.7 + 0.0);
+            const sway = 0.25 * g + 0.07 * SIN(timeSec * 1.7 + 0.0);
             return { gust: g, sway: sway };
         }
 
@@ -803,11 +804,11 @@
         // Flow taken perpendicular to gradient (simulate flow along isobars)
         let vx = -gz;
         let vz =  gx;
-        const len = Math.hypot(vx, vz) || 1;
+        const len = HYPOT(vx, vz) || 1;
         vx /= len; vz /= len;
         // Slowly rotate vector for variety
-        const rot = 0.2 * Math.sin(timeSec * 0.05);
-        const cr = Math.cos(rot), sr = Math.sin(rot);
+        const rot = 0.2 * SIN(timeSec * 0.05);
+        const cr = COS(rot), sr = SIN(rot);
         const rvx = vx*cr - vz*sr;
         const rvz = vx*sr + vz*cr;
         return {x:rvx, z:rvz, speed: len};
@@ -823,7 +824,7 @@
         const baseGain = 0.08;
         const gainScale = 0.6;
         let targetGain = baseGain + gainScale * s.sway;
-        targetGain = Math.max(0.01, Math.min(1.0, targetGain));
+        targetGain = MAX(0.01, MIN(1.0, targetGain));
         audioCtx.windMaster.gain.setTargetAtTime(targetGain, now, 0.25);
         // Filter brightness from sway
         const baseFreq = 200;
@@ -832,10 +833,10 @@
         audioCtx.windFilter.frequency.setTargetAtTime(freq, now, 0.25);
         // --- Stereo cues ---
         // Relative angle: wind vector vs listener forward (yaw)
-        const relAngle = Math.atan2(wind.x, wind.z) - yaw;
+        const relAngle = ATAN2(wind.x, wind.z) - yaw;
         // Wrap to [-PI, PI]
-        const a = Math.atan2(Math.sin(relAngle), Math.cos(relAngle));
-        const pan = Math.sin(a); // -1 (left) .. +1 (right)
+        const a = ATAN2(SIN(relAngle), COS(relAngle));
+        const pan = SIN(a); // -1 (left) .. +1 (right)
         // ILD (small): modify per-ear gains
         const ildAmt = 0.3; // strength of level difference
         const leftLevel = 1 - ildAmt * pan;
@@ -871,19 +872,141 @@
     // -- /SOLUTION: Scene-Audio-Click --
     // -- SOLUTION: Scene-Audio-Step --
     function playStepSound(){
+        // Chiptune-style engine bootstrap (bells + simple drums + cat melody)
         if(!audioCtx) return;
-        const t = audioCtx.currentTime;
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(60, t);
-        osc.frequency.exponentialRampToValueAtTime(160, t + 0.2);
-        gain.gain.setValueAtTime(0.3, t);
-        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
-        osc.start(t);
-        osc.stop(t + 0.3);
+        if(!window.chipMusic){
+            const master = audioCtx.createGain();
+            master.gain.setValueAtTime(0, audioCtx.currentTime);
+            master.connect(audioCtx.destination);
+            window.chipMusic = {
+                g: master,
+                energy: 0,
+                lastActive: audioCtx.currentTime,
+                tempoBase: 90, // upbeat baseline
+                tempoMax: 190,  // faster when very active
+                beatDur: 60/140,
+                nextBeat: audioCtx.currentTime + 0.05,
+                step: 0,
+                // Drum patterns (1=hit,0=rest). 16-step base grid.
+                kickPat:  [1,0,0,0, 0,0,1,0, 1,0,1,0, 0,0,1,0],
+                snarePat: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0], // backbeat on 5 and 13 (0-indexed)
+                // Bell arpeggio (indexes into bellScale; -1 = rest)
+                bellSeq:  [0,-1,0,-1, 0,1,0,-1,-1,-1, 0,-1,0,-1, 0,0,0,-1,-1,-1], // 17 steps (prime-ish)
+                // Cat voice melody (indexes into catScale; -1 = rest)
+                catSeq:   [0,0,0,-1, 0,0,0,1, 2,3,0,-1, 3,5,7,-1,0, -1],
+                bellScale:[0,0,0,0,0,0,0,0], // degrees in semitones relative to root (C-like minor feel)
+                catScale: [0,0,0,0,0,0,0,0,0,0,0,0,0],
+            };
+        }
+    }
+    function updateAdaptiveMusic(moveMag, dt){ // reusing loop name for integration
+        if(!audioCtx || !window.chipMusic) return;
+        const m = window.chipMusic;
+        const now = audioCtx.currentTime;
+        // Energy logic
+        const rise = 0.05; // faster build
+        const fall = 0.2; // moderate decay
+        if(moveMag > 0.1){
+            m.energy = MIN(1, m.energy + rise * dt);
+            m.lastActive = now;
+        } else if(now - m.lastActive > 0.8){
+            m.energy = MAX(0, m.energy - fall * dt);
+        }
+        // Tempo modulation
+        const tempo = m.tempoBase + (m.tempoMax - m.tempoBase) * POW(m.energy,0.7);
+        m.beatDur = 60/tempo; // 1 beat = quarter note
+        const targetGain = (m.energy===0)?0: (0.05 + 0.2*m.energy);
+        m.g.gain.setTargetAtTime(targetGain, now, 0.2);
+        while(now >= m.nextBeat){
+            emitChipBeat(m);
+            m.nextBeat += m.beatDur/2; // 8th-note resolution for more activity
+        }
+        if(m.energy===0 && now - m.lastActive > 5){
+            m.g.gain.setTargetAtTime(0.0001, now, 1.0);
+        }
+    }
+    function emitChipBeat(m){
+        const now = audioCtx.currentTime;
+        m.step++;
+        const beat16 = m.step % 16; // index for drums
+        // Kick
+        if(m.kickPat[beat16] && m.energy > 0.2){ spawnKick(now, m); }
+        // Snare (appears after some energy)
+        if(m.snarePat[beat16] && m.energy > 0.35){ spawnSnare(now, m); }
+        // Bells (appear early)
+        const bIdx = m.step % m.bellSeq.length;
+        const bellNote = m.bellSeq[bIdx];
+        if(bellNote >= 0 && m.energy > 0.3){
+            const semis = m.bellScale[bellNote % m.bellScale.length];
+            spawnBell(now, 523.25 * POW(2, semis/12), m); // base root ~ C5
+        }
+        // Cat melody (gated by higher energy)
+        const cIdx = m.step % m.catSeq.length;
+        const catNote = m.catSeq[cIdx];
+        if(catNote >= 0 && m.energy > 1.9){
+            const semis = m.catScale[catNote % m.catScale.length];
+            spawnCatVoice(now, 880* POW(2, semis/12), m); // root ~ G4
+        }
+        // Occasional extra bell at max energy for sparkle
+        if(m.energy > 0.5 && RANDOM() < 0.1){
+            spawnBell(now, 880 * POW(2, ((RANDOM()*12)|0)/12), m, 0.12); // random twinkle
+        }
+    }
+    // --- Instrument spawners ---
+    function spawnKick(t, m){
+        const o = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        o.type='sine';
+        o.frequency.setValueAtTime(120, t);
+        o.frequency.exponentialRampToValueAtTime(40, t+0.18);
+        g.gain.setValueAtTime(0.001, t);
+        g.gain.exponentialRampToValueAtTime(0.6*(0.4+0.6*m.energy), t+0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, t+0.22);
+        o.connect(g); g.connect(m.g);
+        o.start(t); o.stop(t+0.25);
+    }
+    function spawnSnare(t, m){
+        const noise = audioCtx.createBufferSource();
+        const buf = audioCtx.createBuffer(1, audioCtx.sampleRate*0.2, audioCtx.sampleRate);
+        const data = buf.getChannelData(0);
+        for(let i=0;i<data.length;i++){ data[i] = (RANDOM()*2-1)*POW(1-i/data.length, 1.8); }
+        noise.buffer=buf;
+        const bp = audioCtx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.setValueAtTime(1800, t);
+        const g = audioCtx.createGain(); g.gain.setValueAtTime(0.001,t); g.gain.exponentialRampToValueAtTime(0.4*(0.4+0.6*m.energy), t+0.008); g.gain.exponentialRampToValueAtTime(0.0001, t+0.18);
+        noise.connect(bp); bp.connect(g); g.connect(m.g);
+        noise.start(t); noise.stop(t+0.2);
+    }
+    function spawnBell(t, f, m, vol){
+        const o = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        o.type='triangle';
+        o.frequency.setValueAtTime(f, t);
+        g.gain.setValueAtTime(0.001,t);
+        const peak = (vol||0.18) * (0.5+0.2*m.energy);
+        g.gain.exponentialRampToValueAtTime(peak, t+0.02);
+        g.gain.exponentialRampToValueAtTime(0.0002, t+0.6);
+        o.connect(g); g.connect(m.g);
+        o.start(t); o.stop(t+0.65);
+    }
+    function spawnCatVoice(t, f, m){
+        // Simple formant-ish meow made from two detuned oscillators fading quickly
+        const carrier = audioCtx.createOscillator();
+        const formant = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        carrier.type='square'; formant.type='sine';
+        carrier.frequency.setValueAtTime(f, t);
+        formant.frequency.setValueAtTime(f*2.01, t);
+        // mild vibrato
+        const lfo = audioCtx.createOscillator();
+        const lfoGain = audioCtx.createGain(); lfoGain.gain.value = 6; // semitone-ish wobble
+        lfo.frequency.value = 5;
+        lfo.connect(lfoGain); lfoGain.connect(carrier.frequency);
+        g.gain.setValueAtTime(0.001,t);
+        g.gain.exponentialRampToValueAtTime(0.1*(0.2+0.4*m.energy), t+0.05);
+        g.gain.exponentialRampToValueAtTime(0.0003, t+0.55);
+        carrier.connect(g); formant.connect(g); g.connect(m.g);
+        carrier.start(t); formant.start(t); lfo.start(t);
+        carrier.stop(t+0.6); formant.stop(t+0.6); lfo.stop(t+0.6);
     }
     // -- /SOLUTION: Scene-Audio-Step --
     // -- /MODULE: Scene-Audio --
@@ -1002,7 +1125,7 @@
             hudCtx.fillStyle = '#fff';
             hudCtx.font = '16px system-ui';
             hudCtx.fillText(`Mode: ${mode}${isMobile ? ' (Touch)' : ''}`, 20, 60);
-            hudCtx.fillText(`FPS: ${Math.round(1/dt)}`, 20, 80);
+            hudCtx.fillText(`FPS: ${ROUND(1/dt)}`, 20, 80);
             hudCtx.fillText(`MS: ${dt.toFixed(3)}`, 100, 80);
             hudCtx.fillText(`Pos: (${user.x.toFixed(1)}, ${user.z.toFixed(1)})`, 100, 100);
             hudCtx.fillText(`Yaw: ${(user.yaw * 180 / PI | 0)}°`, 20, 100);
@@ -1133,7 +1256,7 @@
         const n = size|0;
         // make a small random grid then bilinearly sample with wrap to create smooth tileable texture
         const grid = new Float32Array(n * n);
-        for (let i = 0; i < grid.length; i++) grid[i] = Math.random();
+        for (let i = 0; i < grid.length; i++) grid[i] = RANDOM();
 
         // bilinear sampling helper with wrap
         function sampleGrid(u, v) {
@@ -1143,8 +1266,8 @@
             const y0 = ((y|0) + n) % n;
             const x1 = (x0 + 1) % n;
             const y1 = (y0 + 1) % n;
-            const fx = x - Math.floor(x);
-            const fy = y - Math.floor(y);
+            const fx = x - FLOOR(x);
+            const fy = y - FLOOR(y);
             const a = grid[y0 * n + x0];
             const b = grid[y0 * n + x1];
             const c = grid[y1 * n + x0];
@@ -1162,7 +1285,7 @@
                 // sample at multiple fractional offsets then combine to get smoother noise
                 const v0 = sampleGrid(u, v);
                 const v1 = sampleGrid(u + 0.5 / n, v + 0.3 / n);
-                const val = Math.max(0, Math.min(1, (v0 * 0.6 + v1 * 0.4)));
+                const val = MAX(0, MIN(1, (v0 * 0.6 + v1 * 0.4)));
                 const idx = (y * n + x) * 4;
                 const c = (val * 255) | 0;
                 img[idx + 0] = c;
@@ -1435,8 +1558,8 @@
 
     // Simple deterministic hash for rock placement
     function rockHash(ix, iz, salt){
-        const s = Math.sin(ix*127.1 + iz*311.7 + salt*13.13) * 43758.5453;
-        return s - Math.floor(s);
+        const s = SIN(ix*127.1 + iz*311.7 + salt*13.13) * 43758.5453;
+        return s - FLOOR(s);
     }
 
     // Build a low-res sphere for rock base (coarse facets)
@@ -1509,10 +1632,10 @@
         }
         rocks.length = 0;
         const c = ROCK_CELL; const r = ROCK_RADIUS;
-        const minX = Math.floor((camX - r)/c);
-        const maxX = Math.floor((camX + r)/c);
-        const minZ = Math.floor((camZ - r)/c);
-        const maxZ = Math.floor((camZ + r)/c);
+        const minX = FLOOR((camX - r)/c);
+        const maxX = FLOOR((camX + r)/c);
+        const minZ = FLOOR((camZ - r)/c);
+        const maxZ = FLOOR((camZ + r)/c);
         for(let gz=minZ; gz<=maxZ; gz++){
             for(let gx=minX; gx<=maxX; gx++){
                 const h = rockHash(gx, gz, 0.0);
@@ -1669,18 +1792,18 @@
     
     // Fast small hash (deterministic)
     function plantHash(ix, iz, salt){
-        const s = Math.sin(ix*127.1 + iz*311.7 + salt*17.17)*43758.5453;
-        return s - Math.floor(s);
+        const s = SIN(ix*127.1 + iz*311.7 + salt*17.17)*43758.5453;
+        return s - FLOOR(s);
     }
     
     // Generate plants near (cx,cz); returns array of objects
     function genPlants(cx, cz){
         const r = PLANT_RADIUS;
         const c = PLANT_CELL;
-        const minX = Math.floor((cx - r)/c);
-        const maxX = Math.floor((cx + r)/c);
-        const minZ = Math.floor((cz - r)/c);
-        const maxZ = Math.floor((cz + r)/c);
+        const minX = FLOOR((cx - r)/c);
+        const maxX = FLOOR((cx + r)/c);
+        const minZ = FLOOR((cz - r)/c);
+        const maxZ = FLOOR((cz + r)/c);
         const out = [];
         for(let gz=minZ; gz<=maxZ; gz++){
             for(let gx=minX; gx<=maxX; gx++){
@@ -1952,7 +2075,9 @@
         step(dt, mv);
         // Update black cat AI & drops
         updateCat(dt);
-
+        const moveMag = HYPOT(mv.x, mv.y);
+        updateAdaptiveMusic(moveMag, dt);
+        
         // Update camera matrices
         buildViewProj();
         // NEW: update wind stereo each frame (after camera matrix updated)
@@ -2003,7 +2128,7 @@
         for(const t of traps) drawSphere(V,P,t.x,t.y,t.z,t.r,[0.8,0.5,0.1]);
         // Render Black Cat
         const c=[0.02,0.02,0.02];
-        const yaw = cat.yaw-20; const cy = Math.cos(yaw), sy = Math.sin(yaw);
+        const yaw = cat.yaw-20; const cy = COS(yaw), sy = SIN(yaw);
         // helper to rotate local offsets (forward = +Z local)
         function place(lx, ly, lz, r){
             const wx = cat.x + lx*cy + lz*sy;
@@ -2015,7 +2140,7 @@
         // Head
         place(0.38,0.18,0,0.20);
         // Legs (animated)
-        const amp=0.08, a=cat.anim, cyc=(v)=>Math.sin(v)*amp, cy0=cyc(a), cy1=cyc(a+Math.PI), baseY=-0.30;
+        const amp=0.08, a=cat.anim, cyc=(v)=>SIN(v)*amp, cy0=cyc(a), cy1=cyc(a+PI), baseY=-0.30;
         place(0.15, baseY + cy0, 0.14, 0.09); // FR
         place(0.15, baseY + cy1,-0.14, 0.09); // FL
         place(-0.25, baseY + cy1, 0.15, 0.09); // BR
@@ -2066,7 +2191,7 @@
 
                 // Distance & LOD
                 const dx = camX - px, dz = camZ - pz;
-                const dist = Math.hypot(dx, dz);
+                const dist = HYPOT(dx, dz);
 
                 const NEAR_HIDE = 4.0;
                 const NEAR_FULL = 6.0;
@@ -2076,14 +2201,14 @@
 
                 const MIN_ITER = 2, MAX_ITER = 14;
                 const sstep = x => x*x*(3-2*x);
-                let a = (dist - NEAR_HIDE)/(NEAR_FULL-NEAR_HIDE); a = sstep(Math.min(1, Math.max(0,a)));
-                let b = (FAR_HIDE - dist)/(FAR_HIDE - FAR_START); b = sstep(Math.min(1, Math.max(0,b)));
+                let a = (dist - NEAR_HIDE)/(NEAR_FULL-NEAR_HIDE); a = sstep(MIN(1, MAX(0,a)));
+                let b = (FAR_HIDE - dist)/(FAR_HIDE - FAR_START); b = sstep(MIN(1, MAX(0,b)));
                 let q = a * b;
                 if(q < 0.05) continue;
 
                 const key = p.gx + ',' + p.gz;
                 const target = MIN_ITER + q*(MAX_ITER - MIN_ITER);
-                const iterations = Math.max(MIN_ITER, Math.min(MAX_ITER, target)) | 0;
+                const iterations = MAX(MIN_ITER, MIN(MAX_ITER, target)) | 0;
                 const plantSeed = plantHash(p.gx, p.gz, 4.0);
 
                 const angle = ATAN2(camX - px, camZ - pz);
@@ -2279,6 +2404,8 @@
         step(dt, mv);
         // Update black cat AI & drops
         updateCat(dt);
+        const moveMag = HYPOT(mv.x, mv.y);
+        updateAdaptiveMusic(moveMag, dt);
 
         // Create an offset reference space to account for user-controlled movement
         const half = -user.yaw * 0.5;
@@ -2375,7 +2502,7 @@
 
             // Render Black Cat
             const c=[0.02,0.02,0.02];
-            const yaw = cat.yaw-20; const cy = Math.cos(yaw), sy = Math.sin(yaw);
+            const yaw = cat.yaw-20; const cy = COS(yaw), sy = SIN(yaw);
             // helper to rotate local offsets (forward = +Z local)
             function place(lx, ly, lz, r){
                 const wx = cat.x + lx*cy + lz*sy;
@@ -2387,7 +2514,7 @@
             // Head
             place(0.38,0.18,0,0.20);
             // Legs (animated)
-            const amp=0.08, a=cat.anim, cyc=(v)=>Math.sin(v)*amp, cy0=cyc(a), cy1=cyc(a+Math.PI), baseY=-0.30;
+            const amp=0.08, a=cat.anim, cyc=(v)=>SIN(v)*amp, cy0=cyc(a), cy1=cyc(a+PI), baseY=-0.30;
             place(0.15, baseY + cy0, 0.14, 0.09); // FR
             place(0.15, baseY + cy1,-0.14, 0.09); // FL
             place(-0.25, baseY + cy1, 0.15, 0.09); // BR
@@ -2441,7 +2568,7 @@
 
                 // Distance & LOD
                 const dx = camX - px, dz = camZ - pz;
-                const dist = Math.hypot(dx, dz);
+                const dist = HYPOT(dx, dz);
 
                 const NEAR_HIDE = 4.0;
                 const NEAR_FULL = 6.0;
@@ -2451,14 +2578,14 @@
 
                 const MIN_ITER = 2, MAX_ITER = 16;
                 const sstep = x => x*x*(3-2*x);
-                let a = (dist - NEAR_HIDE)/(NEAR_FULL-NEAR_HIDE); a = sstep(Math.min(1, Math.max(0,a)));
-                let b = (FAR_HIDE - dist)/(FAR_HIDE - FAR_START); b = sstep(Math.min(1, Math.max(0,b)));
+                let a = (dist - NEAR_HIDE)/(NEAR_FULL-NEAR_HIDE); a = sstep(MIN(1, MAX(0,a)));
+                let b = (FAR_HIDE - dist)/(FAR_HIDE - FAR_START); b = sstep(MIN(1, MAX(0,b)));
                 let q = a * b;
                 if(q < 0.05) continue;
 
                 const key = p.gx + ',' + p.gz;
                 const target = MIN_ITER + q*(MAX_ITER - MIN_ITER);
-                const iterations = Math.max(MIN_ITER, Math.min(MAX_ITER, target)) | 0;
+                const iterations = MAX(MIN_ITER, MIN(MAX_ITER, target)) | 0;
                 const plantSeed = plantHash(p.gx, p.gz, 4.0);
 
                 const angle = ATAN2(camX - px, camZ - pz);
