@@ -2075,10 +2075,9 @@
         step(dt, mv);
         // Update black cat AI & drops
         updateCat(dt);
-
-        
         const moveMag = HYPOT(mv.x, mv.y);
         updateAdaptiveMusic(moveMag, dt);
+        
         // Update camera matrices
         buildViewProj();
         // NEW: update wind stereo each frame (after camera matrix updated)
@@ -2405,6 +2404,8 @@
         step(dt, mv);
         // Update black cat AI & drops
         updateCat(dt);
+        const moveMag = HYPOT(mv.x, mv.y);
+        updateAdaptiveMusic(moveMag, dt);
 
         // Create an offset reference space to account for user-controlled movement
         const half = -user.yaw * 0.5;
