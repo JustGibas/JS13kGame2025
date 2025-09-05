@@ -2375,7 +2375,7 @@
 
             // Render Black Cat
             const c=[0.02,0.02,0.02];
-            const yaw = cat.yaw-20; const cy = Math.cos(yaw), sy = Math.sin(yaw);
+            const yaw = cat.yaw-20; const cy = COS(yaw), sy = SIN(yaw);
             // helper to rotate local offsets (forward = +Z local)
             function place(lx, ly, lz, r){
                 const wx = cat.x + lx*cy + lz*sy;
@@ -2387,7 +2387,7 @@
             // Head
             place(0.38,0.18,0,0.20);
             // Legs (animated)
-            const amp=0.08, a=cat.anim, cyc=(v)=>Math.sin(v)*amp, cy0=cyc(a), cy1=cyc(a+Math.PI), baseY=-0.30;
+            const amp=0.08, a=cat.anim, cyc=(v)=>SIN(v)*amp, cy0=cyc(a), cy1=cyc(a+PI), baseY=-0.30;
             place(0.15, baseY + cy0, 0.14, 0.09); // FR
             place(0.15, baseY + cy1,-0.14, 0.09); // FL
             place(-0.25, baseY + cy1, 0.15, 0.09); // BR
@@ -2441,7 +2441,7 @@
 
                 // Distance & LOD
                 const dx = camX - px, dz = camZ - pz;
-                const dist = Math.hypot(dx, dz);
+                const dist = HYPOT(dx, dz);
 
                 const NEAR_HIDE = 4.0;
                 const NEAR_FULL = 6.0;
@@ -2451,14 +2451,14 @@
 
                 const MIN_ITER = 2, MAX_ITER = 16;
                 const sstep = x => x*x*(3-2*x);
-                let a = (dist - NEAR_HIDE)/(NEAR_FULL-NEAR_HIDE); a = sstep(Math.min(1, Math.max(0,a)));
-                let b = (FAR_HIDE - dist)/(FAR_HIDE - FAR_START); b = sstep(Math.min(1, Math.max(0,b)));
+                let a = (dist - NEAR_HIDE)/(NEAR_FULL-NEAR_HIDE); a = sstep(MIN(1, MAX(0,a)));
+                let b = (FAR_HIDE - dist)/(FAR_HIDE - FAR_START); b = sstep(MIN(1, MAX(0,b)));
                 let q = a * b;
                 if(q < 0.05) continue;
 
                 const key = p.gx + ',' + p.gz;
                 const target = MIN_ITER + q*(MAX_ITER - MIN_ITER);
-                const iterations = Math.max(MIN_ITER, Math.min(MAX_ITER, target)) | 0;
+                const iterations = MAX(MIN_ITER, MIN(MAX_ITER, target)) | 0;
                 const plantSeed = plantHash(p.gx, p.gz, 4.0);
 
                 const angle = ATAN2(camX - px, camZ - pz);
