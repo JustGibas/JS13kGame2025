@@ -28,7 +28,7 @@
     // Expose Math functions to global scope
     Object.getOwnPropertyNames(Math).forEach(n => window[n.toUpperCase()] = Math[n]);
     // --- Math Library ---
-    const D2R = 0.0174532925 // or Math.PI / 180;
+    const D2R = 0.0174532925 // or PI / 180;
     const F32 = Float32Array;
     const M4 = (v) => new F32(v || [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]);
     const V3 = (v) => new F32(v || 3);
@@ -211,7 +211,7 @@
     // Updates the user's position and orientation based on movement input and delta time
     function step(dt, mv) {
         const now = performance.now();
-        const moveMagnitude = Math.hypot(mv.x, mv.y);
+        const moveMagnitude = HYPOT(mv.x, mv.y);
         if(moveMagnitude > 0.1 && now - lastStepTime > stepInterval){
             playStepSound();
             lastStepTime = now;
@@ -262,7 +262,7 @@
         const n = size|0;
         // make a small random grid then bilinearly sample with wrap to create smooth tileable texture
         const grid = new Float32Array(n * n);
-        for (let i = 0; i < grid.length; i++) grid[i] = Math.random();
+        for (let i = 0; i < grid.length; i++) grid[i] = RANDOM();
 
         // bilinear sampling helper with wrap
         function sampleGrid(u, v) {
@@ -272,8 +272,8 @@
             const y0 = ((y|0) + n) % n;
             const x1 = (x0 + 1) % n;
             const y1 = (y0 + 1) % n;
-            const fx = x - Math.floor(x);
-            const fy = y - Math.floor(y);
+            const fx = x - FLOOR(x);
+            const fy = y - FLOOR(y);
             const a = grid[y0 * n + x0];
             const b = grid[y0 * n + x1];
             const c = grid[y1 * n + x0];
@@ -291,7 +291,7 @@
                 // sample at multiple fractional offsets then combine to get smoother noise
                 const v0 = sampleGrid(u, v);
                 const v1 = sampleGrid(u + 0.5 / n, v + 0.3 / n);
-                const val = Math.max(0, Math.min(1, (v0 * 0.6 + v1 * 0.4)));
+                const val = MAX(0, MIN(1, (v0 * 0.6 + v1 * 0.4)));
                 const idx = (y * n + x) * 4;
                 const c = (val * 255) | 0;
                 img[idx + 0] = c;
