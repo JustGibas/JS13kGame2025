@@ -64,7 +64,7 @@
     // Expose Math functions to global scope
     Object.getOwnPropertyNames(Math).forEach(n => window[n.toUpperCase()] = Math[n]);
     // --- Math Library ---
-    const D2R = 0.0174532925 // or Math.PI / 180;
+    const D2R = 0.0174532925 // or PI / 180;
     const F32 = Float32Array;
     const M4 = (v) => new F32(v || [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]);
     const V3 = (v) => new F32(v || 3);
@@ -272,11 +272,11 @@
         for (const itm of items){
             if (!itm.active) continue;
             // Nearest Y on capsule segment
-            const ny = Math.max(baseY, Math.min(topY, itm.y));
+            const ny = MAX(baseY, MIN(topY, itm.y));
             const dx = itm.x - user.x;
             const dy = itm.y - ny;
             const dz = itm.z - user.z;
-            const dist = Math.hypot(dx,dy,dz);
+            const dist = HYPOT(dx,dy,dz);
             if (dist < itm.r + playerCapsule.radius){
                 itm.active = false;
                 if (speedBoosts.length < MAX_BOOSTS){
@@ -292,11 +292,11 @@
         const baseY = user.y - playerCapsule.eyeOffset;
         const topY  = baseY + playerCapsule.height;
         for (const o of obstacles){
-            const ny = Math.max(baseY, Math.min(topY, o.y));
+            const ny = MAX(baseY, MIN(topY, o.y));
             let dx = user.x - o.x;
             let dy = ny - o.y;
             let dz = user.z - o.z;
-            const dist = Math.hypot(dx,dy,dz);
+            const dist = HYPOT(dx,dy,dz);
             const minDist = playerCapsule.radius + o.r;
             if (dist < minDist){
                 if (dist < 1e-4){ // avoid division by zero
@@ -353,7 +353,7 @@
         const speed = MOVES * (currentSpeedMult());
         // Apply movement
         const now = performance.now();
-        const moveMagnitude = Math.hypot(mv.x, mv.y);
+        const moveMagnitude = HYPOT(mv.x, mv.y);
         if(moveMagnitude > 0.1 && now - lastStepTime > stepInterval){
             playStepSound();
             lastStepTime = now;
@@ -513,8 +513,8 @@
 
     // Simple deterministic hash for rock placement
     function rockHash(ix, iz, salt){
-        const s = Math.sin(ix*127.1 + iz*311.7 + salt*13.13) * 43758.5453;
-        return s - Math.floor(s);
+        const s = SIN(ix*127.1 + iz*311.7 + salt*13.13) * 43758.5453;
+        return s - FLOOR(s);
     }
 
     // Build a low-res sphere for rock base (coarse facets)
@@ -587,10 +587,10 @@
         }
         rocks.length = 0;
         const c = ROCK_CELL; const r = ROCK_RADIUS;
-        const minX = Math.floor((camX - r)/c);
-        const maxX = Math.floor((camX + r)/c);
-        const minZ = Math.floor((camZ - r)/c);
-        const maxZ = Math.floor((camZ + r)/c);
+        const minX = FLOOR((camX - r)/c);
+        const maxX = FLOOR((camX + r)/c);
+        const minZ = FLOOR((camZ - r)/c);
+        const maxZ = FLOOR((camZ + r)/c);
         for(let gz=minZ; gz<=maxZ; gz++){
             for(let gx=minX; gx<=maxX; gx++){
                 const h = rockHash(gx, gz, 0.0);
