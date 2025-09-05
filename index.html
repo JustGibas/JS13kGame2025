@@ -28,7 +28,7 @@
     // Expose Math functions to global scope
     Object.getOwnPropertyNames(Math).forEach(n => window[n.toUpperCase()] = Math[n]);
     // --- Math Library ---
-    const D2R = 0.0174532925 // or Math.PI / 180;
+    const D2R = 0.0174532925 // or PI / 180;
     const F32 = Float32Array;
     const M4 = (v) => new F32(v || [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]);
     const V3 = (v) => new F32(v || 3);
@@ -212,7 +212,7 @@
     // Updates the user's position and orientation based on movement input and delta time
     function step(dt, mv) {
         const now = performance.now();
-        const moveMagnitude = Math.hypot(mv.x, mv.y);
+        const moveMagnitude = HYPOT(mv.x, mv.y);
         if(moveMagnitude > 0.1 && now - lastStepTime > stepInterval){
             playStepSound();
             lastStepTime = now;
@@ -315,18 +315,18 @@
     
     // Fast small hash (deterministic)
     function plantHash(ix, iz, salt){
-        const s = Math.sin(ix*127.1 + iz*311.7 + salt*17.17)*43758.5453;
-        return s - Math.floor(s);
+        const s = SIN(ix*127.1 + iz*311.7 + salt*17.17)*43758.5453;
+        return s - FLOOR(s);
     }
     
     // Generate plants near (cx,cz); returns array of objects
     function genPlants(cx, cz){
         const r = PLANT_RADIUS;
         const c = PLANT_CELL;
-        const minX = Math.floor((cx - r)/c);
-        const maxX = Math.floor((cx + r)/c);
-        const minZ = Math.floor((cz - r)/c);
-        const maxZ = Math.floor((cz + r)/c);
+        const minX = FLOOR((cx - r)/c);
+        const maxX = FLOOR((cx + r)/c);
+        const minZ = FLOOR((cz - r)/c);
+        const maxZ = FLOOR((cz + r)/c);
         const out = [];
         for(let gz=minZ; gz<=maxZ; gz++){
             for(let gx=minX; gx<=maxX; gx++){
@@ -560,7 +560,7 @@
 
                 // Distance & LOD
                 const dx = camX - px, dz = camZ - pz;
-                const dist = Math.hypot(dx, dz);
+                const dist = HYPOT(dx, dz);
 
                 const NEAR_HIDE = 4.0;
                 const NEAR_FULL = 6.0;
@@ -570,14 +570,14 @@
 
                 const MIN_ITER = 2, MAX_ITER = 14;
                 const sstep = x => x*x*(3-2*x);
-                let a = (dist - NEAR_HIDE)/(NEAR_FULL-NEAR_HIDE); a = sstep(Math.min(1, Math.max(0,a)));
-                let b = (FAR_HIDE - dist)/(FAR_HIDE - FAR_START); b = sstep(Math.min(1, Math.max(0,b)));
+                let a = (dist - NEAR_HIDE)/(NEAR_FULL-NEAR_HIDE); a = sstep(MIN(1, MAX(0,a)));
+                let b = (FAR_HIDE - dist)/(FAR_HIDE - FAR_START); b = sstep(MIN(1, MAX(0,b)));
                 let q = a * b;
                 if(q < 0.05) continue;
 
                 const key = p.gx + ',' + p.gz;
                 const target = MIN_ITER + q*(MAX_ITER - MIN_ITER);
-                const iterations = Math.max(MIN_ITER, Math.min(MAX_ITER, target)) | 0;
+                const iterations = MAX(MIN_ITER, MIN(MAX_ITER, target)) | 0;
                 const plantSeed = plantHash(p.gx, p.gz, 4.0);
 
                 const angle = ATAN2(camX - px, camZ - pz);
