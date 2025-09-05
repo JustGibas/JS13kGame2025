@@ -28,7 +28,7 @@
     // Expose Math functions to global scope
     Object.getOwnPropertyNames(Math).forEach(n => window[n.toUpperCase()] = Math[n]);
     // --- Math Library ---
-    const D2R = 0.0174532925 // or Math.PI / 180;
+    const D2R = 0.0174532925 // or PI / 180;
     const F32 = Float32Array;
     const M4 = (v) => new F32(v || [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]);
     const V3 = (v) => new F32(v || 3);
