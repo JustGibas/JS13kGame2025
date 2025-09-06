@@ -33,7 +33,7 @@
             width: 36px;
             height: 36px;
             border-radius: 50%;
-            background: rgba(255, 255, 255, 0.9);
+            background: rgba(255, 255, 255, 0.6);
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
@@ -979,7 +979,7 @@
         { id: 'logtog', u0: 0.85, v0: 0.5, u1: 0.98, v1: 0.6 , label: 'LOG', onClick: () => { playClickSound(); logVisible = !logVisible; } },
         { id: 'logdn', u0: 0.85, v0: 0.8, u1: 0.98, v1: 0.9, label: 'Down', onClick: () => { playClickSound(); logScroll = MAX(0, logScroll - 1); } },
         { id: 'logup', u0: 0.85, v0: 0.7, u1: 0.98, v1: 0.8, label: 'Up', onClick: () => { playClickSound(); logScroll = MIN(MAX(0, LOG.length - 1), logScroll + 1); } },
-        { id: 'hudx', u0: 0.8, v0: 0.03, u1: 0.98, v1: 0.1, label: 'Close', onClick: () => { playClickSound(); hudVisible = false; } }
+        { id: 'hudx', u0: 0.8, v0: 0.04, u1: 0.98, v1: 0.3, label: 'Close X', onClick: () => { playClickSound(); hudVisible = false; } }
     ];
     const UI_TAB = [
         { id: 'hudopen', u0: 0.4, v0: 0, u1: 0.6, v1: 0.12, label: 'HUD', onClick: () => { playClickSound(); hudVisible = true; } }
@@ -1039,8 +1039,8 @@
                   w = (b.u1 - b.u0) * hudCan.width,
                   h = (b.v1 - b.v0) * hudCan.height;
             const hov = hoverBtn && hoverBtn.id === 'hudopen';
-            hudCtx.fillStyle = hov ? 'rgba(160,200,255,.28)' : 'rgba(120,160,255,.18)';
-            hudCtx.strokeStyle = hov ? 'rgba(190,220,255,.95)' : 'rgba(160,200,255,.55)';
+            hudCtx.fillStyle = hov ? 'rgba(160,200,160,.28)' : 'rgba(120,160,120,.18)';
+            hudCtx.strokeStyle = hov ? 'rgba(190,220,190,.95)' : 'rgba(160,200,160,.55)';
             hudCtx.lineWidth = 2;
             hudCtx.beginPath();
             hudCtx.roundRect(x, y, w, h, 10);
@@ -1055,7 +1055,7 @@
             hudCtx.textBaseline = 'alphabetic';
         } else {
             // Draw the full HUD panel
-            hudCtx.fillStyle = 'rgba(20,30,40,.90)';
+            hudCtx.fillStyle = 'rgba(40,30,20,.90)';
             hudCtx.strokeStyle = 'rgba(255,255,255,.12)';
             hudCtx.lineWidth = 2;
             hudCtx.beginPath();
@@ -1064,7 +1064,7 @@
             hudCtx.stroke();
 
             // Header text
-            hudCtx.fillStyle = '#9cf';
+            hudCtx.fillStyle = '#9f9';
             hudCtx.font = '24px system-ui';
             hudCtx.fillText('HUD', 20, 34);
             hudCtx.fillStyle = '#fff';
@@ -1111,14 +1111,15 @@
                       w = (b.u1 - b.u0) * hudCan.width,
                       h = (b.v1 - b.v0) * hudCan.height;
                 const hov = hoverBtn && hoverBtn.id === b.id;
-                hudCtx.fillStyle = hov ? 'rgba(150,190,255,.25)' : 'rgba(120,160,255,.12)';
-                hudCtx.strokeStyle = hov ? 'rgba(190,220,255,.9)' : 'rgba(160,200,255,.4)';
-                hudCtx.lineWidth = 2;
+                hudCtx.fillStyle = hov ? 'rgba(150,190,150,.25)' : 'rgba(120,160,120,.12)';
+                hudCtx.strokeStyle = hov ? 'rgba(190,220,190,.9)' : 'rgba(160,200,160,.4)';
+                hudCtx.lineWidth = 1;
                 hudCtx.beginPath();
                 hudCtx.roundRect(x, y, w, h, 8);
                 hudCtx.fill(); hudCtx.stroke();
                 hudCtx.fillStyle = hov ? '#fff' : '#eef';
-                hudCtx.font = '16px system-ui';
+                hudCtx.font = '18px system-ui';
+                // Center text vertically and with a slight left padding
                 hudCtx.fillText(lab, x + 10, y + h * 0.65);
             }
         }
