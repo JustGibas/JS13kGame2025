@@ -1040,7 +1040,7 @@
         { id: 'logtog', u0: 0.85, v0: 0.5, u1: 0.98, v1: 0.6 , label: 'LOG', onClick: () => { playClickSound(); logVisible = !logVisible; } },
         { id: 'logdn', u0: 0.85, v0: 0.8, u1: 0.98, v1: 0.9, label: 'Down', onClick: () => { playClickSound(); logScroll = MAX(0, logScroll - 1); } },
         { id: 'logup', u0: 0.85, v0: 0.7, u1: 0.98, v1: 0.8, label: 'Up', onClick: () => { playClickSound(); logScroll = MIN(MAX(0, LOG.length - 1), logScroll + 1); } },
-        { id: 'hudx', u0: 0.8, v0: 0.04, u1: 0.98, v1: 0.3, label: 'Close X', onClick: () => { playClickSound(); hudVisible = false; } }
+        { id: 'hudx', u0: 0.8, v0: 0.04, u1: 0.98, v1: 0.2, label: 'Close       X', onClick: () => { playClickSound(); hudVisible = false; } }
     ];
     const UI_TAB = [
         { id: 'hudopen', u0: 0.4, v0: 0, u1: 0.6, v1: 0.12, label: 'HUD', onClick: () => { playClickSound(); hudVisible = true; } }
@@ -1180,8 +1180,12 @@
                 hudCtx.fill(); hudCtx.stroke();
                 hudCtx.fillStyle = hov ? '#fff' : '#eef';
                 hudCtx.font = '18px system-ui';
+                //hudCtx.textAlign = 'center';
+                hudCtx.textBaseline = 'middle';
+                //hudCtx.fillText(lab, x + w / 2, y + h / 2);
+                //hudCtx.textAlign = 'left';
                 // Center text vertically and with a slight left padding
-                hudCtx.fillText(lab, x + 10, y + h * 0.65);
+                hudCtx.fillText(lab, x + 10, y + h * 0.5);
             }
         }
 
