@@ -490,11 +490,12 @@
         // Catch detection
         if(dP2 < (CAT_CATCH_R+playerCapsule.radius)*(CAT_CATCH_R+playerCapsule.radius)){
             cat.caught++; log('Cat caught #' + cat.caught);
+            if(speedBoosts.length < MAX_BOOSTS) speedBoosts.push({timeLeft:BOOST_DURATION, amount:BOOST_AMOUNT});
+            resetCatPosition();
+            if(!audioCtx) return;
             spawnBell(audioCtx.currentTime, 800, window.chipMusic, 0.5);
             spawnBell(audioCtx.currentTime+0.1, 1000, window.chipMusic, 0.3);
             spawnBell(audioCtx.currentTime+0.2, 1200, window.chipMusic, 0.4);
-            if(speedBoosts.length < MAX_BOOSTS) speedBoosts.push({timeLeft:BOOST_DURATION, amount:BOOST_AMOUNT});
-            resetCatPosition();
             //for(let i=0;i<4;i++); //spawnDrop(cat.x + (RANDOM()*2-1), cat.z + (RANDOM()*2-1));
         }
     }
