@@ -422,23 +422,22 @@
     precision highp float;
     layout(location=0) in vec3 p;
     uniform mat4 M, V, P;
-    out vec3 w; // Pass world position to fragment shader.
+    out vec3 w;
     void main(){
-        w = (M * vec4(p, 1.0)).xyz;
-        gl_Position = P * V * vec4(w, 1.0);
+        w = (M * vec4(p,1.)).xyz;
+        gl_Position = P * V * vec4(w,1.);
     }`;
     const fsG = `#version 300 es
     precision highp float;
     in vec3 w;
     out vec4 o;
+    float h(vec2 v){return fract(sin(dot(v,vec2(41,289)))*9e3);}
     void main(){
-        float c = 2.0; // Grid cell size.
-        // Draw lines using fract() and step().
-        float l = step(abs(fract(w.x/c) - 0.5), 0.01) + step(abs(fract(w.z/c) - 0.5), 0.01);
-        float g = clamp(l, 0.0, 1.0);
-        // Fade to a darker color in the distance.
-        vec3 b = mix(vec3(0.04), vec3(0.08), smoothstep(0.0, 20.0, length(w.xz)));
-        o = vec4(b + g * vec3(0.2, 1.0, 0.2) * 0.6, 1.0);
+        vec2 q=floor(w.xz/.6);
+        float r=h(q),r2=h(q+13.);
+        vec3 c=mix(vec3(.08,.05,.02),vec3(.3,.2,.1),r)+step(.97,r2)*vec3(.1,.08,.04);
+        c=mix(c,vec3(.02,.015,.005),min(dot(w.xz,w.xz)*4e-6,1.));
+        o=vec4(c,1);
     }`;
 
     const PG = prog(vsG, fsG);
