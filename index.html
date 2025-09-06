@@ -388,10 +388,12 @@
         // Respect existing weighting (boost scarce), tweak slightly
         if(RANDOM()<0.4){
             items.push({x, y:0.5, z, r:0.4, active:true});
-            playClickSound();
+            //playClickSound();
+            spawnBell(audioCtx.currentTime, 880, window.chipMusic, 0.12);
         }else{
             traps.push({x, y:0.6, z, r:0.6});
-            playClickSound();
+            //playClickSound();
+            spawnBell(audioCtx.currentTime, 440, window.chipMusic, 0.12);
         }
         if(items.length>2) items.splice(0, items.length-2);
         if(traps.length>3) traps.splice(0, traps.length-3);
@@ -711,6 +713,7 @@
 
     // Reuse existing gust computation
     // --- Wind gust math (mirror of grass shader) ---
+        // in serch of smple and efficient periodic functions
         // Compute gust/sway values using same vectors and time constants as the grass vertex shader
         function computeGustAt(x, z, timeSec) {
             // same direction vectors used in the grass vertex shader
