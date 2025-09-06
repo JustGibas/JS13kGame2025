@@ -213,10 +213,12 @@
         // Respect existing weighting (boost scarce), tweak slightly
         if(RANDOM()<0.4){
             items.push({x, y:0.5, z, r:0.4, active:true});
+            if(!audioCtx) return;
             //playClickSound();
             spawnBell(audioCtx.currentTime, 870, window.chipMusic, 0.1);
         }else{
             traps.push({x, y:0.6, z, r:0.6});
+            if(!audioCtx) return;
             //playClickSound();
             spawnBell(audioCtx.currentTime, 660, window.chipMusic, 0.2);
         }
@@ -318,7 +320,7 @@
             spawnBell(audioCtx.currentTime+0.2, 1200, window.chipMusic, 0.4);
             if(speedBoosts.length < MAX_BOOSTS) speedBoosts.push({timeLeft:BOOST_DURATION, amount:BOOST_AMOUNT});
             resetCatPosition();
-            for(let i=0;i<4;i++); //spawnDrop(cat.x + (RANDOM()*2-1), cat.z + (RANDOM()*2-1));
+            //for(let i=0;i<4;i++); //spawnDrop(cat.x + (RANDOM()*2-1), cat.z + (RANDOM()*2-1));
         }
     }
     resetCatPosition();
@@ -354,6 +356,7 @@
                 if (speedBoosts.length < MAX_BOOSTS){
                     speedBoosts.push({ timeLeft: BOOST_DURATION, amount: BOOST_AMOUNT });
                 }
+                if(!audioCtx) return;
                 //playClickSound();
                 spawnBell(audioCtx.currentTime, 880 * POW(2, ((RANDOM()*6)|0)/6), window.chipMusic, 0.2);
             }
