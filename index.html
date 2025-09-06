@@ -921,7 +921,7 @@
         o.type='triangle';
         o.frequency.setValueAtTime(f, t);
         g.gain.setValueAtTime(0.001,t);
-        const peak = (vol||0.18) * (0.5+0.2*m.energy);
+        const peak = (vol||0.18) * (0.5+0.2/* *m.energy */);
         g.gain.exponentialRampToValueAtTime(peak, t+0.02);
         g.gain.exponentialRampToValueAtTime(0.0002, t+0.6);
         o.connect(g); g.connect(m.g);
