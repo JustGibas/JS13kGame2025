@@ -200,7 +200,7 @@
             input.look.x = e.clientX;
             input.look.y = e.clientY;
             user.yaw += dx * 0.002;
-            user.pitch = MAX(-PI / 2, MIN(PI / 2, user.pitch - dy * 0.002));
+            user.pitch = MAX(-PI / 2-0.001, MIN(PI / 2-0.001, user.pitch - dy * 0.002));
         }
     });
     
