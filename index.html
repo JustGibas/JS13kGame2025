@@ -891,10 +891,10 @@
                 kickPat:  [1,0,0,0, 0,0,1,0, 1,0,1,0, 0,0,1,0],
                 snarePat: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0], // backbeat on 5 and 13 (0-indexed)
                 // Bell arpeggio (indexes into bellScale; -1 = rest)
-                bellSeq:  [0,-1,0,-1, 0,1,0,-1,-1,-1, 0,-1,0,-1, 0,0,0,-1,-1,-1], // 17 steps (prime-ish)
+                bellSeq:  [0,-1,1,-1, 2,1,2,-1,1,-1, 0,-1,1,-1, 0,2,0,-1,-1,0,3,4,3,-1], // 17 steps (prime-ish)
                 // Cat voice melody (indexes into catScale; -1 = rest)
                 catSeq:   [0,0,0,-1, 0,0,0,1, 2,3,0,-1, 3,5,7,-1,0, -1],
-                bellScale:[0,0,0,0,0,0,0,0], // degrees in semitones relative to root (C-like minor feel)
+                bellScale:[0,-1,2,3,5,7], // degrees in semitones relative to root (C-like minor feel)
                 catScale: [0,0,0,0,0,0,0,0,0,0,0,0,0],
             };
         }
@@ -938,9 +938,9 @@
         const bellNote = m.bellSeq[bIdx];
         if(bellNote >= 0 && m.energy > 0.3){
             const semis = m.bellScale[bellNote % m.bellScale.length];
-            spawnBell(now, 523.25 * POW(2, semis/12), m); // base root ~ C5
+            spawnBell(now, 982 * POW(2, semis/12), m); // base root ~ B5
         }
-        // Cat melody (gated by higher energy)
+        // Cat melody (gated by speedboosts)
         const cIdx = m.step % m.catSeq.length;
         const catNote = m.catSeq[cIdx];
         if(catNote >= 0 && m.energy > 1.9){
@@ -948,9 +948,9 @@
             spawnCatVoice(now, 880* POW(2, semis/12), m); // root ~ G4
         }
         // Occasional extra bell at max energy for sparkle
-        if(m.energy > 0.5 && RANDOM() < 0.1){
-            spawnBell(now, 880 * POW(2, ((RANDOM()*12)|0)/12), m, 0.12); // random twinkle
-        }
+        //if(m.energy > 0.5 && RANDOM() < 0.1){
+        //    spawnBell(now, 880 * POW(2, ((RANDOM()*12)|0)/12), m, 0.12); // random twinkle
+        //}
     }
     // --- Instrument spawners ---
     function spawnKick(t, m){
