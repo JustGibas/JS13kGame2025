@@ -275,13 +275,14 @@
     precision highp float;
     in vec3 w;
     out vec4 o;
-    float h(vec2 v){return fract(sin(dot(v,vec2(41,289)))*9e3);}
+    float h(vec2 v){return fract(sin(dot(v,vec2(41.,289.)))*9000.);}
     void main(){
-        vec2 q=floor(w.xz/.6);
-        float r=h(q),r2=h(q+13.);
-        vec3 c=mix(vec3(.08,.05,.02),vec3(.3,.2,.1),r)+step(.97,r2)*vec3(.1,.08,.04);
-        c=mix(c,vec3(.02,.015,.005),min(dot(w.xz,w.xz)*4e-6,1.));
-        o=vec4(c,1);
+        vec2 q = floor(w.xz / .6);
+        float r = h(q), r2 = h(q + 13.);
+        // Base tile color with occasional lighter specks
+        vec3 c = mix(vec3(.08,.05,.02), vec3(.3,.2,.1), r) + step(.97, r2) * vec3(.1,.08,.04);
+        // Removed distance-based darkening to keep texture infinite
+        o = vec4(c, 1.);
     }`;
 
     const PG = prog(vsG, fsG);
