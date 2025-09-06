@@ -371,8 +371,8 @@
     // -- MODULE: Gameplay-Cat --
     // Stylized Black Cat entity the player must catch. Cat roams near center, avoids player, drops boosts & obstacles.
     const cat = { x:0, y:0.6, z:0, vx:0, vz:0, caught:0, drop:1.2, baseS:3, anim:0, evade:0, yaw:0 };
-    const CAT_MAX_R = 590;        // Hard clamp so cat never wanders too far
-    const CAT_PREF_R = 30;       // Preferred roaming radius from origin
+    const CAT_MAX_R = 1000;        // Hard clamp so cat never wanders too far
+    const CAT_PREF_R = 50;       // Preferred roaming radius from origin
     const CAT_CATCH_R = 0.5;     // Distance threshold to count as caught
     const CAT_FLEE_R = 10;       // Start fleeing if player within this distance
     const CAT_SEEK_R = 50;      // Begin seeking player if beyond this distance
@@ -389,11 +389,11 @@
         if(RANDOM()<0.4){
             items.push({x, y:0.5, z, r:0.4, active:true});
             //playClickSound();
-            spawnBell(audioCtx.currentTime, 880, window.chipMusic, 0.12);
+            spawnBell(audioCtx.currentTime, 870, window.chipMusic, 0.1);
         }else{
             traps.push({x, y:0.6, z, r:0.6});
             //playClickSound();
-            spawnBell(audioCtx.currentTime, 440, window.chipMusic, 0.12);
+            spawnBell(audioCtx.currentTime, 660, window.chipMusic, 0.2);
         }
         if(items.length>2) items.splice(0, items.length-2);
         if(traps.length>3) traps.splice(0, traps.length-3);
@@ -487,7 +487,10 @@
         cat.anim += sp*dt*3.5;
         // Catch detection
         if(dP2 < (CAT_CATCH_R+playerCapsule.radius)*(CAT_CATCH_R+playerCapsule.radius)){
-            cat.caught++; log('Cat caught #' + cat.caught); playClickSound && playClickSound();
+            cat.caught++; log('Cat caught #' + cat.caught);
+            spawnBell(audioCtx.currentTime, 800, window.chipMusic, 0.5);
+            spawnBell(audioCtx.currentTime+0.1, 1000, window.chipMusic, 0.3);
+            spawnBell(audioCtx.currentTime+0.2, 1200, window.chipMusic, 0.4);
             if(speedBoosts.length < MAX_BOOSTS) speedBoosts.push({timeLeft:BOOST_DURATION, amount:BOOST_AMOUNT});
             resetCatPosition();
             for(let i=0;i<4;i++); //spawnDrop(cat.x + (RANDOM()*2-1), cat.z + (RANDOM()*2-1));
@@ -495,16 +498,6 @@
     }
     resetCatPosition();
     // -- /MODULE: Gameplay-Cat --
-
-    function spawnTestContent(){
-        // Pickup items
-        for (let i=0;i<26;i++){
-            items.push({ x: i*2 - 5, y: 0.5, z: -4 - i*2, r:0.4, active:true });
-        }
-        // One obstacle sphere to demonstrate collision
-        obstacles.push({ x: 0, y: 0.8, z: -2, r: 0.8 });
-    }
-    //spawnTestContent();
 
     function currentSpeedMult(){
         let m = 1;
@@ -536,7 +529,8 @@
                 if (speedBoosts.length < MAX_BOOSTS){
                     speedBoosts.push({ timeLeft: BOOST_DURATION, amount: BOOST_AMOUNT });
                 }
-                playClickSound && playClickSound();
+                //playClickSound();
+                spawnBell(audioCtx.currentTime, 880 * POW(2, ((RANDOM()*6)|0)/6), window.chipMusic, 0.2);
             }
         }
     }
@@ -810,18 +804,139 @@
     // -- SOLUTION: Scene-Audio-Step --
     function playStepSound(){
         if(!audioCtx) return;
-        const t = audioCtx.currentTime;
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(60, t);
-        osc.frequency.exponentialRampToValueAtTime(160, t + 0.2);
-        gain.gain.setValueAtTime(0.3, t);
-        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
-        osc.start(t);
-        osc.stop(t + 0.3);
+        if(!window.chipMusic){
+            const master = audioCtx.createGain();
+            master.gain.setValueAtTime(0, audioCtx.currentTime);
+            master.connect(audioCtx.destination);
+            window.chipMusic = {
+                g: master,
+                energy: 0,
+                lastActive: audioCtx.currentTime,
+                tempoBase: 90, // upbeat baseline
+                tempoMax: 190,  // faster when very active
+                beatDur: 60/140,
+                nextBeat: audioCtx.currentTime + 0.05,
+                step: 0,
+                // Drum patterns (1=hit,0=rest). 16-step base grid.
+                kickPat:  [1,0,0,0, 0,0,1,0, 1,0,1,0, 0,0,1,0],
+                snarePat: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0], // backbeat on 5 and 13 (0-indexed)
+                // Bell arpeggio (indexes into bellScale; -1 = rest)
+                bellSeq:  [0,-1,1,-1, 2,1,2,-1,1,-1, 0,-1,1,-1, 0,2,0,-1,-1,0,3,4,3,-1], // 17 steps (prime-ish)
+                // Cat voice melody (indexes into catScale; -1 = rest)
+                catSeq:   [0,0,0,-1, 0,0,0,1, 2,3,0,-1, 3,5,7,-1,0, -1],
+                bellScale:[0,-1,2,3,5,7], // degrees in semitones relative to root (C-like minor feel)
+                catScale: [0,0,0,0,0,0,0,0,0,0,0,0,0],
+            };
+        }
+    }
+    function updateAdaptiveMusic(moveMag, dt){ // reusing loop name for integration
+        if(!audioCtx || !window.chipMusic) return;
+        const m = window.chipMusic;
+        const now = audioCtx.currentTime;
+        // Energy logic
+        const rise = 0.05; // faster build
+        const fall = 0.2; // moderate decay
+        if(moveMag > 0.1){
+            m.energy = MIN(1, m.energy + rise * dt);
+            m.lastActive = now;
+        } else if(now - m.lastActive > 0.8){
+            m.energy = MAX(0, m.energy - fall * dt);
+        }
+        // Tempo modulation
+        const tempo = m.tempoBase + (m.tempoMax - m.tempoBase) * POW(m.energy,0.7);
+        m.beatDur = 60/tempo; // 1 beat = quarter note
+        const targetGain = (m.energy===0)?0: (0.05 + 0.2*m.energy);
+        m.g.gain.setTargetAtTime(targetGain, now, 0.2);
+        while(now >= m.nextBeat){
+            emitChipBeat(m);
+            m.nextBeat += m.beatDur/2; // 8th-note resolution for more activity
+        }
+        if(m.energy===0 && now - m.lastActive > 5){
+            m.g.gain.setTargetAtTime(0.0001, now, 1.0);
+        }
+    }
+    function emitChipBeat(m){
+        const now = audioCtx.currentTime;
+        m.step++;
+        const beat16 = m.step % 16; // index for drums
+        // Kick
+        if(m.kickPat[beat16] && m.energy > 0.2){ spawnKick(now, m); }
+        // Snare (appears after some energy)
+        if(m.snarePat[beat16] && m.energy > 0.35){ spawnSnare(now, m); }
+        // Bells (appear early)
+        const bIdx = m.step % m.bellSeq.length;
+        const bellNote = m.bellSeq[bIdx];
+        if(bellNote >= 0 && m.energy > 0.3){
+            const semis = m.bellScale[bellNote % m.bellScale.length];
+            spawnBell(now, 980 * POW(2, semis/12), m); // base root ~ B5
+        }
+        // Cat melody (gated by speedboosts)
+        //const cIdx = m.step % m.catSeq.length;
+        //const catNote = m.catSeq[cIdx];
+        //if(catNote >= 0 && m.energy > 1.9){
+        //    const semis = m.catScale[catNote % m.catScale.length];
+        //    spawnCatVoice(now, 880* POW(2, semis/12), m); // root ~ G4
+        //}
+        // Occasional extra bell at max energy for sparkle
+        //if(m.energy > 0.5 && RANDOM() < 0.1){
+        //    spawnBell(now, 880 * POW(2, ((RANDOM()*12)|0)/12), m, 0.12); // random twinkle
+        //}
+    }
+    // --- Instrument spawners ---
+    function spawnKick(t, m){
+        const o = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        o.type='sine';
+        o.frequency.setValueAtTime(120, t);
+        o.frequency.exponentialRampToValueAtTime(40, t+0.18);
+        g.gain.setValueAtTime(0.001, t);
+        g.gain.exponentialRampToValueAtTime(0.6*(0.4+0.6*m.energy), t+0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, t+0.22);
+        o.connect(g); g.connect(m.g);
+        o.start(t); o.stop(t+0.25);
+    }
+    function spawnSnare(t, m){
+        const noise = audioCtx.createBufferSource();
+        const buf = audioCtx.createBuffer(1, audioCtx.sampleRate*0.2, audioCtx.sampleRate);
+        const data = buf.getChannelData(0);
+        for(let i=0;i<data.length;i++){ data[i] = (RANDOM()*2-1)*POW(1-i/data.length, 1.8); }
+        noise.buffer=buf;
+        const bp = audioCtx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.setValueAtTime(1800, t);
+        const g = audioCtx.createGain(); g.gain.setValueAtTime(0.001,t); g.gain.exponentialRampToValueAtTime(0.4*(0.4+0.6*m.energy), t+0.008); g.gain.exponentialRampToValueAtTime(0.0001, t+0.18);
+        noise.connect(bp); bp.connect(g); g.connect(m.g);
+        noise.start(t); noise.stop(t+0.2);
+    }
+    function spawnBell(t, f, m, vol){
+        const o = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        o.type='triangle';
+        o.frequency.setValueAtTime(f, t);
+        g.gain.setValueAtTime(0.001,t);
+        const peak = (vol||0.18) * (0.5+0.2*m.energy);
+        g.gain.exponentialRampToValueAtTime(peak, t+0.02);
+        g.gain.exponentialRampToValueAtTime(0.0002, t+0.6);
+        o.connect(g); g.connect(m.g);
+        o.start(t); o.stop(t+0.65);
+    }
+    function spawnCatVoice(t, f, m){
+        // Simple formant-ish meow made from two detuned oscillators fading quickly
+        const carrier = audioCtx.createOscillator();
+        const formant = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        carrier.type='square'; formant.type='sine';
+        carrier.frequency.setValueAtTime(f, t);
+        formant.frequency.setValueAtTime(f*2.01, t);
+        // mild vibrato
+        const lfo = audioCtx.createOscillator();
+        const lfoGain = audioCtx.createGain(); lfoGain.gain.value = 6; // semitone-ish wobble
+        lfo.frequency.value = 5;
+        lfo.connect(lfoGain); lfoGain.connect(carrier.frequency);
+        g.gain.setValueAtTime(0.001,t);
+        g.gain.exponentialRampToValueAtTime(0.1*(0.2+0.4*m.energy), t+0.05);
+        g.gain.exponentialRampToValueAtTime(0.0003, t+0.55);
+        carrier.connect(g); formant.connect(g); g.connect(m.g);
+        carrier.start(t); formant.start(t); lfo.start(t);
+        carrier.stop(t+0.6); formant.stop(t+0.6); lfo.stop(t+0.6);
     }
     // -- /SOLUTION: Scene-Audio-Step --
     // -- /MODULE: Scene-Audio --
