@@ -1,130 +1,95 @@
-// Simple HTML + JS packer for small game jam builds.
-// Focus: clarity + reliability. All GLSL minification logic REMOVED per request.
-//
-// Usage:
-//   node minify.cjs            -> reads index.html, writes index.min.html
-//   node minify.cjs in.html out.html
-//
-// What it does:
-// 1. Reads the input HTML file as text.
-// 2. Extracts every <script>...</script> block (any attributes kept verbatim).
-// 3. Minifies ONLY the JavaScript bodies with Terser (no GLSL heuristics).
-// 4. Rebuilds the HTML with the minified scripts.
-// 5. Minifies the final HTML (and any inline CSS) with html-minifier-terser.
-// 6. Writes the output file.
+// Ultra‑minimal HTML+JS packer for jam builds.
+// Usage: node minify.cjs [in.html] [out.html]
+// Defaults: in=index.html  out=index.min.html
+// Steps: read HTML -> extract <script> bodies -> aggressive Terser -> reinsert -> minify HTML -> write.
 
-// Dependencies (install once):
-//   npm i terser html-minifier-terser
 const { readFile, writeFile } = require("fs/promises");
 const { minify: terser } = require("terser");
 const { minify: minifyHTML } = require("html-minifier-terser");
 
-// Main async IIFE so we can use await at top level.
 (async () => {
-  // Resolve input / output paths with simple defaults.
   const inFile  = process.argv[2] || "index.html";
   const outFile = process.argv[3] || "index.min.html";
 
-  // 1. Read source HTML.
-  let rawHtml;
-  try {
-    rawHtml = await readFile(inFile, "utf8");
-  } catch (e) {
-    console.error(`Could not read input file "${inFile}":`, e.message);
-    process.exit(1);
-  }
+  // Read input.
+  let src;
+  try { src = await readFile(inFile, "utf8"); }
+  catch (e) { console.error("Read fail:", e.message); process.exit(1); }
 
-  // 2. Extract <script> blocks.
-  // We store an object per script so we can replace with placeholders then re‑insert.
-  // Pattern: <script ...> (any content, including newlines, non-greedy) </script>
-  // NOTE: This is a pragmatic regex approach sufficient for controlled jam HTML.
-  const scripts = []; // { idx, attrs, body }
-  const htmlWithSlots = rawHtml.replace(
-    /<script\b([^>]*)>([\s\S]*?)<\/script>/gi,
-    (full, attrs, body) => {
-      const idx = scripts.length;
-      scripts.push({ idx, attrs: attrs.trim(), body });
-      return `<!--SCRIPT_SLOT_${idx}-->`;
-    }
-  );
+  // Extract scripts -> placeholders.
+  const scripts = [];
+  const withSlots = src.replace(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi, (m, attrs, body) => {
+    const i = scripts.length;
+    scripts.push({ i, attrs: attrs.trim(), body });
+    return `<!--S${i}-->`;
+  });
 
-  // 3. Configure terser. Options picked for good compression without breaking typical small games.
+  // Aggressive terser (kept focused; property mangling only for _private style names).
   const terserOptions = {
-    ecma: 2020,        // Modern syntax support.
-    toplevel: true,    // Allow mangling/compressing top-level scope.
-    mangle: {
-      toplevel: true,
-      safari10: true   // Helps avoid edge Safari bugs.
-    },
+    ecma: 2020,
+    toplevel: true,
+    mangle: { toplevel: true, safari10: true, properties: { regex: /^_/ } },
     compress: {
-      passes: 3,           // Multiple passes can squeeze a bit more.
+      passes: 5,
       toplevel: true,
-      inline: 3,           // Aggressive inlining (still generally safe).
-      pure_getters: true,  // Assume property access has no side effects.
+      inline: 3,
+      pure_getters: true,
       booleans_as_integers: true,
-      unsafe: true,        // Standard "unsafe" opts (acceptable in jam context).
-      unsafe_math: true,
+      unsafe: true,
       unsafe_arrows: true,
-      drop_debugger: true,
+      unsafe_math: true,
+      unsafe_Function: true,
+      unsafe_methods: true,
+      unsafe_symbols: true,
       hoist_funs: true,
-      keep_fnames: true    // Keep function names to avoid accidental global collisions.
-      // Optionally: drop_console: true
+      hoist_props: true,
+      hoist_vars: true,
+      reduce_funcs: true,
+      reduce_vars: true,
+      collapse_vars: true,
+      conditionals: true,
+      dead_code: true,
+      evaluate: true,
+      sequences: true,
+      join_vars: true,
+      loops: true,
+      switches: true,
+      comparisons: true,
+      drop_debugger: true,
+      arrows: true
     },
-    keep_fnames: true,
-    format: { ascii_only: true } // Ensures escaped non-ASCII (safer for some hosting pipelines).
+    format: { ascii_only: true, comments: false }
   };
 
-  // 4. Minify each script's JS body (raw text). We do NOT attempt to parse types;
-  // If a script has a non-JS type (e.g., type="x-shader/x-vertex"), we now STILL attempt JS minification.
-  // If that causes errors (because it's not JS), we fall back to original body.
-  const rebuiltScripts = [];
+  // Minify scripts.
+  const rebuilt = [];
   for (const s of scripts) {
-    let minified = s.body;
-    try {
-      const result = await terser(s.body, terserOptions);
-      minified = result.code;
-    } catch (e) {
-      console.warn(
-        `[warn] Skipped minifying script #${s.idx} (likely non-JS or syntax error). Reason: ${e.message}`
-      );
-    }
-    // Reconstruct the <script> tag. Only add a space before attributes if they exist.
-    rebuiltScripts[s.idx] = `<script${s.attrs ? " " + s.attrs : ""}>${minified}</script>`;
+    let code = s.body;
+    try { code = (await terser(s.body, terserOptions)).code; }
+    catch (e) { console.warn("[skip]", s.i, e.message); }
+    rebuilt[s.i] = `<script${s.attrs ? " " + s.attrs : ""}>${code}</script>`;
   }
 
-  // 5. Reinsert the minified scripts by replacing placeholders.
-  let rebuiltHtml = htmlWithSlots;
-  for (const s of scripts) {
-    rebuiltHtml = rebuiltHtml.replace(`<!--SCRIPT_SLOT_${s.idx}-->`, rebuiltScripts[s.idx]);
-  }
+  // Reinsert.
+  let html = withSlots;
+  for (const s of scripts) html = html.replace(`<!--S${s.i}-->`, rebuilt[s.i]);
 
-  // 6. Minify the HTML (includes inline CSS; JS already minified).
-  let finalHtml;
+  // Minify HTML (leave JS untouched now).
   try {
-    finalHtml = await minifyHTML(rebuiltHtml, {
+    html = await minifyHTML(html, {
       collapseWhitespace: true,
       removeComments: true,
       removeAttributeQuotes: true,
       removeOptionalTags: true,
       useShortDoctype: true,
       minifyCSS: true,
-      minifyJS: false // We already handled JS; avoid double-processing.
+      minifyJS: false
     });
   } catch (e) {
-    console.error("HTML minification failed, writing non-minified rebuilt version. Reason:", e.message);
-    finalHtml = rebuiltHtml;
+    console.warn("HTML minify failed, using non-minified HTML:", e.message);
   }
 
-  // 7. Write output file.
-  try {
-    await writeFile(outFile, finalHtml, "utf8");
-    console.log(`Packed -> ${outFile}`);
-  } catch (e) {
-    console.error(`Failed to write output file "${outFile}":`, e.message);
-    process.exit(1);
-  }
-})().catch(e => {
-  // Catch any unanticipated failure.
-  console.error("Build failed with unexpected error:", e);
-  process.exit(1);
-});
+  // Write output.
+  try { await writeFile(outFile, html, "utf8"); console.log("Packed ->", outFile); }
+  catch (e) { console.error("Write fail:", e.message); process.exit(1); }
+})().catch(e => { console.error("Unexpected:", e); process.exit(1); });
