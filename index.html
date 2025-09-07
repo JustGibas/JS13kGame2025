@@ -1001,26 +1001,9 @@
 
     // Simple textured quad shader for the HUD
     const vsH = `#version 300 es
-    precision highp float;
-    layout(location=0) in vec3 p;
-    layout(location=1) in vec2 uv;
-    uniform mat4 M, V, P;
-    out vec2 U;
-    void main(){
-        U = uv;
-        gl_Position = P * V * M * vec4(p, 1.0);
-    }`;
+    precision highp float;layout(location=0)in vec3 p;layout(location=1)in vec2 uv;uniform mat4 M,V,P;out vec2 U;void main(){U=uv;gl_Position=P*V*M*vec4(p,1.);}`;
     const fsH = `#version 300 es
-    precision highp float;
-    #define UNIFORM uniform
-    in vec2 U;
-    UNIFORM sampler2D T;
-    out vec4 o;
-    void main(){
-        vec4 c = texture(T, U);
-        if(c.a < 0.01) discard; // Discard fully transparent pixels.
-        o = c;
-    }`;
+    precision highp float;in vec2 U;uniform sampler2D T;out vec4 o;void main(){vec4 c=texture(T,U);if(c.a<0.01)discard;o=c;}`;
     const PH = prog(vsH, fsH);
     const uMH = gl.getUniformLocation(PH, 'M'),
           uVH = gl.getUniformLocation(PH, 'V'),
@@ -1133,28 +1116,10 @@
     // -- MODULE: Scene-Ground --
     // --- Grid Shader ---
     // A simple shader to draw a grid on the ground plane
-    const vsG = `#version 300 es
-    precision highp float;
-    layout(location=0) in vec3 p;
-    uniform mat4 M, V, P;
-    out vec3 w;
-    void main(){
-        w = (M * vec4(p,1.)).xyz;
-        gl_Position = P * V * vec4(w,1.);
-    }`;
-    const fsG = `#version 300 es
-    precision highp float;
-    in vec3 w;
-    out vec4 o;
-    float h(vec2 v){return fract(sin(dot(v,vec2(41.,289.)))*9000.);}
-    void main(){
-        vec2 q = floor(w.xz / .6);
-        float r = h(q), r2 = h(q + 13.);
-        // Base tile color with occasional lighter specks
-        vec3 c = mix(vec3(.08,.05,.02), vec3(.3,.2,.1), r) + step(.97, r2) * vec3(.1,.08,.04);
-        // Removed distance-based darkening to keep texture infinite
-        o = vec4(c, 1.);
-    }`;
+    const vsG=`#version 300 es
+    precision highp float;layout(location=0) in vec3 p;uniform mat4 M,V,P;out vec3 w;void main(){w=(M*vec4(p,1.)).xyz;gl_Position=P*V*vec4(w,1.);}`;
+    const fsG=`#version 300 es
+    precision highp float;in vec3 w;out vec4 o;float h(vec2 v){return fract(sin(dot(v,vec2(41.,289.)))*9000.);}void main(){vec2 q=floor(w.xz/.6);float r=h(q),r2=h(q+13.);vec3 c=mix(vec3(.08,.05,.02),vec3(.3,.2,.1),r)+step(.97,r2)*vec3(.1,.08,.04);o=vec4(c,1.);}`;
 
     const PG = prog(vsG, fsG);
     const uM = gl.getUniformLocation(PG, 'M');
@@ -1174,19 +1139,9 @@
     // -- MODULE: Gameplay-item --
     // NEW: Sphere (items/obstacles) minimal shader + geometry
     const vsSphere = `#version 300 es
-    layout(location=0) in vec3 p;
-    uniform mat4 V,P;
-    uniform vec3 uPos;
-    uniform float uS;
-    void main(){
-        vec3 wp = p * uS + uPos;
-        gl_Position = P * V * vec4(wp,1.0);
-    }`;
+    layout(location=0) in vec3 p;uniform mat4 V,P;uniform vec3 uPos;uniform float uS;void main(){vec3 wp=p*uS+uPos;gl_Position=P*V*vec4(wp,1.0);}`;
     const fsSphere = `#version 300 es
-    precision highp float;
-    uniform vec3 uColor;
-    out vec4 o;
-    void main(){ o = vec4(uColor,1.0); }`;
+    precision highp float;uniform vec3 uColor;out vec4 o;void main(){ o = vec4(uColor,1.0); }`;
 
     function buildSphere(lat=10, lon=12){
         const v=[];
@@ -1409,27 +1364,11 @@
     // -- MODULE: Scene-VR (hand disc only) --
     // Reticle removed; single disc shader used for VR hand/grip indicator
 
-    const vsDisc = `#version 300 es
-    precision highp float;
-    layout(location=0) in vec2 p;
-    uniform mat4 M,V,P;
-    out vec2 uv;
-    void main(){
-        uv = p * 0.5 + 0.5;
-        gl_Position = P * V * M * vec4(p.x, 0.0, p.y, 1.0);
-    }`;
+    const vsDisc=`#version 300 es
+    precision highp float;layout(location=0)in vec2 p;uniform mat4 M,V,P;out vec2 uv;void main(){uv=p*.5+.5;gl_Position=P*V*M*vec4(p.x,0.,p.y,1.);}`;
 
-    const fsDisc = `#version 300 es
-    precision highp float;
-    in vec2 uv;
-    uniform vec4 col;
-    out vec4 o;
-    void main(){
-        float d = distance(uv, vec2(0.5));
-        float ring = smoothstep(0.5, 0.4, d) - smoothstep(0.4, 0.3, d);
-        o = vec4(col.rgb, col.a * ring);
-        if (o.a < 0.02) discard;
-    }`;
+    const fsDisc=`#version 300 es
+    precision highp float;in vec2 uv;uniform vec4 col;out vec4 o;void main(){float d=distance(uv,vec2(.5)),r=smoothstep(.5,.4,d)-smoothstep(.4,.3,d);o=vec4(col.rgb,col.a*r);if(o.a<.02)discard;}`;
 
     const PDisc = prog(vsDisc, fsDisc);
     const uMDisc = gl.getUniformLocation(PDisc, 'M'),
