@@ -171,7 +171,7 @@
         const k = e.key.toLowerCase();
         input.keys[k] = true;
         if (k === 'h' || k === 'escape') {playClickSound(); hudVisible = !hudVisible;} // 'H' and escape key toggles HUD visibility
-        if (k === 'f') {playClickSound(); beastMode = !beastMode;} // 'F' key toggles beastMode
+        //if (k === 'f') {playClickSound(); beastMode = !beastMode;} // 'F' key toggles beastMode
     });
     document.addEventListener('keyup', e => input.keys[e.key.toLowerCase()] = false);
     
@@ -328,11 +328,11 @@
         }
 
         // If no button was clicked, check for a hit on the ground
-        const g = rayHitGround(r);
-        if (g) {
-            lastHit = g;
-            log('ground ' + g.map(v => v.toFixed(2)).join(','));
-        }
+        //const g = rayHitGround(r);
+        //if (g) {
+        //    lastHit = g;
+        //    log('ground ' + g.map(v => v.toFixed(2)).join(','));
+        //}
     }
 
     // Creates a world-space ray from the camera or a VR controller
@@ -378,14 +378,14 @@
     
 
     // Calculates the intersection point of a ray with the ground plane (Y=0)
-    function rayHitGround(ray) {
-        if (!ray || ray.d[1] >= 0) return null; // Ray is parallel to or going away from the ground
-        const t = (0 - ray.o[1]) / ray.d[1];
-        if (t > 0) {
-            return [ray.o[0] + ray.d[0] * t, 0.001, ray.o[2] + ray.d[2] * t];
-        }
-        return null;
-    }
+    //function rayHitGround(ray) {
+    //    if (!ray || ray.d[1] >= 0) return null; // Ray is parallel to or going away from the ground
+    //    const t = (0 - ray.o[1]) / ray.d[1];
+    //    if (t > 0) {
+    //        return [ray.o[0] + ray.d[0] * t, 0.001, ray.o[2] + ray.d[2] * t];
+    //    }
+    //    return null;
+    //}
 
     // Helper to get a ray from a VR controller
     function controllerRay(frame, src) {
@@ -408,11 +408,11 @@
     // -- /FEATURE: Input --
 
     // -- FEATURE: Gameplay --
-    let beastMode = false; // toggle beast mode
+    //let beastMode = false; // toggle beast mode
     // -- MODULE: Gameplay-Item --
-    const BOOST_DURATION = 15;          // seconds per pickup
-    const BOOST_AMOUNT  = 0.3;        // +30% per stack
-    const MAX_BOOSTS    = 100;           // safety cap
+    //const BOOST_DURATION = 15;          // seconds per pickup
+    //const BOOST_AMOUNT  = 0.3;        // +30% per stack
+    //const MAX_BOOSTS    = 100;           // safety cap
     const speedBoosts = [];            // {timeLeft, amount}
     const items = [];                  // pickup spheres {x,y,z,r,active:true}
     const obstacles = [];              // solid spheres for collision {x,y,z,r}
@@ -423,17 +423,17 @@
     // -- MODULE: Gameplay-Cat --
     // Stylized Black Cat entity the player must catch. Cat roams near center, avoids player, drops boosts & obstacles.
     const cat = { x:0, y:0.6, z:0, vx:0, vz:0, caught:0, drop:1.2, baseS:3, anim:0, evade:0, yaw:0 };
-    const CAT_MAX_R = 1000;        // Hard clamp so cat never wanders too far
-    const CAT_PREF_R = 50;       // Preferred roaming radius from origin
-    const CAT_CATCH_R = 0.5;     // Distance threshold to count as caught
-    const CAT_FLEE_R = 10;       // Start fleeing if player within this distance
-    const CAT_SEEK_R = 50;      // Begin seeking player if beyond this distance
-    const CAT_EVADE_R = 3;     // Distance to trigger perpendicular dodge
-    const CAT_DROP_MIN = 1.9;    // Min seconds between drops (only while chased)
-    const CAT_DROP_VAR = 0.8;    // Added random variance
+    //const CAT_MAX_R = 1000;        // Hard clamp so cat never wanders too far
+    //const CAT_PREF_R = 50;       // Preferred roaming radius from origin
+    //const CAT_CATCH_R = 0.5;     // Distance threshold to count as caught
+    //const CAT_FLEE_R = 10;       // Start fleeing if player within this distance
+    //const CAT_SEEK_R = 50;      // Begin seeking player if beyond this distance
+    //const CAT_EVADE_R = 3;     // Distance to trigger perpendicular dodge
+    //const CAT_DROP_MIN = 1.9;    // Min seconds between drops (only while chased)
+    //const CAT_DROP_VAR = 0.8;    // Added random variance
     function resetCatPosition(){
         // Random point within preferred radius
-        const a = RANDOM()*PI*2; const r = RANDOM()*CAT_PREF_R*0.8;
+        const a = RANDOM()*PI*2; const r = RANDOM()*50*0.8;
         cat.x = COS(a)*r; cat.z = SIN(a)*r; cat.vx = cat.vz = 0;
     }
     function spawnDrop(x,z){
@@ -463,7 +463,7 @@
         // 1. Seek (player far) -> move toward predicted position
         // 2. Orbit (mid range) -> tangential movement
         // 3. Flee (close) -> run away + evasive handled below
-        if(dist > CAT_SEEK_R){
+        if(dist > 50){
             // Predictive pursuit: estimate lead time proportional to distance & relative speed
             const relSpeed = HYPOT(userVelX, userVelZ) + 0.01;
             const lead = MIN(3, dist / (cat.baseS + 2));
@@ -472,7 +472,7 @@
             const tx = targetX - cat.x, tz = targetZ - cat.z;
             const td = HYPOT(tx, tz)||1;
             fx += (tx/td)*5; fz += (tz/td)*5;
-        } else if(dist > CAT_FLEE_R){
+        } else if(dist > 10){
             // Orbit band: push slightly toward player but add strong perpendicular drift
             const nx = dxP/dist, nz = dzP/dist;
             // Toward component keeps it from drifting away too much
@@ -486,15 +486,15 @@
         }
         // Centering band
         const dc2 = cat.x*cat.x + cat.z*cat.z; const dc = SQRT(dc2)||1;
-        if(dc > CAT_PREF_R){ fx += (-cat.x/dc)*((dc-CAT_PREF_R)*1.0); fz += (-cat.z/dc)*((dc-CAT_PREF_R)*1.0); }
-        else if(dc < CAT_PREF_R*0.55){ fx += (cat.x/dc)*0.5; fz += (cat.z/dc)*0.5; }
+        if(dc > 150){ fx += (-cat.x/dc)*((dc+1000)*1.0); fz += (-cat.z/dc)*((dc+1000)*1.0); }
+        else if(dc < 50*0.55){ fx += (cat.x/dc)*0.5; fz += (cat.z/dc)*0.5; }
         // Obstacle avoidance (proximity repulsion + simple forward ray)
         const spd = HYPOT(cat.vx, cat.vz) + 0.1;
         const dirx = cat.vx/spd, dirz = cat.vz/spd;
         const look = 2 + spd*0.6;
         for(const ob of obstacles){
             const ox = ob.x - cat.x, oz = ob.z - cat.z;
-            const dist2 = ox*ox + oz*oz; const rad = ob.r + 0.7;
+            const dist2 = ox*ox + oz*oz; const rad = ob.r + 2;
             if(dist2 < rad*rad){ // proximity push
                 const d = SQRT(dist2)||1; fx -= (ox/d)*2.4; fz -= (oz/d)*2.4;
             } else if(dist2 < (look*look)){ // forward ray influence
@@ -511,7 +511,7 @@
         fx += (RANDOM()*2-1)*0.9; fz += (RANDOM()*2-1)*0.9;
         // Evasive perpendicular burst if very close
         cat.evade -= dt;
-        if(dP2 < CAT_EVADE_R*CAT_EVADE_R && cat.evade<=0){
+        if(dP2 < 3*3 && cat.evade<=0){
             const d = SQRT(dP2)||1; const nx = dxP/d, nz = dzP/d;
             // pick perpendicular sign based on random
             const sign = (RANDOM()<0.5)?1:-1;
@@ -533,16 +533,16 @@
             if(dy > PI) dy -= 2*PI; else if(dy < -PI) dy += 2*PI;
             cat.yaw += dy * MIN(1, dt*10); // turn speed factor
         }
-        const r2 = cat.x*cat.x + cat.z*cat.z; if(r2>CAT_MAX_R*CAT_MAX_R){ const r=SQRT(r2); cat.x*=CAT_MAX_R/r; cat.z*=CAT_MAX_R/r; }
+        //const r2 = cat.x*cat.x + cat.z*cat.z; if(r2>200*200){ const r=SQRT(r2); cat.x*=200/r; cat.z*=200/r; }
         // Friction
         cat.vx *= (1 - 1.1*dt); cat.vz *= (1 - 1.1*dt);
         // Chase detection (player near & moving)
-        const chased = (dP2 < CAT_FLEE_R*CAT_FLEE_R && playerMoveMag>0.15);
-        if(chased){ cat.drop -= dt; if(cat.drop<=0){ spawnDrop(cat.x, cat.z); cat.drop = CAT_DROP_MIN + RANDOM()*CAT_DROP_VAR; } }
+        const chased = (dP2 < 10*10 && playerMoveMag>0.15);
+        if(chased){ cat.drop -= dt; if(cat.drop<=0){ spawnDrop(cat.x, cat.z); cat.drop = 1.9 + RANDOM()*0.8; } }
         // Animation clock
         cat.anim += sp*dt*3.5;
         // Catch detection
-        if(dP2 < (CAT_CATCH_R+playerCapsule.radius)*(CAT_CATCH_R+playerCapsule.radius)){
+        if(dP2 < (0.5+playerCapsule.radius)*(0.5+playerCapsule.radius)){
             cat.caught++; log('Cat caught #' + cat.caught);
             if(audioCtx) {
                 //playClickSound();
@@ -550,7 +550,7 @@
                 spawnBell(audioCtx.currentTime+0.1, 1000, window.chipMusic, 0.3);
                 spawnBell(audioCtx.currentTime+0.2, 1200, window.chipMusic, 0.4);
             }
-            if(speedBoosts.length < MAX_BOOSTS) speedBoosts.push({timeLeft:BOOST_DURATION, amount:BOOST_AMOUNT});
+            if(speedBoosts.length < 10) speedBoosts.push({timeLeft:15, amount:0.3});
             resetCatPosition();
             //for(let i=0;i<4;i++); //spawnDrop(cat.x + (RANDOM()*2-1), cat.z + (RANDOM()*2-1));
         }
@@ -585,8 +585,8 @@
             const dist = HYPOT(dx,dy,dz);
             if (dist < itm.r + playerCapsule.radius){
                 itm.active = false;
-                if (speedBoosts.length < MAX_BOOSTS){
-                    speedBoosts.push({ timeLeft: BOOST_DURATION, amount: BOOST_AMOUNT });
+                if (speedBoosts.length < 10){
+                    speedBoosts.push({ timeLeft: 15, amount: 0.3 });
                 }
                 if(audioCtx) {
                     //playClickSound();
@@ -810,7 +810,7 @@
     const LOG = [];
     const LOG_MAX = 200;
     let logScroll = 0;
-    let logVisible = true;
+    //let logVisible = true;
     let hudVisible = true;
 
     // State for HUD interaction.
@@ -818,14 +818,14 @@
     let hoverBtn = null; // The button currently being hovered over
 
     function log(s) { LOG.push(s); if (LOG.length > LOG_MAX) LOG.shift(); }
-    function logClear() { LOG.length = 0; log('log cleared'); }
+    //function logClear() { LOG.length = 0; log('log cleared'); }
 
     // UI button definitions. Each object defines a button's ID, position (in UV space), label, and click handler
     let uiEnterLabel = 'Enter VR';
     const UI_MAIN = [
         { id: 'reset', u0: 0.4, v0: 0.1, u1: 0.7, v1: 0.2, label: 'Reset', onClick: () => { playClickSound(); user.x = 0; user.z = 2; user.yaw = 0; user.pitch = 0; log('reset position'); } },
         { id: 'vr', u0: 0.4, v0: 0.3, u1: 0.7, v1: 0.4, label: () => uiEnterLabel, onClick: () => { playClickSound(); toggleXRFromUI(); } },
-        { id: 'logtog', u0: 0.85, v0: 0.5, u1: 0.98, v1: 0.6 , label: 'LOG', onClick: () => { playClickSound(); logVisible = !logVisible; } },
+        //{ id: 'logtog', u0: 0.85, v0: 0.5, u1: 0.98, v1: 0.6 , label: 'LOG', onClick: () => { playClickSound(); logVisible = !logVisible; } },
         { id: 'logdn', u0: 0.85, v0: 0.8, u1: 0.98, v1: 0.9, label: 'Down', onClick: () => { playClickSound(); logScroll = MAX(0, logScroll - 1); } },
         { id: 'logup', u0: 0.85, v0: 0.7, u1: 0.98, v1: 0.8, label: 'Up', onClick: () => { playClickSound(); logScroll = MIN(MAX(0, LOG.length - 1), logScroll + 1); } },
         { id: 'hudx', u0: 0.8, v0: 0.04, u1: 0.98, v1: 0.2, label: 'Close       X', onClick: () => { playClickSound(); hudVisible = false; } }
@@ -925,11 +925,11 @@
             hudCtx.fillText(`Yaw: ${(user.yaw * 180 / PI | 0)}°`, 20, 100);
             hudCtx.fillText(`Cat Caught: ${cat.caught}`, 20, 120);
             hudCtx.fillText(`Boosts: ${speedBoosts.length}`, 150, 120);
-            if (hit) { hudCtx.fillStyle = '#afa';
-            hudCtx.fillText(`Hit @ ground: (${hit[0].toFixed(2)}, ${hit[2].toFixed(2)})`, 20, 140); }
+            //if (hit) { hudCtx.fillStyle = '#afa';
+            //hudCtx.fillText(`Hit @ ground: (${hit[0].toFixed(2)}, ${hit[2].toFixed(2)})`, 20, 140); }
 
             // Log box
-            if (logVisible) {
+            //if (logVisible) {
                 const x = 18,
                       y = 150,
                       w = hudCan.width - 120,
@@ -950,7 +950,7 @@
                 for (let i = 0; i < lines.length; i++)
                     hudCtx.fillText(lines[i], x + 12, y + 24 + i * 16);
                 hudCtx.restore();
-            }
+            //}
 
             // Buttons
             for (const b of UI_MAIN) {
@@ -1549,10 +1549,10 @@
         gl.uniformMatrix4fv(uM, false, M);
         gl.uniformMatrix4fv(uV, false, V);
         gl.uniformMatrix4fv(uP, false, P);
-        if (beastMode===true){
-        gl.enable(gl.CULL_FACE);
-        gl.cullFace(gl.FRONT)}
-        else {gl.disable(gl.CULL_FACE);};
+        //if (beastMode===true){
+        //gl.enable(gl.CULL_FACE);
+        //gl.cullFace(gl.FRONT)}
+        //else {gl.disable(gl.CULL_FACE);};
         gl.drawArrays(gl.TRIANGLES, 0, 6);
 
         // --- NEW: Render Items & Obstacles (now works because drawSphere exists) ---
@@ -1626,22 +1626,22 @@
                 const dx = camX - px, dz = camZ - pz;
                 const dist = HYPOT(dx, dz);
 
-                const NEAR_HIDE = 4.0;
-                const NEAR_FULL = 6.0;
-                const FAR_START = 18.0;
-                const FAR_HIDE  = 50.0;
-                if(dist < NEAR_HIDE || dist > FAR_HIDE) continue;
+                //const NEAR_HIDE = 4.0;
+                //const NEAR_FULL = 6.0;
+                //const FAR_START = 18.0;
+                //const FAR_HIDE  = 50.0;
+                if(dist < 4.0 || dist > 50.0) continue;
 
-                const MIN_ITER = 2, MAX_ITER = 14;
+                //const MIN_ITER = 2, MAX_ITER = 14;
                 const sstep = x => x*x*(3-2*x);
-                let a = (dist - NEAR_HIDE)/(NEAR_FULL-NEAR_HIDE); a = sstep(MIN(1, MAX(0,a)));
-                let b = (FAR_HIDE - dist)/(FAR_HIDE - FAR_START); b = sstep(MIN(1, MAX(0,b)));
+                let a = (dist - 4.0)/(6.0-4.0); a = sstep(MIN(1, MAX(0,a)));
+                let b = (50.0 - dist)/(50.0 - 18.0); b = sstep(MIN(1, MAX(0,b)));
                 let q = a * b;
                 if(q < 0.05) continue;
 
                 const key = p.gx + ',' + p.gz;
-                const target = MIN_ITER + q*(MAX_ITER - MIN_ITER);
-                const iterations = MAX(MIN_ITER, MIN(MAX_ITER, target)) | 0;
+                const target = 2 + q*(14 - 2);
+                const iterations = MAX(2, MIN(14, target)) | 0;
                 const plantSeed = plantHash(p.gx, p.gz, 4.0);
 
                 const angle = ATAN2(camX - px, camZ - pz);
@@ -1666,20 +1666,20 @@
         }
 
         // Render Reticle if there's a ground hit
-        if (lastHit) {
-            const T = translateScale(lastHit[0], 0.001, lastHit[2], 0.15, 1, 0.15);
-            gl.useProgram(PR);
-            gl.bindVertexArray(vaoR);
-            gl.uniformMatrix4fv(uMR, false, T);
-            gl.uniformMatrix4fv(uVR, false, V);
-            gl.uniformMatrix4fv(uPR, false, P);
-            gl.enable(gl.BLEND);
-            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-            gl.disable(gl.DEPTH_TEST);
-            gl.drawArrays(gl.TRIANGLES, 0, 6);
-            gl.enable(gl.DEPTH_TEST);
-            gl.disable(gl.BLEND);
-        }
+        //if (lastHit) {
+        //    const T = translateScale(lastHit[0], 0.001, lastHit[2], 0.15, 1, 0.15);
+        //    gl.useProgram(PR);
+        //    gl.bindVertexArray(vaoR);
+        //    gl.uniformMatrix4fv(uMR, false, T);
+        //    gl.uniformMatrix4fv(uVR, false, V);
+        //    gl.uniformMatrix4fv(uPR, false, P);
+        //    gl.enable(gl.BLEND);
+        //    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        //    gl.disable(gl.DEPTH_TEST);
+        //    gl.drawArrays(gl.TRIANGLES, 0, 6);
+        //    gl.enable(gl.DEPTH_TEST);
+        //    gl.disable(gl.BLEND);
+        //}
 
 
         // Render HUD
@@ -1871,10 +1871,10 @@
 
                     if (h && h.button) {
                         h.button.onClick();
-                    } else {
-                        const g = rayHitGround(r);
-                        if (g) { lastHit = g; log('ground ' + g.map(v => v.toFixed(2)).join(',')); }
-                    }
+                    } //else {
+                    //    const g = rayHitGround(r);
+                    //    if (g) { lastHit = g; log('ground ' + g.map(v => v.toFixed(2)).join(',')); }
+                    //}
                 }
             }
             pressedMap.set(src, now);
@@ -2003,22 +2003,22 @@
                 const dx = camX - px, dz = camZ - pz;
                 const dist = HYPOT(dx, dz);
 
-                const NEAR_HIDE = 4.0;
-                const NEAR_FULL = 6.0;
-                const FAR_START = 18.0;
-                const FAR_HIDE  = 80.0;
-                if(dist < NEAR_HIDE || dist > FAR_HIDE) continue;
+                //const NEAR_HIDE = 4.0;
+                //const NEAR_FULL = 6.0;
+                //const FAR_START = 18.0;
+                //const FAR_HIDE  = 50.0;
+                if(dist < 4.0 || dist > 50.0) continue;
 
-                const MIN_ITER = 2, MAX_ITER = 16;
+                //const MIN_ITER = 2, MAX_ITER = 16;
                 const sstep = x => x*x*(3-2*x);
-                let a = (dist - NEAR_HIDE)/(NEAR_FULL-NEAR_HIDE); a = sstep(MIN(1, MAX(0,a)));
-                let b = (FAR_HIDE - dist)/(FAR_HIDE - FAR_START); b = sstep(MIN(1, MAX(0,b)));
+                let a = (dist - 4.0)/(6.0-4.0); a = sstep(MIN(1, MAX(0,a)));
+                let b = (50.0 - dist)/(50.0 - 18.0); b = sstep(MIN(1, MAX(0,b)));
                 let q = a * b;
                 if(q < 0.05) continue;
 
                 const key = p.gx + ',' + p.gz;
-                const target = MIN_ITER + q*(MAX_ITER - MIN_ITER);
-                const iterations = MAX(MIN_ITER, MIN(MAX_ITER, target)) | 0;
+                const target = 2 + q*(16 - 2);
+                const iterations = MAX(2, MIN(16, target)) | 0;
                 const plantSeed = plantHash(p.gx, p.gz, 4.0);
 
                 const angle = ATAN2(camX - px, camZ - pz);
@@ -2043,21 +2043,21 @@
             }
 
             // Render Reticle
-            if (lastHit) {
-                const Tm = translateScale(lastHit[0], 0.001, lastHit[2], 0.15, 1, 0.15);
-                gl.useProgram(PR);
-                gl.bindVertexArray(vaoR);
-                gl.uniformMatrix4fv(uMR, false, Tm);
-                gl.uniformMatrix4fv(uVR, false, v.transform.inverse.matrix);
-                gl.uniformMatrix4fv(uPR, false, v.projectionMatrix);
-                gl.enable(gl.BLEND); 
-                gl.blendFunc(gl.SRC_ALPHA, 
-                gl.ONE_MINUS_SRC_ALPHA);
-                gl.disable(gl.DEPTH_TEST); 
-                gl.drawArrays(gl.TRIANGLES, 0, 6);
-                gl.enable(gl.DEPTH_TEST); 
-                gl.disable(gl.BLEND);
-            }
+            //if (lastHit) {
+            //    const Tm = translateScale(lastHit[0], 0.001, lastHit[2], 0.15, 1, 0.15);
+            //    gl.useProgram(PR);
+            //    gl.bindVertexArray(vaoR);
+            //    gl.uniformMatrix4fv(uMR, false, Tm);
+            //    gl.uniformMatrix4fv(uVR, false, v.transform.inverse.matrix);
+            //    gl.uniformMatrix4fv(uPR, false, v.projectionMatrix);
+            //    gl.enable(gl.BLEND); 
+            //    gl.blendFunc(gl.SRC_ALPHA, 
+            //    gl.ONE_MINUS_SRC_ALPHA);
+            //    gl.disable(gl.DEPTH_TEST); 
+            //    gl.drawArrays(gl.TRIANGLES, 0, 6);
+            //    gl.enable(gl.DEPTH_TEST); 
+            //    gl.disable(gl.BLEND);
+            //}
             
             // Render HUD
             const T = getHudTransform();
@@ -2137,22 +2137,22 @@
                     gl.enable(gl.DEPTH_TEST);
 
                     // Ground hit indicator for the controller ray
-                    const g = rayHitGround(r);
-                    if (g) {
-                        const Mhit = translateScale(g[0], 0.001, g[2], 0.09, 1, 0.09);
-                        gl.useProgram(PDisc); 
-                        gl.bindVertexArray(vaoR);
-                        gl.uniformMatrix4fv(uMDisc, false, Mhit); 
-                        gl.uniformMatrix4fv(uVDisc, false, v.transform.inverse.matrix); 
-                        gl.uniformMatrix4fv(uPDisc, false, v.projectionMatrix);
-                        gl.uniform4f(uColDisc, 1.0, 0.95, 0.3, 0.95);
-                        gl.disable(gl.DEPTH_TEST); 
-                        gl.enable(gl.BLEND); 
-                        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-                        gl.drawArrays(gl.TRIANGLES, 0, 6);
-                        gl.disable(gl.BLEND); 
-                        gl.enable(gl.DEPTH_TEST);
-                    }
+                    //const g = rayHitGround(r);
+                    //if (g) {
+                    //    const Mhit = translateScale(g[0], 0.001, g[2], 0.09, 1, 0.09);
+                    //    gl.useProgram(PDisc); 
+                    //    gl.bindVertexArray(vaoR);
+                    //    gl.uniformMatrix4fv(uMDisc, false, Mhit); 
+                    //    gl.uniformMatrix4fv(uVDisc, false, v.transform.inverse.matrix); 
+                    //    gl.uniformMatrix4fv(uPDisc, false, v.projectionMatrix);
+                    //    gl.uniform4f(uColDisc, 1.0, 0.95, 0.3, 0.95);
+                    //    gl.disable(gl.DEPTH_TEST); 
+                    //    gl.enable(gl.BLEND); 
+                    //    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+                    //    gl.drawArrays(gl.TRIANGLES, 0, 6);
+                    //    gl.disable(gl.BLEND); 
+                    //    gl.enable(gl.DEPTH_TEST);
+                    //}
                 }
             }
         }
