@@ -994,26 +994,26 @@
         o.connect(g); g.connect(m.g);
         o.start(t); o.stop(t+0.65);
     }
-    function spawnCatVoice(t, f, m){
-        // Simple formant-ish meow made from two detuned oscillators fading quickly
-        const carrier = audioCtx.createOscillator();
-        const formant = audioCtx.createOscillator();
-        const g = audioCtx.createGain();
-        carrier.type='square'; formant.type='sine';
-        carrier.frequency.setValueAtTime(f, t);
-        formant.frequency.setValueAtTime(f*2.01, t);
-        // mild vibrato
-        const lfo = audioCtx.createOscillator();
-        const lfoGain = audioCtx.createGain(); lfoGain.gain.value = 6; // semitone-ish wobble
-        lfo.frequency.value = 5;
-        lfo.connect(lfoGain); lfoGain.connect(carrier.frequency);
-        g.gain.setValueAtTime(0.001,t);
-        g.gain.exponentialRampToValueAtTime(0.1*(0.2+0.4*m.energy), t+0.05);
-        g.gain.exponentialRampToValueAtTime(0.0003, t+0.55);
-        carrier.connect(g); formant.connect(g); g.connect(m.g);
-        carrier.start(t); formant.start(t); lfo.start(t);
-        carrier.stop(t+0.6); formant.stop(t+0.6); lfo.stop(t+0.6);
-    }
+    //function spawnCatVoice(t, f, m){
+    //    // Simple formant-ish meow made from two detuned oscillators fading quickly
+    //    const carrier = audioCtx.createOscillator();
+    //    const formant = audioCtx.createOscillator();
+    //    const g = audioCtx.createGain();
+    //    carrier.type='square'; formant.type='sine';
+    //    carrier.frequency.setValueAtTime(f, t);
+    //    formant.frequency.setValueAtTime(f*2.01, t);
+    //    // mild vibrato
+    //    const lfo = audioCtx.createOscillator();
+    //    const lfoGain = audioCtx.createGain(); lfoGain.gain.value = 6; // semitone-ish wobble
+    //    lfo.frequency.value = 5;
+    //    lfo.connect(lfoGain); lfoGain.connect(carrier.frequency);
+    //    g.gain.setValueAtTime(0.001,t);
+    //    g.gain.exponentialRampToValueAtTime(0.1*(0.2+0.4*m.energy), t+0.05);
+    //    g.gain.exponentialRampToValueAtTime(0.0003, t+0.55);
+    //    carrier.connect(g); formant.connect(g); g.connect(m.g);
+    //    carrier.start(t); formant.start(t); lfo.start(t);
+    //    carrier.stop(t+0.6); formant.stop(t+0.6); lfo.stop(t+0.6);
+    //}
     // -- /SOLUTION: Scene-Audio-Step --
     // -- /MODULE: Scene-Audio --
 
@@ -1255,12 +1255,12 @@
     // -- MODULE: Scene-Sky --
     // --- Sky Shader ---
     let noiseTex = gl.createTexture();
-    let cloudCoverage = 0.25;      // threshold knob -> more/less cloud
-    let cloudSharpness = 0.52;     // edge softness knob
-    let shadowSamples = 3;        // cheap self-shadow sampling count
-    let cloudHeight = 100.0;      // height (world units) of the cloud layer (controls horizon)
-    let cloudScale = 0.0001;      // global mapping scale from world XZ -> cloud texture space (MAIN SIZE LEVER)
-    let cloudMotionSpeed = 0.02;   // global motion speed scalar
+    //let cloudCoverage = 0.25;      // threshold knob -> more/less cloud
+    //let cloudSharpness = 0.52;     // edge softness knob
+    //let shadowSamples = 3;        // cheap self-shadow sampling count
+    //let cloudHeight = 100.0;      // height (world units) of the cloud layer (controls horizon)
+    //let cloudScale = 0.0001;      // global mapping scale from world XZ -> cloud texture space (MAIN SIZE LEVER)
+    //let cloudMotionSpeed = 0.02;   // global motion speed scalar
 
     function makeTileableNoise(size) {
 
@@ -1318,157 +1318,28 @@
     makeTileableNoise(128);
 
     // A procedural skybox rendered using a single full-screen triangle
-    const vsSky = `#version 300 es
-    precision highp float;
-    // Hardcoded vertices for a full-screen triangle.
-    const vec2 v[3] = vec2[3](vec2(-1.0,-1.0), vec2(3.0,-1.0), vec2(-1.0,3.0));
-    out vec2 uv; // Pass UV coordinates to the fragment shader.
-    void main(){
-        uv = v[gl_VertexID] * 0.5 + 0.5; // Convert vertex ID to UV coords [0,1].
-        gl_Position = vec4(v[gl_VertexID], 0.0, 1.0); // Output clip space position.
-    }`;
+    const vsSky=`#version 300 es
+    precision highp float;const vec2 v[3]=vec2[3](vec2(-1.,-1.),vec2(3.,-1.),vec2(-1.,3.));out vec2 uv;void main(){uv=v[gl_VertexID]*.5+.5;gl_Position=vec4(v[gl_VertexID],0.,1.);}`;
 
     // Replaced fragment shader: perspective-correct cloud mapping (plane intersection), reduced velocities
-    const fsSky = `#version 300 es
-    precision highp float;
-    in vec2 uv;
-    out vec4 o;
-    uniform vec3 sunDir;    // Direction of the sun in world space.
-    uniform mat4 Vinv;      // Inverse of the view matrix (world-from-view).
-    uniform mat4 invPV;     // Inverse of the combined projection*view matrix.
-    uniform sampler2D uNoise;
-    uniform float uTime;
-    uniform float uCloudCoverage;
-    uniform float uCloudSharpness;
-    uniform int   uCloudShadowSamples;
-    uniform float uCloudHeight;
-    uniform float uCloudScale;
-    uniform float uCloudMotionSpeed;
-
-    // Color palette for the sky.
-    const vec3 zen = vec3(0.2, 0.2, 0.4); // Zenith color (top of the sky).
-    const vec3 hor = vec3(0.20, 0.28, 0.36); // Horizon color.
-    const vec3 sunTint = vec3(0.8, 0.6, 0.1); // Color of the sun's glow.
-
-    // simple noise sample wrapper (texture is tileable and repeated)
-    float n2(vec2 p) {
-        return texture(uNoise, p).r;
-    }
-
-    // 4-octave fBm
-    float fbm4(vec2 p) {
-        float sum = 0.0;
-        float amp = 0.5;
-
-        // OPTIONAL DOMAIN WARP (uncomment to add non-uniformity before sampling):
-        // vec2 warp = vec2(n2(p + 13.1), n2(p + 7.7)) * 0.8 - 0.4; // [-0.4..0.4] offset
-        // p += warp;
-
-        // Base velocities for each octave (edit speeds/directions for different motion patterns)
-        vec2 baseVel0 = vec2(0.012, 0.007);
-        vec2 baseVel1 = vec2(-0.008, 0.015);
-        vec2 baseVel2 = vec2(0.017, -0.011);
-        vec2 baseVel3 = vec2(-0.011, -0.018);
-
-        // Octaves
-        sum += amp * n2(p + uTime * baseVel0 * uCloudMotionSpeed);
-
-        p *= 2.0;    // LACUNARITY: try 2.2 or 2.5 for more size separation
-        amp *= 0.5;  // GAIN: try 0.55..0.65 to keep more small-scale detail
-        sum += amp * n2(p + uTime * baseVel1 * uCloudMotionSpeed);
-
-        p *= 2.0;    // Another scale jump (edit to taste)
-        amp *= 0.5;  // Another gain drop
-        sum += amp * n2(p + uTime * baseVel2 * uCloudMotionSpeed);
-
-        p *= 2.0;
-        amp *= 0.5;
-        sum += amp * n2(p + uTime * baseVel3 * uCloudMotionSpeed);
-
-        return sum;
-    }
-
-    void main(){
-        // reconstruct view ray in world space
-        vec3 ro = (Vinv * vec4(0.0,0.0,0.0,1.0)).xyz;
-        vec2 ndc = uv * 2.0 - 1.0;
-        vec4 clipFar = vec4(ndc, 1.0, 1.0);
-        vec4 worldFar4 = invPV * clipFar;
-        vec3 worldFar = worldFar4.xyz / worldFar4.w;
-        vec3 rd = normalize(worldFar - ro);
-
-        // base sky gradient and sun glow (unchanged)
-        float t = pow(max(rd.y * 0.5 + 0.5, 0.0), 1.2);
-        vec3 sky = mix(hor, zen, t);
-        vec3 s = normalize(sunDir);
-        float sd = max(dot(rd, s), 0.0);
-        float sun = smoothstep(0.995, 1.0, sd);
-        float glow = pow(sd, 60.0) + 0.4 * pow(sd, 12.0);
-        vec3 col = sky + sunTint * glow + vec3(1.0) * sun * 0.15;
-
-        // --- perspective-correct cloud mapping: intersect ray with horizontal cloud plane ---
-        vec2 samplePos;
-        float tCloud = (uCloudHeight - ro.y) / rd.y;
-        if (tCloud > 0.0) {
-            vec3 p = ro + rd * tCloud;
-            samplePos = p.xz;
-        } else {
-            // ray goes upward or doesn't hit plane: fallback sample far along ray (keeps sky-top reasonable)
-            vec3 p = ro + rd * 1000.0;
-            samplePos = p.xz;
-        }
-
-        // map world XZ to cloud texture UV, apply global scale
-        vec2 cloudUV = samplePos * uCloudScale;
-
-        // BUILD NOISE- fBm - 4D Perlin noise function
-        float f = fbm4(cloudUV);
-
-        // COVERAGE / EDGE SOFTNESS
-        float coverage = clamp(uCloudCoverage, 0.0, 1.0);
-        float sharp = max(0.001, uCloudSharpness);
-        float cloudMask = smoothstep(coverage, coverage + sharp, f);
-
-        // SHADOW TUNING:
-        vec2 sunStep = normalize(s.xz + 0.0001);
-        float occ = 0.0;
-        int samples = max(1, uCloudShadowSamples);
-        float stepSize = 8.0 * uCloudScale; // tie to scale so softness stays consistent when size changes
-        for (int i = 1; i <= 8; ++i) {
-            if (i > samples) break;
-            vec2 p = cloudUV + sunStep * float(i) * stepSize;
-            occ += fbm4(p);
-        }
-        occ /= float(samples);
-        float lightFactor = 1.0 - clamp(occ * 1.6, 0.0, 1.0);
-
-        // shade clouds and blend
-        vec3 cloudBase = vec3(0.95, 0.98, 1.0);
-        vec3 cloudShaded = cloudBase * (0.45 + 0.55 * lightFactor);
-        float facingSun = clamp(dot(normalize(vec3(s.x, s.y, s.z)), normalize(rd)), 0.0, 1.0);
-        cloudShaded += 0.25 * sun * facingSun;
-
-        float cloudAlpha = cloudMask * 0.95;
-        col = mix(col, cloudShaded, cloudAlpha);
-
-        o = vec4(col, 1.0);
-    }`;
+    const fsSky=`#version 300 es
+    precision highp float;in vec2 uv;out vec4 o;uniform mat4 Vinv,invPV;uniform sampler2D uNoise;uniform float uTime;float n(vec2 p){return texture(uNoise,p).r;}float fbm(vec2 p){float s=0.,a=.5;s+=a*n(p+uTime*vec2(.012,.007)*.02);p*=2.;a*=.5;s+=a*n(p+uTime*vec2(-.008,.015)*.02);p*=2.;a*=.5;s+=a*n(p+uTime*vec2(.017,-.011)*.02);p*=2.;a*=.5;s+=a*n(p+uTime*vec2(-.011,-.018)*.02);return s;}void main(){vec3 ro=(Vinv*vec4(0,0,0,1)).xyz;vec4 f4=invPV*vec4(uv*2.-1.,1,1);vec3 rd=normalize(f4.xyz/f4.w-ro);float t=pow(max(rd.y*.5+.5,0.),1.2);vec3 col=mix(vec3(.2,.28,.36),vec3(.2,.2,.4),t);vec3 s=normalize(vec3(.1,.1,-.9));float sd=max(dot(rd,s),0.);float sun=smoothstep(.995,1.,sd);col+=vec3(.8,.6,.1)*(pow(sd,60.)+.4*pow(sd,12.))+vec3(1)*sun*.15;vec2 sp;float tc=(100.-ro.y)/rd.y;if(tc>0.){vec3 p=ro+rd*tc;sp=p.xz;}else{vec3 p=ro+rd*1e3;sp=p.xz;}vec2 cuv=sp*1e-4;float f=fbm(cuv);float cm=smoothstep(.25,.25+.52,f);vec2 ss=normalize(s.xz+.0001);float occ=0.;for(int i=1;i<=3;++i){vec2 p=cuv+ss*float(i)*8e-4;occ+=fbm(p);}occ/=3.;float lf=1.-clamp(occ*1.6,0.,1.);vec3 cs=vec3(.95,.98,1.)*(.45+.55*lf);cs+=.25*sun*clamp(dot(s,rd),0.,1.);col=mix(col,cs,cm*.95);o=vec4(col,1.);}`;
 
     const PSKY = prog(vsSky, fsSky);
     const vaoSky = gl.createVertexArray();
     const uVinv = gl.getUniformLocation(PSKY, 'Vinv');
     const uInvPV = gl.getUniformLocation(PSKY, 'invPV');
-    const uSun = gl.getUniformLocation(PSKY, 'sunDir');
+    //const uSun = gl.getUniformLocation(PSKY, 'sunDir');
 
     // --- new: sky shader uniform locations for noise & cloud params ---
     const uNoiseSky = gl.getUniformLocation(PSKY, 'uNoise');
     const uTimeSky = gl.getUniformLocation(PSKY, 'uTime');
-    const uCoverage = gl.getUniformLocation(PSKY, 'uCloudCoverage');
-    const uSharpness = gl.getUniformLocation(PSKY, 'uCloudSharpness');
-    const uShadowSamples = gl.getUniformLocation(PSKY, 'uCloudShadowSamples');
-    const uCloudHeightLoc = gl.getUniformLocation(PSKY, 'uCloudHeight');
-    const uCloudScaleLoc = gl.getUniformLocation(PSKY, 'uCloudScale');
-    const uCloudMotionSpeedLoc = gl.getUniformLocation(PSKY, 'uCloudMotionSpeed');
+    //const uCoverage = gl.getUniformLocation(PSKY, 'uCloudCoverage');
+    //const uSharpness = gl.getUniformLocation(PSKY, 'uCloudSharpness');
+    //const uShadowSamples = gl.getUniformLocation(PSKY, 'uCloudShadowSamples');
+    //const uCloudHeightLoc = gl.getUniformLocation(PSKY, 'uCloudHeight');
+    //const uCloudScaleLoc = gl.getUniformLocation(PSKY, 'uCloudScale');
+    //const uCloudMotionSpeedLoc = gl.getUniformLocation(PSKY, 'uCloudMotionSpeed');
 
     // -- /MODULE: Scene-Sky --
     // -- MODULE: Scene-Ground --
@@ -1576,45 +1447,10 @@
     // Build a low-res sphere for rock base (coarse facets)
     const rockVerts = buildSphere(6, 8); // fewer subdivisions -> larger facets
     const PRock_vs = `#version 300 es
-    layout(location=0) in vec3 p;
-    uniform mat4 V, P;
-    uniform vec3 uPos;
-    uniform float uS;
-    uniform float uSeed;
-    out vec3 vLocal;
-    // cheap hash noise
-    float h(float x){ return fract(sin(x)*43758.5453); }
-    void main(){
-        // Displace vertex along its normal-ish direction using a cheap noise based on seed and vertex
-        vec3 local = p * uS;
-        float n = h((local.x + local.y*1.7 + local.z*2.3) * (uSeed + 1.0));
-        float off = (n - 0.5) * (0.5 * uS); // displacement magnitude
-        // push outward roughly by position vector (acts like normal)
-        vec3 wp = (local + normalize(local) * off) + uPos;
-        vLocal = local;
-        gl_Position = P * V * vec4(wp, 1.0);
-    }`;
+    layout(location=0)in vec3 p;uniform mat4 V,P;uniform vec3 uPos;uniform float uS,uSeed;out vec3 vLocal;float h(float x){return fract(sin(x)*43758.5453);}void main(){vLocal=p*uS;float n=h((vLocal.x+vLocal.y*1.7+vLocal.z*2.3)*(uSeed+1.));float o=(n-.5)*(.5*uS);vec3 w=(vLocal+normalize(vLocal)*o)+uPos;gl_Position=P*V*vec4(w,1.);}`;
 
     const PRock_fs = `#version 300 es
-    precision highp float;
-    in vec3 vLocal;
-    out vec4 o;
-    uniform float uSeed;
-    // quantize shading to get flat bands
-    void main(){
-        vec3 baseA = vec3(0.35, 0.3, 0.2);
-        vec3 baseB = vec3(0.15, 0.1, 0.1);
-        // fake normal from position
-        vec3 n = normalize(vLocal + vec3(0.0,0.0,-2.5));
-        float shade = dot(n, normalize(vec3(0.0,0.1,-0.5)));
-        shade = clamp(shade, 0.0, 1.0);
-        // quantize into 4 levels
-        float q = floor(shade * 4.0) / 4.0;
-        // subtle pattern variation
-        //float grain = fract(sin((vLocal.x+vLocal.y*7.7+vLocal.z*13.3) * (uSeed+1.0)) * 43758.5453) * 0.06;
-        vec3 col = mix(baseB, baseA, q);// + grain;
-        o = vec4(col, 1.0);
-    }`;
+    precision highp float;in vec3 vLocal;out vec4 o;uniform float uSeed;void main(){vec3 n=normalize(vLocal+vec3(0.,0.,-2.5));float s=clamp(dot(n,normalize(vec3(0.,.1,-.5))),0.,1.);float q=floor(s*4.)/4.;vec3 c=mix(vec3(.15,.1,.1),vec3(.35,.3,.2),q);o=vec4(c,1.);}`;
 
     const PROCK = prog(PRock_vs, PRock_fs);
     const rockVao = gl.createVertexArray();
@@ -1631,9 +1467,9 @@
     const uR_Seed = gl.getUniformLocation(PROCK, 'uSeed');
 
     // Parameters for rock field
-    const ROCK_CELL = 5;
-    const ROCK_RADIUS = 200.0; // generation radius
-    const ROCK_PROB = 0.01;   // spawn probability per cell
+    //const ROCK_CELL = 5;
+    //const ROCK_RADIUS = 200.0; // generation radius
+    //const ROCK_PROB = 0.01;   // spawn probability per cell
 
     // Update rocks around camera and sync to obstacles array (mark obstacles with _isRock)
     function updateRocks(camX, camZ){
@@ -1642,21 +1478,21 @@
             if (obstacles[i]._isRock) obstacles.splice(i, 1);
         }
         rocks.length = 0;
-        const c = ROCK_CELL; const r = ROCK_RADIUS;
-        const minX = FLOOR((camX - r)/c);
-        const maxX = FLOOR((camX + r)/c);
-        const minZ = FLOOR((camZ - r)/c);
-        const maxZ = FLOOR((camZ + r)/c);
+        //const c = 5; const r = 200.0;
+        const minX = FLOOR((camX - 200.0)/5);
+        const maxX = FLOOR((camX + 200.0)/5);
+        const minZ = FLOOR((camZ - 200.0)/5);
+        const maxZ = FLOOR((camZ + 200.0)/5);
         for(let gz=minZ; gz<=maxZ; gz++){
             for(let gx=minX; gx<=maxX; gx++){
                 const h = rockHash(gx, gz, 0.0);
-                if (h < ROCK_PROB){
+                if (h < 0.01){
                     const jx = rockHash(gx, gz, 1.0) - 0.5;
                     const jz = rockHash(gx, gz, 2.0) - 0.5;
-                    const px = gx*c + (jx * c * 0.6) + c*0.5;
-                    const pz = gz*c + (jz * c * 0.6) + c*0.5;
+                    const px = gx*5 + (jx * 5 * 0.6) + 5*0.5;
+                    const pz = gz*5 + (jz * 5 * 0.6) + 5*0.5;
                     const dx = px - camX, dz = pz - camZ;
-                    if (dx*dx + dz*dz <= r*r){
+                    if (dx*dx + dz*dz <= 200.0*200.0){
                         const seed = rockHash(gx, gz, -7.0) * 1000.0;
                         const scale = 4.0 + rockHash(gx, gz, 5.0) * 2.; // 1.0 .. 6.0 meters
                         const rx = px, rz = pz, ry = scale * 0.45; // small y offset
@@ -1676,97 +1512,14 @@
     // -- MODULE: Scene-Grass --
     // --- Grass Shaders ---
     // Grass rendering constants.
-    const GRASS_SEG = 4; // Number of segments per blade of grass
-    const GRASS_VCOUNT = (GRASS_SEG + 1) * 2; // Total vertices per blade
+    //const GRASS_SEG = 4; // Number of segments per blade of grass
+    //const GRASS_VCOUNT = (GRASS_SEG + 1) * 2; // Total vertices per blade
 
     // Uses instanced rendering to draw many blades of grass efficiently
     const vsGrass = `#version 300 es
-    precision highp float;
-    #define NORMALIZE normalize
-    uniform mat4 V, P;
-    uniform vec2 uCamXZ;
-    uniform vec3 uCamRight;
-    uniform float uTime;
-    uniform float uCell;
-    uniform int uGridN;
-    uniform float uSeed;
-    // NEW: biome noise
-    uniform sampler2D uNoise;
-    uniform float uNoiseScale;
-    out vec3 vCol;
-
-    // Simple hash functions for procedural generation.
-    float hash12(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453123); }
-    vec2  hash22(vec2 p){ float n = sin(dot(p, vec2(1.0,113.0))); return fract(vec2(262144.0*n, 32768.0*n)); }
-
-    void main(){
-        // Determine the world-space cell for this instance.
-        int N = uGridN;
-        int iid = gl_InstanceID;
-        int ix = iid % N - N/2;
-        int iz = iid / N - N/2;
-
-        vec2 camCellF = floor(uCamXZ / uCell);
-        vec2 cellF = camCellF + vec2(float(ix), float(iz));
-        vec2 baseCenter = (cellF + vec2(0.5)) * uCell;
-
-        // Per-cell randomization for grass placement, height, width, etc.
-        vec2 tileKey = floor(baseCenter / uCell) + vec2(uSeed);
-        vec2 jitter = (hash22(tileKey) - 0.5) * (uCell * 90.9);
-        float hRand = hash12(tileKey * 3.1);
-        float wRand = hash12(tileKey * 7.7);
-        float ph = hash12(tileKey * 5.3) * 6.2831853; // Phase for wind sway.
-
-        // NEW: sample biome noise (0..1) - low values = dry, high = lush
-        float biome = texture(uNoise, baseCenter * uNoiseScale).r;
-
-        // Cull instances outside the radius.
-        //float dist = length(baseCenter - uCamXZ);
-        //float inRadius = step(dist, uRadius);
-
-        // Define the shape of a single grass blade (a triangle strip).
-        float H = mix(0.6, 0.9, hRand);
-        float t = float(gl_VertexID / 2) / float(${GRASS_SEG});
-        float side = (gl_VertexID % 2 == 0) ? -1.0 : 1.0;
-        
-        // Make blades wider when close to the camera to hide gaps.
-        float nearWScale = mix(1.9, 1.0, smoothstep(0.0, 2.0, 1.0));
-        float width = 0.05 * (1.0 - t) * (0.6 + 0.6 * wRand) * nearWScale;
-
-        // Animate wind using a coherent noise field.
-        vec2 w1 = vec2(0.07, 0.05);
-        vec2 w2 = vec2(-0.03, 0.04);
-        float gust = 0.6 * sin(dot(baseCenter, w1) + uTime * 0.7) + 0.4 * sin(dot(baseCenter, w2) - uTime * 1.2);
-        float sway = (0.25 * gust) + 0.07 * sin(uTime * 1.7 + ph);
-        float bend = (t * t) * sway;
-
-        // Construct the final vertex position.
-        vec2 baseXZ = baseCenter + jitter;
-        vec3 base = vec3(baseXZ.x, 0.0, baseXZ.y);
-        vec3 right = NORMALIZE(uCamRight); // Billboard the blade towards the camera.
-        vec2 w = vec2(cos(0.3 * uTime), sin(0.32 * uTime)); // Two phases out of sync
-        w *= inversesqrt(dot(w,w) + 1e-3);   // add  0.001 to not mult by near 0
-        vec2 windDir = w; // consider calculating once per frame
-        vec3 bendOff = vec3(windDir.x, 0.0, windDir.y) * bend * H;
-        vec3 pos = base + right * (side * width) + vec3(0.0, t * H, 0.0) + bendOff;
-
-        // Biome-based color gradients
-        vec3 dry_c0 = vec3(0.12, 0.10, 0.01);
-        vec3 dry_c1 = vec3(0.45, 0.38, 0.05);
-        vec3 lush_c0 = vec3(0.05, 0.12, 0.02);
-        vec3 lush_c1 = vec3(0.30, 0.70, 0.22);
-        vec3 c0 = mix(dry_c0, lush_c0, biome);
-        vec3 c1 = mix(dry_c1, lush_c1, biome);
-        // Preserve original vertical gradient & slight random tint
-        vCol = mix(c0, c1, smoothstep(0.0, 1.0, t)) * (0.85 + 0.15 * hash12(tileKey * 11.1));
-
-        gl_Position = P * V * vec4(pos, 1.0);
-    }`;
+    precision highp float;uniform mat4 V,P;uniform vec2 uCamXZ;uniform vec3 uCamRight;uniform float uTime,uCell,uSeed;uniform sampler2D uNoise;uniform float uNoiseScale;out vec3 vCol;float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}vec2 h2(vec2 p){float n=sin(dot(p,vec2(1.,113.)));return fract(vec2(262144.*n,32768.*n));}void main(){int N=170;int i=gl_InstanceID;int ix=i%N-N/2;int iz=i/N-N/2;vec2 cF=floor(uCamXZ/uCell);vec2 C=cF+vec2(float(ix),float(iz));vec2 bC=(C+vec2(.5))*uCell;vec2 tK=floor(bC/uCell)+vec2(uSeed);vec2 j=(h2(tK)-.5)*(uCell*90.9);float hR=h(tK*3.1);float wR=h(tK*7.7);float ph=h(tK*5.3)*6.283;float B=texture(uNoise,bC*uNoiseScale).r;float H=mix(.6,.9,hR);float T=float(gl_VertexID/2)/4.;float s=float(gl_VertexID%2)*2.-1.;float nS=mix(1.9,1.,smoothstep(0.,2.,1.));float W=.05*(1.-T)*(.6+.6*wR)*nS;vec2 w1=vec2(.07,.05);vec2 w2=vec2(-.03,.04);float g=.6*sin(dot(bC,w1)+uTime*.7)+.4*sin(dot(bC,w2)-uTime*1.2);float S=(.25*g)+.07*sin(uTime*1.7+ph);float b=(T*T)*S;vec2 bXZ=bC+j;vec3 Bp=vec3(bXZ.x,0.,bXZ.y);vec3 R=normalize(uCamRight);vec2 w=vec2(cos(.3*uTime),sin(.32*uTime));w*=inversesqrt(dot(w,w)+1e-3);vec3 bO=vec3(w.x,0.,w.y)*b*H;vec3 pos=Bp+R*s*W+vec3(0.,T*H,0.)+bO;vec3 d0=vec3(.12,.1,.01);vec3 d1=vec3(.45,.38,.05);vec3 l0=vec3(.05,.12,.02);vec3 l1=vec3(.3,.7,.22);vec3 c0=mix(d0,l0,B);vec3 c1=mix(d1,l1,B);vCol=mix(c0,c1,smoothstep(0.,1.,T))*(.85+.15*h(tK*11.1));gl_Position=P*V*vec4(pos,1.);}`;
     const fsGrass = `#version 300 es
-    precision highp float;
-    in vec3 vCol;
-    out vec4 o;
-    void main(){ o = vec4(vCol, 1.0); }`;
+    precision highp float;in vec3 vCol;out vec4 o;void main(){ o = vec4(vCol, 1.0); }`;
 
     const PGRASS = prog(vsGrass, fsGrass);
     const uVG = gl.getUniformLocation(PGRASS, 'V'), uPG = gl.getUniformLocation(PGRASS, 'P');
@@ -1774,7 +1527,7 @@
     const uCamRight = gl.getUniformLocation(PGRASS, 'uCamRight');
     const uTimeG = gl.getUniformLocation(PGRASS, 'uTime');
     const uCell = gl.getUniformLocation(PGRASS, 'uCell');
-    const uGridN = gl.getUniformLocation(PGRASS, 'uGridN');
+    //const uGridN = gl.getUniformLocation(PGRASS, 'uGridN');
     //const uRadius = gl.getUniformLocation(PGRASS, 'uRadius');
     const uSeed = gl.getUniformLocation(PGRASS, 'uSeed');
     // NEW biome uniforms
@@ -1795,11 +1548,11 @@
     // -- SOLUTION: Scene-Plant--
     // Positions and scales for the scattered L-system plants.
     // --- Procedural plant field (infinite-style) ---
-    const PLANT_CELL = 6.0;          // World size of one plant decision cell
-    const PLANT_PROB = 0.3;         // Spawn probability per cell
-    const PLANT_RADIUS = 55.0;       // Active radius around camera (render window)
-    const PLANT_SCALE_MIN = 1.8;
-    const PLANT_SCALE_MAX = 3.0;
+    //const PLANT_CELL = 6.0;          // World size of one plant decision cell
+    //const PLANT_PROB = 0.3;         // Spawn probability per cell
+    //const PLANT_RADIUS = 55.0;       // Active radius around camera (render window)
+    //const PLANT_SCALE_MIN = 1.8;
+    //const PLANT_SCALE_MAX = 3.0;
     
     // Fast small hash (deterministic)
     function plantHash(ix, iz, salt){
@@ -1809,25 +1562,25 @@
     
     // Generate plants near (cx,cz); returns array of objects
     function genPlants(cx, cz){
-        const r = PLANT_RADIUS;
-        const c = PLANT_CELL;
-        const minX = FLOOR((cx - r)/c);
-        const maxX = FLOOR((cx + r)/c);
-        const minZ = FLOOR((cz - r)/c);
-        const maxZ = FLOOR((cz + r)/c);
+        //const r = PLANT_RADIUS;
+        //const c = 6.0;
+        const minX = FLOOR((cx - 55)/6.0);
+        const maxX = FLOOR((cx + 55)/6.0);
+        const minZ = FLOOR((cz - 55)/6.0);
+        const maxZ = FLOOR((cz + 55)/6.0);
         const out = [];
         for(let gz=minZ; gz<=maxZ; gz++){
             for(let gx=minX; gx<=maxX; gx++){
                 const h = plantHash(gx, gz, 0.0);
-                if(h < PLANT_PROB){
+                if(h < 0.3){
                     // Stable jitter inside cell
                     const jx = plantHash(gx, gz, 1.0) - 0.5;
                     const jz = plantHash(gx, gz, 2.0) - 0.5;
-                    const px = gx*c + (jx * c * 0.85) + c*0.5;
-                    const pz = gz*c + (jz * c * 0.85) + c*0.5;
+                    const px = gx*6.0 + (jx * 6.0 * 0.85) + 6.0*0.5;
+                    const pz = gz*6.0 + (jz * 6.0 * 0.85) + 6.0*0.5;
                     const dx = px - cx, dz = pz - cz;
-                    if(dx*dx + dz*dz <= r*r){
-                        const sc = PLANT_SCALE_MIN + (plantHash(gx, gz, 3.0) * (PLANT_SCALE_MAX - PLANT_SCALE_MIN));
+                    if(dx*dx + dz*dz <= 55*55){
+                        const sc = 1.8 + (plantHash(gx, gz, 3.0) * (3 - 1.8));
                         out.push({px, pz, scale: sc, gx, gz});
                     }
                 }
@@ -1836,130 +1589,11 @@
         return out;
     }
     
-    const vsPlants = `#version 300 es
-    precision highp float; // Use high precision for all float operations
-    layout(location=0) in vec3 p; // Input vertex position attribute at location 0
-    layout(location=1) in vec2 uv_in; // Input UV texture coordinate attribute at location 1
-    uniform mat4 M, V, P; // Model, View, and Projection matrices
-    out vec2 uv; // Pass UV coordinates to fragment shader
-    void main() { // Main vertex shader function
-        uv = uv_in; // Pass through UV coordinates unchanged
-        gl_Position = P * V * M * vec4(p, 1.0); // Transform vertex position to clip space
-    }`;
+    const vsPlants=`#version 300 es
+    precision highp float;layout(location=0)in vec3 p;layout(location=1)in vec2 uv_in;uniform mat4 M,V,P;out vec2 uv;void main(){uv=uv_in;gl_Position=P*V*M*vec4(p,1.0);}`;
 
     const fsPlants = `#version 300 es
-    precision highp float; // Use high precision for all float operations
-    in vec2 uv; // UV coordinates received from vertex shader
-    out vec4 o; // Output color for this fragment
-    uniform float uTime; // Time uniform for animation
-    uniform int uMaxIterations; // Control the quality/complexity
-    uniform vec3 uPlantPos; // World position of the plant
-    uniform float uPlantSeed; // Seed for this plant
-
-    #define PI 3.14159 // Define PI constant for mathematical calculations
-
-    mat3 Rot(float angle) { float c = cos(angle); float s = sin(angle); return mat3(vec3(c, s, 0), vec3(-s, c, 0), vec3(0, 0, 1)); }
-    mat3 Disp(vec2 displacement) { return mat3(vec3(1, 0, 0), vec3(0, 1, 0), vec3(displacement, 1)); }
-
-    float sdCappedCylinder(vec2 p, vec2 h) {
-        p -= vec2(0., h.y);
-        vec2 d = abs(vec2(length(p.x), p.y)) - h;
-        return min(max(d.x, d.y), 0.0) + length(max(d, 0.0));
-    }
-
-    // small hash helper inside shader
-    float hashf(float x){ return fract(sin(x)*43758.5453); }
-    float hash2(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
-
-    float center(vec2 pt) {
-        float baseAngle = 25.7 + uPlantSeed * 10.0;
-        mat3 posR = Rot(-(baseAngle / 360.) * 2. * PI);
-        mat3 negR = Rot(baseAngle / 360. * 2. * PI);
-
-        // Vary depth using seed (3..7)
-        int depth = 3 + int(uPlantSeed * 4.0);
-        const int branches = 3;
-        int maxDepth = 1; for(int i=0;i<depth;i++) maxDepth *= branches;
-        float len = 1.5;
-        float wid = .02;
-        pt = pt + vec2(0, 2);
-        float trunk = sdCappedCylinder(pt - vec2(0., 0.), vec2(wid, len));
-        float d = 500.;
-        int c = 0;
-
-        // Wind like grass
-        vec2 w1 = vec2(0.07, 0.05);
-        vec2 w2 = vec2(-0.03, 0.04);
-        float gust = 0.6 * sin(dot(uPlantPos.xz, w1) + uTime * 0.7) + 0.4 * sin(dot(uPlantPos.xz, w2) - uTime * 1.2);
-        float ph = fract(sin(dot(uPlantPos.xz, vec2(12.9898,78.233))) * 43758.5453) * 6.283;
-        float sway = (0.25 * gust) + 0.07 * sin(uTime * 1.7 + ph);
-        mat3 windMatrix = Rot(sway * 0.5);
-
-        for (int count = 0; count <  uMaxIterations; ++count) {
-            int off = 1; for(int i=0;i<depth;i++) off *= branches;
-            vec2 pt_n = pt;
-            for (int i = 1; i <= depth; ++i) {
-                float l = len / pow(2., float(i));
-                off /= branches;
-                int dec = c / off;
-                int path = dec - branches * (dec / branches);
-                mat3 mx;
-                if (path == 0) {
-                    mx = posR * Disp(vec2(0, -2. * l));
-                } else if (path == 1) {
-                    mx = windMatrix * negR * Disp(vec2(0, -2. * l));
-                } else {
-                    mx = windMatrix * Disp(vec2(0, -4. * l));
-                }
-                pt_n = (mx * vec3(pt_n, 1)).xy;
-                float y = sdCappedCylinder(pt_n, vec2(wid, l));
-                if (y - 2.0 * l > 0.0) { c += off - 1; break; }
-                d = min(d, y);
-                if (d < 0.01) break; // Early exit if we are inside a shape
-            }
-            if (d < 0.01) break; // And check again here to exit outer loop
-            ++c;
-            if (c > maxDepth) break;
-        }
-        return min(d, trunk);
-    }
-
-    void main() {
-        // compute distance field
-        vec2 p = (uv * 2.0 - 1.0) * 5.0;
-        p.y += 3.0;
-        float d = center(p);
-
-        // alpha from distance (same approach as before)
-        float t = clamp(d, 0.0, .04) * 2. * 12.5;
-        float alpha = 1.0 - t;
-        if (alpha < 0.05) discard;
-
-        // vertical gradient factor from vertex UV (0..1)
-        float height = clamp(uv.y, 0.0, 1.0);
-
-        // base green and orange palettes
-        vec3 green = vec3(0.3, 0.4, 0.1);
-        vec3 orange = vec3(0.5, 0.4, 0.2);
-
-        // random tint 0..1 from seed -> bias towards green or orange
-        float tint = hashf(uPlantSeed * 37.17);
-
-        // per-plant subtle brightness variation
-        float varb = 0.85 + 0.3 * hash2(uPlantPos.xz + vec2(uPlantSeed));
-
-        // mix base color between green and orange, then apply vertical gradient
-        vec3 base = mix(green, orange, smoothstep(0.0, 1.0, tint));
-        vec3 top = base * 1.;
-        vec3 bottom = base * 0.4;
-        vec3 col = mix(bottom, top, smoothstep(0.0, 1.0, height)) * varb;
-
-        // slight per-pixel noise to avoid banding
-        float n = hash2(uPlantPos.xz + uv*12.34);
-        col *= (0.97 + 0.06 * n);
-
-        o = vec4(col * alpha, alpha);
-    }`;
+    precision highp float;in vec2 uv;out vec4 o;uniform float uTime;uniform int uMaxIterations;uniform vec3 uPlantPos;uniform float uPlantSeed;mat3 R(float a){float c=cos(a),s=sin(a);return mat3(vec3(c,s,0),vec3(-s,c,0),vec3(0,0,1));}mat3 D(vec2 d){return mat3(vec3(1,0,0),vec3(0,1,0),vec3(d,1));}float C(vec2 p,vec2 h){p-=vec2(0.,h.y);vec2 d=abs(vec2(length(p.x),p.y))-h;return min(max(d.x,d.y),0.)+length(max(d,0.));}float hf(float x){return fract(sin(x)*43758.5453);}float h2(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}float E(vec2 p){float bA=25.7+uPlantSeed*10.;mat3 pR=R(-(bA/360.)*6.28318);mat3 nR=R(bA/360.*6.28318);int d=3+int(uPlantSeed*4.);const int B=3;int mD=1;for(int i=0;i<d;i++)mD*=B;float l=1.5;float w=.02;p=p+vec2(0,2);float t=C(p-vec2(0.,0.),vec2(w,l));float Dst=500.;int c=0;vec2 w1=vec2(.07,.05);vec2 w2=vec2(-.03,.04);float g=.6*sin(dot(uPlantPos.xz,w1)+uTime*.7)+.4*sin(dot(uPlantPos.xz,w2)-uTime*1.2);float ph=fract(sin(dot(uPlantPos.xz,vec2(12.9898,78.233)))*43758.5453)*6.283;float s=(.25*g)+.07*sin(uTime*1.7+ph);mat3 wM=R(s*.5);for(int i=0;i<uMaxIterations;++i){int O=1;for(int j=0;j<d;j++)O*=B;vec2 p_n=p;for(int j=1;j<=d;++j){float L=l/pow(2.,float(j));O/=B;int dec=c/O;int path=dec-B*(dec/B);mat3 mx;if(path==0){mx=pR*D(vec2(0,-2.*L));}else if(path==1){mx=wM*nR*D(vec2(0,-2.*L));}else{mx=wM*D(vec2(0,-4.*L));}p_n=(mx*vec3(p_n,1)).xy;float y=C(p_n,vec2(w,L));if(y-2.*L>0.){c+=O-1;break;}Dst=min(Dst,y);if(Dst<.01)break;}if(Dst<.01)break;++c;if(c>mD)break;}return min(Dst,t);}void main(){vec2 p=(uv*2.-1.)*5.;p.y+=3.;float d=E(p);float t=clamp(d,0.,.04)*25.;float a=1.-t;if(a<.05)discard;float h=clamp(uv.y,0.,1.);vec3 G=vec3(.3,.4,.1);vec3 O=vec3(.5,.4,.2);float T=hf(uPlantSeed*37.17);float v=0.85+0.3*h2(uPlantPos.xz+vec2(uPlantSeed));vec3 b=mix(G,O,smoothstep(0.,1.,T));vec3 c=mix(b*.4,b,smoothstep(0.,1.,h))*v;float n=h2(uPlantPos.xz+uv*12.34);c*=(.97+.06*n);o=vec4(c*a,a);}`;
 
     const PPLANTS = prog(vsPlants, fsPlants); // Compile and link plant shader program
     const uMPla = gl.getUniformLocation(PPLANTS, 'M'); // Get location of Model matrix uniform
@@ -2105,19 +1739,19 @@
         const Vinv = INV(V);
         gl.uniformMatrix4fv(uVinv, false, Vinv);
         gl.uniformMatrix4fv(uInvPV, false, invPV);
-        gl.uniform3fv(uSun, [0.1, 0.1, -0.9]);
+        //gl.uniform3fv(uSun, [0.1, 0.1, -0.9]);
 
         // Noise texture for clouds
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, noiseTex);
         gl.uniform1i(uNoiseSky, 1);
         gl.uniform1f(uTimeSky, t * 0.001);
-        gl.uniform1f(uCoverage, cloudCoverage);
-        gl.uniform1f(uSharpness, cloudSharpness);
-        gl.uniform1i(uShadowSamples, shadowSamples);
-        gl.uniform1f(uCloudHeightLoc, cloudHeight);
-        gl.uniform1f(uCloudScaleLoc, cloudScale);
-        gl.uniform1f(uCloudMotionSpeedLoc, cloudMotionSpeed);
+        //gl.uniform1f(uCoverage, cloudCoverage);
+        //gl.uniform1f(uSharpness, cloudSharpness);
+        //gl.uniform1i(uShadowSamples, shadowSamples);
+        //gl.uniform1f(uCloudHeightLoc, cloudHeight);
+        //gl.uniform1f(uCloudScaleLoc, cloudScale);
+        //gl.uniform1f(uCloudMotionSpeedLoc, cloudMotionSpeed);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
         gl.enable(gl.DEPTH_TEST);
 
@@ -2321,7 +1955,7 @@
         gl.uniform3f(uCamRight, camRight[0], camRight[1], camRight[2]);
         gl.uniform1f(uTimeG, timeSec);
         gl.uniform1f(uCell, cell);
-        gl.uniform1i(uGridN, gridN | 0);
+        //gl.uniform1i(uGridN, gridN | 0);
         gl.uniform1f(uSeed, seed);
         // Bind noise texture once per pass
         gl.activeTexture(gl.TEXTURE0);
@@ -2329,7 +1963,7 @@
         gl.uniform1i(uNoise, 0);
         gl.uniform1f(uNoiseScale, 0.0002); // adjust for biome size (smaller = larger biomes)
         gl.enable(gl.DEPTH_TEST);
-        gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, GRASS_VCOUNT, gridN * gridN);
+        gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 10, gridN * gridN);
     }
 
     // Computes the view and projection matrices for desktop mode
@@ -2482,19 +2116,19 @@
             gl.disable(gl.DEPTH_TEST);
             gl.uniformMatrix4fv(uVinv, false, VinvEye);
             gl.uniformMatrix4fv(uInvPV, false, invPVEye);
-            gl.uniform3fv(uSun, [0.1, 0.1, -0.9]);
+            //gl.uniform3fv(uSun, [0.1, 0.1, -0.9]);
 
             // Sky uniforms per-eye (same tuning rules apply)
             gl.activeTexture(gl.TEXTURE1);
             gl.bindTexture(gl.TEXTURE_2D, noiseTex);
             gl.uniform1i(uNoiseSky, 1);
             gl.uniform1f(uTimeSky, t * 0.001);
-            gl.uniform1f(uCoverage, cloudCoverage);
-            gl.uniform1f(uSharpness, cloudSharpness);
-            gl.uniform1i(uShadowSamples, shadowSamples);
-            gl.uniform1f(uCloudHeightLoc, cloudHeight);
-            gl.uniform1f(uCloudScaleLoc, cloudScale);       // adjust for global cloud size
-            gl.uniform1f(uCloudMotionSpeedLoc, cloudMotionSpeed);
+            //gl.uniform1f(uCoverage, cloudCoverage);
+            //gl.uniform1f(uSharpness, cloudSharpness);
+            //gl.uniform1i(uShadowSamples, shadowSamples);
+            //gl.uniform1f(uCloudHeightLoc, cloudHeight);
+            //gl.uniform1f(uCloudScaleLoc, cloudScale);       // adjust for global cloud size
+            //gl.uniform1f(uCloudMotionSpeedLoc, cloudMotionSpeed);
             gl.drawArrays(gl.TRIANGLES, 0, 3);
             gl.enable(gl.DEPTH_TEST);
 
