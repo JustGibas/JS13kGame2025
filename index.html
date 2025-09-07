@@ -722,142 +722,23 @@
 
     }
     // -- SOLUTION: Scene-Audio-Wind --
+    // Minimal wind: one looping brown-noise buffer -> lowpass -> gain.
     function playWindSound(){
         if(!audioCtx) return;
-        
-        const t = audioCtx.currentTime;
-        const bufferSize = audioCtx.sampleRate * 3; // 3 seconds of audio
-        const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-        const data = buffer.getChannelData(0);
-        
-        // Generate brown noise (filtered white noise for wind-like sound)
-        let lastOut = 0;
-        for (let i = 0; i < bufferSize; i++) {
-            const white = RANDOM() * 2 - 1;
-            const brown = (lastOut + (0.01 * white)) / 1.03;
-            data[i] = brown; //  *3 Amplify
-            lastOut = brown;
-        }
-        
-        const source = audioCtx.createBufferSource();
-        const filter = audioCtx.createBiquadFilter();
-        const gain = audioCtx.createGain(); // legacy (kept for compatibility / master)
-        // NEW: stereo nodes
-        const leftDelay = audioCtx.createDelay(0.01);   // up to 10ms (we will use < 1ms)
-        const rightDelay = audioCtx.createDelay(0.01);
-        const leftGain  = audioCtx.createGain();
-        const rightGain = audioCtx.createGain();
-        const merger    = audioCtx.createChannelMerger(2);
-        const master    = audioCtx.createGain();
-        
-        source.buffer = buffer;
-        source.loop = true;
-        filter.type = 'lowpass';
-        filter.frequency.value = 200;
-        filter.Q.value = 1.1;
-        // Wiring (duplicate mono to two ears with independent delay/gain)
-        source.connect(filter);
-        filter.connect(leftDelay);
-        filter.connect(rightDelay);
-        leftDelay.connect(leftGain);
-        rightDelay.connect(rightGain);
-        leftGain.connect(merger, 0, 0);
-        rightGain.connect(merger, 0, 1);
-        merger.connect(master);
-        master.connect(audioCtx.destination);
-        // Fade-in
-        master.gain.setValueAtTime(0, t);
-        master.gain.linearRampToValueAtTime(0.2, t + 4);
-        source.start();
-        // expose nodes for updates
-        audioCtx.windSource = source;
-        audioCtx.windFilter = filter;
-        audioCtx.windMaster = master;
-        audioCtx.windLeftGain = leftGain;
-        audioCtx.windRightGain = rightGain;
-        audioCtx.windLeftDelay = leftDelay;
-        audioCtx.windRightDelay = rightDelay;
+        const N=audioCtx.sampleRate*2, b=audioCtx.createBuffer(1,N,audioCtx.sampleRate), d=b.getChannelData(0);
+        let l=0;for(let i=0;i<N;i++){const w=RANDOM()*2-1;d[i]=l=(l+0.02*w)/1.02;}
+        const s=audioCtx.createBufferSource();s.buffer=b;s.loop=true;
+        const f=audioCtx.createBiquadFilter();f.type='lowpass';f.frequency.value=300;f.Q.value=.7;
+        const g=audioCtx.createGain();g.gain.value=0; s.connect(f);f.connect(g);g.connect(audioCtx.destination);s.start();
+        audioCtx.windFilter=f;audioCtx.windGain=g;audioCtx.windStart=audioCtx.currentTime;
     }
-
-    // Reuse existing gust computation
-    // --- Wind gust math (mirror of grass shader) ---
-        // in serch of smple and efficient periodic functions
-        // Compute gust/sway values using same vectors and time constants as the grass vertex shader
-        function computeGustAt(x, z, timeSec) {
-            // same direction vectors used in the grass vertex shader
-            const w1x = 0.07, w1y = 0.05;
-            const w2x = -0.03, w2y = 0.04;
-
-            const dot1 = x * w1x + z * w1y;
-            const dot2 = x * w2x + z * w2y;
-
-            const g = 0.6 * SIN(dot1 + timeSec * 0.7) + 0.4 * SIN(dot2 - timeSec * 1.2);
-            // small global phase term similar to per-blade phase in shader
-            const sway = 0.25 * g + 0.07 * SIN(timeSec * 1.7 + 0.0);
-            return { gust: g, sway: sway };
-        }
-
-    // NEW: approximate local wind vector from gust field gradient (finite difference)
-    function computeWindVector(x, z, timeSec){
-        const eps = 0.5;
-        const gX1 = computeGustAt(x + eps, z, timeSec).gust;
-        const gX0 = computeGustAt(x - eps, z, timeSec).gust;
-        const gZ1 = computeGustAt(x, z + eps, timeSec).gust;
-        const gZ0 = computeGustAt(x, z - eps, timeSec).gust;
-        // gradient
-        let gx = (gX1 - gX0) / (2*eps);
-        let gz = (gZ1 - gZ0) / (2*eps);
-        // Flow taken perpendicular to gradient (simulate flow along isobars)
-        let vx = -gz;
-        let vz =  gx;
-        const len = HYPOT(vx, vz) || 1;
-        vx /= len; vz /= len;
-        // Slowly rotate vector for variety
-        const rot = 0.2 * SIN(timeSec * 0.05);
-        const cr = COS(rot), sr = SIN(rot);
-        const rvx = vx*cr - vz*sr;
-        const rvz = vx*sr + vz*cr;
-        return {x:rvx, z:rvz, speed: len};
-    }
-
-    // Enhanced wind update with stereo spatialization
-    function updateWind(timeSec, camX, camZ, yaw) {
-        if (!audioCtx || !audioCtx.windMaster) return;
-        const now = audioCtx.currentTime;
-        const s = computeGustAt(camX, camZ, timeSec);
-        const wind = computeWindVector(camX, camZ, timeSec);
-        // Loudness & brightness from sway (as before)
-        const baseGain = 0.08;
-        const gainScale = 0.6;
-        let targetGain = baseGain + gainScale * s.sway;
-        targetGain = MAX(0.01, MIN(1.0, targetGain));
-        audioCtx.windMaster.gain.setTargetAtTime(targetGain, now, 0.25);
-        // Filter brightness from sway
-        const baseFreq = 200;
-        const norm = (s.sway + 0.32) / 0.64;
-        const freq = baseFreq + norm * 1200;
-        audioCtx.windFilter.frequency.setTargetAtTime(freq, now, 0.25);
-        // --- Stereo cues ---
-        // Relative angle: wind vector vs listener forward (yaw)
-        const relAngle = ATAN2(wind.x, wind.z) - yaw;
-        // Wrap to [-PI, PI]
-        const a = ATAN2(SIN(relAngle), COS(relAngle));
-        const pan = SIN(a); // -1 (left) .. +1 (right)
-        // ILD (small): modify per-ear gains
-        const ildAmt = 0.3; // strength of level difference
-        const leftLevel = 1 - ildAmt * pan;
-        const rightLevel = 1 + ildAmt * pan;
-        audioCtx.windLeftGain.gain.setTargetAtTime(leftLevel, now, 0.15);
-        audioCtx.windRightGain.gain.setTargetAtTime(rightLevel, now, 0.15);
-        // ITD (max ~0.7ms)
-        const maxITD = 0.0007;
-        const itd = maxITD * pan;
-        const dL = itd > 0 ? itd : 0;
-        const dR = itd < 0 ? -itd : 0;
-        audioCtx.windLeftDelay.delayTime.setTargetAtTime(dL, now, 0.05);
-        audioCtx.windRightDelay.delayTime.setTargetAtTime(dR, now, 0.05);
-        // Optional subtle extra high-frequency boost when facing wind
-        // (Could add an additional peaking filter; kept simple here)
+    // Compact sway (mirrors grass shader math) returns sway value only.
+    function windSway(x,z,t){const g=.6*SIN(x*.07+z*.05+t*.7)+.4*SIN(x*-0.03+z*.04-t*1.2);return .25*g+.07*SIN(t*1.7);}    
+    function updateWind(timeSec,camX,camZ){
+        if(!audioCtx||!audioCtx.windGain) return;const now=audioCtx.currentTime;const s=windSway(camX,camZ,timeSec);
+        // Gain & brightness from sway (no stereo)
+        const gain=0.02+0.01*MAX(0,s+0.3);audioCtx.windGain.gain.setTargetAtTime(gain,now,.3);
+        const freq=250+900*MAX(0,s+0.2);audioCtx.windFilter.frequency.setTargetAtTime(freq,now,.3);
     }
     // -- /SOLUTION: Scene-Audio-Wind --
     // -- SOLUTION: Scene-Audio-Click --
@@ -1726,7 +1607,7 @@
         // Update camera matrices
         buildViewProj();
         // NEW: update wind stereo each frame (after camera matrix updated)
-        if(audioCtx) updateWind(t/1000, user.x, user.z, user.yaw);
+    if(audioCtx) updateWind(t/1000, user.x, user.z);
         // --- Rendering ---
         gl.viewport(0, 0, canvas.width, canvas.height);
         gl.clearColor(0, 0, 0, 1);
@@ -2042,7 +1923,7 @@
         if (!pose) return;
         
         // NEW: update wind stereo each frame (after camera matrix updated)
-        if(audioCtx) updateWind(t/1000, user.x, user.z, user.yaw);
+    if(audioCtx) updateWind(t/1000, user.x, user.z);
 
         // Apply movement based on controller input
         const mv = getMove(s);
