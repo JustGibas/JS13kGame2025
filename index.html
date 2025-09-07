@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>'Wild Cats' 13K Game 2025</title>
-    <!--link rel="icon" type="image/svg+xml" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="55%" x="50%" dominant-baseline="middle" text-anchor="middle" font-size="80">🐈‍⬛</text></svg>'-->
+    <!--<link rel="icon" type="image/svg+xml" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="55%" x="50%" dominant-baseline="middle" text-anchor="middle" font-size="80">🐈‍⬛</text></svg>'>-->
     <style>
         /* Basic styles to make the canvas and joysticks fill the screen */
         html, body {
@@ -1406,64 +1406,46 @@
     // -- /SOLUTION: Scene-Plant1--
     // -- /MODULE: Scene-Plant --
     
-    // -- MODULE: Scene-Reticle --
-    // --- Reticle Shader ---
-    // A small disc drawn on the ground where the user is looking
-    const vsR = `#version 300 es
-    precision highp float;
-    layout(location=0) in vec2 p;
-    uniform mat4 M, V, P;
-    out vec2 uv;
-    void main(){
-        uv = p * 0.5 + 0.5;
-        gl_Position = P * V * M * vec4(p.x, 0.0, p.y, 1.0);
-    }`;
-    const fsR = `#version 300 es
-    precision highp float;
-    in vec2 uv;
-    out vec4 o;
-    void main(){
-        float d = distance(uv, vec2(0.5));
-        float ring = smoothstep(0.5, 0.4, d) - smoothstep(0.4, 0.3, d);
-        o = vec4(0.9, 1.0, 0.9, ring * 0.95);
-        if(o.a < 0.02) discard;
-    }`;
-    const PR = prog(vsR, fsR);
-    const uMR = gl.getUniformLocation(PR, 'M'), uVR = gl.getUniformLocation(PR, 'V'), uPR = gl.getUniformLocation(PR, 'P');
-    const vboR = gl.createBuffer(), vaoR = gl.createVertexArray();
-    gl.bindVertexArray(vaoR);
-    gl.bindBuffer(gl.ARRAY_BUFFER, vboR);
-    gl.bufferData(gl.ARRAY_BUFFER, new F32([-1,-1, 1,-1, 1,1, -1,-1, 1,1, -1,1]), gl.STATIC_DRAW);
-    gl.enableVertexAttribArray(0);
-    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-    // -- MODULE: Scene-Reticle --
+    // -- MODULE: Scene-VR (hand disc only) --
+    // Reticle removed; single disc shader used for VR hand/grip indicator
 
-    // -- MODULE: Scene-VR --
-    // --- Controller Indicator Shaders ---
-    // Disc for hand position
     const vsDisc = `#version 300 es
     precision highp float;
     layout(location=0) in vec2 p;
     uniform mat4 M,V,P;
     out vec2 uv;
     void main(){
-        uv=p*0.5+0.5;
-        gl_Position=P*V*M*vec4(p.x,0.,p.y,1.);
+        uv = p * 0.5 + 0.5;
+        gl_Position = P * V * M * vec4(p.x, 0.0, p.y, 1.0);
     }`;
+
     const fsDisc = `#version 300 es
     precision highp float;
     in vec2 uv;
     uniform vec4 col;
-    out vec4 o; 
+    out vec4 o;
     void main(){
-        float d=distance(uv,vec2(0.5));
-        float ring=smoothstep(0.5,0.4,d)-smoothstep(0.4,0.3,d);
-        o=vec4(col.rgb, col.a*ring);
-        if(o.a<0.02) discard;
+        float d = distance(uv, vec2(0.5));
+        float ring = smoothstep(0.5, 0.4, d) - smoothstep(0.4, 0.3, d);
+        o = vec4(col.rgb, col.a * ring);
+        if (o.a < 0.02) discard;
     }`;
 
     const PDisc = prog(vsDisc, fsDisc);
-    const uMDisc = gl.getUniformLocation(PDisc, 'M'), uVDisc = gl.getUniformLocation(PDisc, 'V'), uPDisc = gl.getUniformLocation(PDisc, 'P'), uColDisc = gl.getUniformLocation(PDisc, 'col');
+    const uMDisc = gl.getUniformLocation(PDisc, 'M'),
+          uVDisc = gl.getUniformLocation(PDisc, 'V'),
+          uPDisc = gl.getUniformLocation(PDisc, 'P'),
+          uColDisc = gl.getUniformLocation(PDisc, 'col');
+
+    const vboR = gl.createBuffer(), vaoR = gl.createVertexArray();
+    gl.bindVertexArray(vaoR);
+    gl.bindBuffer(gl.ARRAY_BUFFER, vboR);
+    // Quad for a 2D disc (two triangles), same layout used elsewhere
+    gl.bufferData(gl.ARRAY_BUFFER, new F32([-1,-1,  1,-1,  1,1,  -1,-1,  1,1,  -1,1]), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+    // -- /MODULE: Scene-VR --
 
     // Beam for pointing ray.
     const vsBeam = `#version 300 es
@@ -1778,7 +1760,7 @@
             log('WebXR not available');
             return;
         }
-        navigator.xr.isSessionSupported('immersive-vr').then(s => log(s ? 'VR supported' : 'VR not supported'));
+        navigator.xr.isSessionSupported('immersive-vr').then(s => log(s ? 'VR supported: click Enter VR button' : 'VR not supported: try a different browser'));
     }
     // if vr not avalable we split screen in to stereo view
 
@@ -2116,8 +2098,8 @@
                     const triggerVal = (src.gamepad && src.gamepad.buttons && src.gamepad.buttons[0]) ? (src.gamepad.buttons[0].value || 0) : 0;
                     const w = 0.004 + 0.01 * triggerVal; // Beam gets thicker when trigger is pressed
                     let len = 3.0;
-                    const tGround = (0 - r.o[1]) / r.d[1];
-                    if (tGround > 0) len = MIN(len, MIN(5.0, tGround));
+                    //const tGround = (0 - r.o[1]) / r.d[1];
+                    //if (tGround > 0) len = MIN(len, MIN(5.0, tGround));
                     const h = HUD_pick(WH, r, currentUI());
                     if (h) len = MIN(len, h.t); // Shorten beam if it hits the HUD
                     
