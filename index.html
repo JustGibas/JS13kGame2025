@@ -1494,9 +1494,11 @@
     // --- Application Entry Point ---
     (function main() {
         requestAnimationFrame(loop);
-        log(`App initialized ${isMobile ? '(Mobile)' : '(Desktop)'} — JustGibas VR 13K Game 2025`);
-        log('Use the top "HUD" button (or H key) to open/close HUD');
-        log('Use (WASD) to move and (Q & E) to rotate');
+        log(`Welcome Catch the black cat!`);
+        log('close HUD using Close button X (H & Esc)');
+        if (!isMobile) log('Use (WASD) to move and (Q & E) to rotate');
+        if (isMobile) log('Use left joystick to move and right joystick to rotate');
+        log('Use touch-drag to Look around');
     })();
     
     // -- /FEATURE: CORE --
