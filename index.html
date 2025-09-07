@@ -2009,7 +2009,7 @@
 
             // Render Controller Indicators and Rays
             for (const src of s.inputSources) {
-                const col = src.handedness === 'left' ? [0, 0.8, 1] : src.handedness === 'right' ? [1, 0, 0.8] : [0.5, 0.5, 1];
+                const col = [1, 1, 0.5]
 
                 // Hand grip indicator
                 const grip = src.gripSpace ? frame.getPose(src.gripSpace, off) : null;
