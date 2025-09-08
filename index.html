@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>'Wild Cats' 13K Game 2025</title>
+    <title>'Wild Catch' 13K Game 2025</title>
     <!--<link rel="icon" type="image/svg+xml" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="55%" x="50%" dominant-baseline="middle" text-anchor="middle" font-size="80">🐈‍⬛</text></svg>'>-->
     <style>
         /* Basic styles to make the canvas and joysticks fill the screen */
@@ -110,7 +110,7 @@
     const canvas = document.getElementById('canvas');
     
    // State variables for the user/camera, rendering loop, and WebGL/WebXR contexts
-    let user = { x: 0, y: 1.6, z: 2, yaw: 0, pitch: 0 }; // User position and orientation
+    let user = { x: 0, y: 1.6, z: 2, yaw: 0, pitch: 0.2 }; // User position and orientation
     let prevUserX = user.x, prevUserZ = user.z; // previous frame planar position
     let userVelX = 0, userVelZ = 0;             // planar velocity for cat pursuit
     let last = 0; // Timestamp of the last frame for calculating delta time
@@ -847,7 +847,7 @@
     // UI button definitions. Each object defines a button's ID, position (in UV space), label, and click handler
     let uiEnterLabel = 'Enter VR';
     const UI_MAIN = [
-        { id: 'reset', u0: 0.4, v0: 0.1, u1: 0.7, v1: 0.2, label: 'Reset', onClick: () => { playClickSound(); user.x = 0; user.z = 2; user.yaw = 0; user.pitch = 0; log('reset position'); } },
+        { id: 'reset', u0: 0.4, v0: 0.1, u1: 0.7, v1: 0.2, label: 'Reset', onClick: () => { playClickSound(); user.x = 0; user.z = 2; user.yaw = 0; user.pitch = 0.2; resetCatPosition(); log('reset position'); } },
         { id: 'vr', u0: 0.4, v0: 0.3, u1: 0.7, v1: 0.4, label: () => uiEnterLabel, onClick: () => { playClickSound(); toggleXRFromUI(); } },
         //{ id: 'logtog', u0: 0.85, v0: 0.5, u1: 0.98, v1: 0.6 , label: 'LOG', onClick: () => { playClickSound(); logVisible = !logVisible; } },
         { id: 'logdn', u0: 0.85, v0: 0.8, u1: 0.98, v1: 0.9, label: 'Down', onClick: () => { playClickSound(); logScroll = MAX(0, logScroll - 1); } },
