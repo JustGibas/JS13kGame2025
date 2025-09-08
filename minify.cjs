@@ -68,15 +68,15 @@ const { minify: minifyHTML } = require("html-minifier-terser");
       drop_debugger: true,       // Remove debugger statements.
       arrows: true,              // Use arrow funcs where smaller.
       // EXTRA AGGRESSIVE ADDITIONS:
-      keep_fargs: false,         // Drop unused function args (RISK: arity-based logic breaks).
-      keep_fnames: false,        // Allow renaming/dropping function names (breaks .name or stack traces).
-      side_effects: true,        // Prune calls/expressions marked pure or provably unused.
+      //keep_fargs: false,         // Drop unused function args (RISK: arity-based logic breaks).
+      //keep_fnames: false,        // Allow renaming/dropping function names (breaks .name or stack traces).
+      //side_effects: true,        // Prune calls/expressions marked pure or provably unused.
       //merge_vars: true,          // Merge and reuse variable declarations.
-      negate_iife: true,         // !function(){}() -> (function(){}()) shorter where legal.
-      unsafe_comps: true,        // Reorder comparisons (RISK with NaN/order edge cases).
-      unsafe_proto: true,        // Optimize obj.__proto__ patterns (RISK if messing with prototypes).
-      unsafe_regexp: true,       // Simplify some RegExps (RISK rare).
-      unsafe_undefined: true,    // Replace undefined with void 0, assume not reassigned.
+      //negate_iife: true,         // !function(){}() -> (function(){}()) shorter where legal.
+      //unsafe_comps: true,        // Reorder comparisons (RISK with NaN/order edge cases).
+      //unsafe_proto: true,        // Optimize obj.__proto__ patterns (RISK if messing with prototypes).
+      //unsafe_regexp: true,       // Simplify some RegExps (RISK rare).
+      //unsafe_undefined: true,    // Replace undefined with void 0, assume not reassigned.
       //unsafe_passes: true,       // Re-run certain unsafe transforms for more gains.
       // pure_funcs: ['console.log','console.info','console.warn'], // Uncomment to drop these calls.
       // drop_console: true,     // Remove all console.* (RISK: lose debug info).
@@ -90,7 +90,7 @@ const { minify: minifyHTML } = require("html-minifier-terser");
 
   // OPTIONAL "second pass" with ultra-aggressive settings.
   // Toggle here (no CLI flags).
-  const SECOND_PASS = true;
+  const SECOND_PASS = false;
 
   // This pass tries to push size further:
   // - Higher 'passes'
