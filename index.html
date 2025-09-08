@@ -654,6 +654,8 @@
     let audioCtx = null;
     let lastStepTime = 0;
     const stepInterval = 500; // ms between walking sounds
+    // Global toggle for step/adaptive music sounds
+    let music = true;
     
     function initAudio(){
       if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -862,7 +864,7 @@
         m.beatDur = 60/tempo; // 1 beat = quarter note
         const targetGain = (m.energy===0)?0: (0.05 + 0.2*m.energy);
         m.g.gain.setTargetAtTime(targetGain, now, 0.2);
-        while(now >= m.nextBeat){
+        while(music && now >= m.nextBeat){
             emitChipBeat(m);
             m.nextBeat += m.beatDur/2; // 8th-note resolution for more activity
         }
