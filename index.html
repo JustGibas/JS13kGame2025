@@ -423,6 +423,8 @@
     // -- MODULE: Gameplay-Cat --
     // Stylized Black Cat entity the player must catch. Cat roams near center, avoids player, drops boosts & obstacles.
     const cat = { x:0, y:0.6, z:0, vx:0, vz:0, caught:0, drop:1.2, baseS:3, anim:0, evade:0, yaw:0 };
+    // Tracks if player is actively chasing (close & moving). Used to gate music build-up.
+    let chaseActive = false;
     //const CAT_MAX_R = 1000;        // Hard clamp so cat never wanders too far
     //const CAT_PREF_R = 50;       // Preferred roaming radius from origin
     //const CAT_CATCH_R = 0.5;     // Distance threshold to count as caught
@@ -442,13 +444,13 @@
             items.push({x, y:0.5, z, r:0.4, active:true});
             if(audioCtx) {
                 //playClickSound();
-                spawnBell(audioCtx.currentTime, 870, window.chipMusic, 0.1);
+                bell(audioCtx.currentTime, 870, window.chipMusic, 0.1);
             }
         }else{
             traps.push({x, y:0.6, z, r:0.6});
             if(audioCtx) {
                 //playClickSound();
-                spawnBell(audioCtx.currentTime, 660, window.chipMusic, 0.2);
+                bell(audioCtx.currentTime, 660, window.chipMusic, 0.2);
             }
         }
         if(items.length>2) items.splice(0, items.length-2);
@@ -537,7 +539,8 @@
         // Friction
         cat.vx *= (1 - 1.1*dt); cat.vz *= (1 - 1.1*dt);
         // Chase detection (player near & moving)
-        const chased = (dP2 < 10*10 && playerMoveMag>0.15);
+    const chased = (dP2 < 10*10 && playerMoveMag>0.15);
+    chaseActive = chased;
         if(chased){ cat.drop -= dt; if(cat.drop<=0){ spawnDrop(cat.x, cat.z); cat.drop = 1.9 + RANDOM()*0.8; } }
         // Animation clock
         cat.anim += sp*dt*3.5;
@@ -546,9 +549,9 @@
             cat.caught++; log('Cat caught #' + cat.caught);
             if(audioCtx) {
                 //playClickSound();
-                spawnBell(audioCtx.currentTime, 800, window.chipMusic, 0.5);
-                spawnBell(audioCtx.currentTime+0.1, 1000, window.chipMusic, 0.3);
-                spawnBell(audioCtx.currentTime+0.2, 1200, window.chipMusic, 0.4);
+                bell(audioCtx.currentTime, 800, window.chipMusic, 0.5);
+                bell(audioCtx.currentTime+0.1, 1000, window.chipMusic, 0.3);
+                bell(audioCtx.currentTime+0.2, 1200, window.chipMusic, 0.4);
             }
             if(speedBoosts.length < 10) speedBoosts.push({timeLeft:15, amount:0.3});
             resetCatPosition();
@@ -590,7 +593,7 @@
                 }
                 if(audioCtx) {
                     //playClickSound();
-                    spawnBell(audioCtx.currentTime, 880 * POW(2, ((RANDOM()*6)|0)/6), window.chipMusic, 0.2);
+                    bell(audioCtx.currentTime, 880 * POW(2, ((RANDOM()*6)|0)/6), window.chipMusic, 0.2);
                 }
             }
         }
@@ -768,20 +771,41 @@
                 sc:[0,-1,2,3,5,7]};
         }
     }
-    function updateAdaptiveMusic(mv,dt){if(!audioCtx||!window.chipMusic)return;const m=window.chipMusic,now=audioCtx.currentTime;
-        if(mv>0.1){m.eng=MIN(1,m.eng+.05*dt);m.last=now;}else if(now-m.last>.8)m.eng=MAX(0,m.eng-.2*dt);
-        const tempo=m.b0+(m.b1-m.b0)*POW(m.eng,.7);m.bd=60/tempo;const tg=m.eng?0.05+.2*m.eng:0;m.g.gain.setTargetAtTime(tg,now,.2);
-        while(now>=m.next){emitBeat(m);m.next+=m.bd/2;} if(m.eng===0&&now-m.last>5)m.g.gain.setTargetAtTime(.0001,now,1);
+    function updateAdaptiveMusic(mv,dt){
+        if(!audioCtx||!window.chipMusic)return;const m=window.chipMusic,now=audioCtx.currentTime;
+        // base engagement rise only if moving AND either chasing or has boosts
+        const boostLevel = speedBoosts.length; // 0..10 typical
+        const boostFactor = MIN(1, boostLevel*0.08); // up to +0.8 contribution
+        const active = mv>0.1 && (chaseActive || boostLevel>0);
+        if(active){
+            // faster build if actually chasing; slower if only boosts
+            const build = (chaseActive?0.08:0.04) + 0.03*boostFactor;
+            m.eng=MIN(1,m.eng+build*dt);m.last=now;
+        } else if(now-m.last> (chaseActive?0.6:0.9)) {
+            // decay slower when recently chasing
+            const decay = chaseActive?0.15:0.10;
+            m.eng=MAX(0,m.eng-decay*dt);
+        }
+        // tempo scaled also by boosts (slight) but clamp if not chasing (cap energy effect)
+        const effEng = chaseActive?m.eng: m.eng*0.6; // limit build when passive
+        const tempoBoost = 1 + boostFactor*0.25; // up to +25% at max boosts
+        const tempo = (m.b0+(m.b1-m.b0)*POW(effEng,.7))*tempoBoost;
+        m.bd=60/tempo;
+        const baseGain = effEng?0.05+.18*effEng:0;
+        // small additive layer from boosts while chasing
+        const tg = baseGain + (chaseActive?boostFactor*0.05:0);
+        m.g.gain.setTargetAtTime(tg,now,.25);
+        while(now>=m.next){emitBeat(m);m.next+=m.bd/2;}
+        if(m.eng===0&&now-m.last>5)m.g.gain.setTargetAtTime(.0001,now,1);
     }
     function emitBeat(m){const t=audioCtx.currentTime; m.st++;const i=m.st%16; // drums
         if(m.eng>.2 && m.k[i]==='1') kick(t,m);
         if(m.eng>.35&& m.s[i]==='1') snare(t,m);
         const b=m.bl[m.st % m.bl.length]; if(b!=='_'&&m.eng>.3){ const sem=m.sc[+b]||0; bell(t,980*POW(2,sem/12),m); }
     }
-    function kick(t,m){const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='sine';o.frequency.setValueAtTime(120,t);o.frequency.exponentialRampToValueAtTime(50,t+.18);g.gain.setValueAtTime(.001,t);g.gain.exponentialRampToValueAtTime(.5*(.4+.6*m.eng),t+.01);g.gain.exponentialRampToValueAtTime(.0001,t+.22);o.connect(g);g.connect(m.g);o.start(t);o.stop(t+.24);}    
+    function kick(t,m){const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='sine';o.frequency.setValueAtTime(120,t);o.frequency.exponentialRampToValueAtTime(50,t+.18);g.gain.setValueAtTime(.001,t);g.gain.exponentialRampToValueAtTime(.2*(.4+.4*m.eng),t+.01);g.gain.exponentialRampToValueAtTime(.0001,t+.22);o.connect(g);g.connect(m.g);o.start(t);o.stop(t+.24);}    
     function snare(t,m){const n=audioCtx.createBufferSource(),B=audioCtx.createBuffer(1,audioCtx.sampleRate*.18,audioCtx.sampleRate),d=B.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(RANDOM()*2-1)*POW(1-i/d.length,1.8);n.buffer=B;const bp=audioCtx.createBiquadFilter();bp.type='bandpass';bp.frequency.value=1800;const g=audioCtx.createGain();g.gain.setValueAtTime(.001,t);g.gain.exponentialRampToValueAtTime(.35*(.4+.6*m.eng),t+.008);g.gain.exponentialRampToValueAtTime(.0001,t+.18);n.connect(bp);bp.connect(g);g.connect(m.g);n.start(t);n.stop(t+.18);}    
-    function bell(t,f,m,vol){const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='triangle';o.frequency.value=f;g.gain.setValueAtTime(.001,t);const pk=(vol||.18)*(0.5+.2*m.eng);g.gain.exponentialRampToValueAtTime(pk,t+.02);g.gain.exponentialRampToValueAtTime(.0002,t+.55);o.connect(g);g.connect(m.g);o.start(t);o.stop(t+.6);} // keep name spawnBell for external calls
-    const spawnBell=bell;
+    function bell(t,f,m,vol){const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='triangle';o.frequency.value=f;g.gain.setValueAtTime(.001,t);const pk=(vol||.18)*(0.5+.2*m.eng);g.gain.exponentialRampToValueAtTime(pk,t+.02);g.gain.exponentialRampToValueAtTime(.0002,t+.55);o.connect(g);g.connect(m.g);o.start(t);o.stop(t+.6);}
     //function spawnCatVoice(t, f, m){
     //    // Simple formant-ish meow made from two detuned oscillators fading quickly
     //    const carrier = audioCtx.createOscillator();
