@@ -1039,6 +1039,7 @@
     const UI_MAIN = [
         { id: 'reset', u0: 0.4, v0: 0.1, u1: 0.7, v1: 0.2, label: 'Reset', onClick: () => { playClickSound(); user.x = 0; user.z = 2; user.yaw = 0; user.pitch = 0.2; log('reset position'); } },
         { id: 'vr', u0: 0.4, v0: 0.3, u1: 0.7, v1: 0.4, label: () => uiEnterLabel, onClick: () => { playClickSound(); toggleXRFromUI(); } },
+        { id: 'music', u0: 0.8, v0: 0.3, u1: 0.98, v1: 0.4, label: () => 'Music: ' + (music ? 'ON' : 'OFF'), onClick: () => { playClickSound(); music = !music; log('music ' + (music ? 'on' : 'off')); } },
         { id: 'logtog', u0: 0.85, v0: 0.5, u1: 0.98, v1: 0.6 , label: 'LOG', onClick: () => { playClickSound(); logVisible = !logVisible; } },
         { id: 'logdn', u0: 0.85, v0: 0.8, u1: 0.98, v1: 0.9, label: 'Down', onClick: () => { playClickSound(); logScroll = MAX(0, logScroll - 1); } },
         { id: 'logup', u0: 0.85, v0: 0.7, u1: 0.98, v1: 0.8, label: 'Up', onClick: () => { playClickSound(); logScroll = MIN(MAX(0, LOG.length - 1), logScroll + 1); } },
