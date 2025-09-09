@@ -1131,50 +1131,54 @@
             }
         }
 
-        // --- Third HUD variant: temporary overlay on top ---
+        // --- Third HUD variant: temporary overlay on top (minimal) ---
         if (congratsTimer > 0) {
-            const a = congratsTimer / CONGRATS_DURATION; // remaining fraction
             hudCtx.save();
-            // Hold full alpha, then fade quickly during the last 0.6s
-            const fadeT = 0.6;
+            // Smooth fade near the end
+            const fadeT = 0.5;
             const alpha = (congratsTimer > fadeT) ? 1 : MAX(0, congratsTimer / fadeT);
             hudCtx.globalAlpha = alpha;
-            // --- Overlay position controls ---
-            // w, h: size of the overlay area (in canvas pixels)
-            const w = hudCan.width * 0.7;
-            const h = 100; // increase/decrease this to give more vertical space for lines
-            // x, y: top-left corner of the overlay area
-            // Horizontal center: (canvasWidth - w) * 0.5
-            const x = (hudCan.width - w) * 0.5;
-            // Vertical center: (canvasHeight - h) * 0.5
-            //  - Move up: subtract pixels (e.g., - 60)
-            //  - Move down: add pixels (e.g., + 60)
-            const y = (hudCan.height - h) + 0;
 
-            // Text rendering setup
+            // Position (clean, unobtrusive near upper center)
+            const x = hudCan.width * 0.5 + 10;
+            const y = hudCan.height * 0.4;
+            const text = `CAT #${cat.caught} CAUGHT`;
+
+            // Typography
             hudCtx.textAlign = 'center';
             hudCtx.textBaseline = 'middle';
-            //hudCtx.fillStyle = '#ffff00'; // yellow text color
-            // For extra readability over the scene, you can enable a soft shadow:
-            // hudCtx.shadowColor = 'rgba(0,0,0,0.6)';
-            // hudCtx.shadowBlur = 4;
-            // Title line - bigger
-            hudCtx.fillStyle = '#aaaaaa'; // text color
-            hudCtx.font = 'bold 50px system-ui';
-            // Title Y position: y + h * 0.xx (0 at top, 1 at bottom of overlay area)
-            //  - Lower the number to move the title up; raise it to move down.
-            hudCtx.fillText('BLACK CAT!', x + w / 2, y + h * 0.01);
-            // Subtitle line - smaller
-            hudCtx.fillStyle = '#77ff00'; // text color
-            hudCtx.font = '40px system-ui';
-            const msg = `CAT #${cat.caught} CAUGHT!`;
-            // Subtitle Y position
-            hudCtx.fillText(msg, x + w / 2, y + h * 0.38);
-            // Extra
-            hudCtx.fillStyle = '#22ff44'; // text color
-            hudCtx.font = 'bold 50px system-ui';
-            // Third line Y position
-            hudCtx.fillText('CAN YOU CATCH AGAIN?', x + w / 2, y + h * 0.85);
+            hudCtx.font = 'bold 44px system-ui';
+
+            // Gentle vertical gradient fill
+            const g = hudCtx.createLinearGradient(0, y - 10, 0, y + 10);
+            g.addColorStop(0, '#c0e0f0'); // bluish top
+            g.addColorStop(1, '#e0d0a0'); // yellowish bottom
+
+            // Thin soft stroke for readability
+            hudCtx.lineWidth = 7;
+            hudCtx.strokeStyle = 'rgba(0,0,0,0.5)';
+            hudCtx.strokeText(text, x, y);
+            hudCtx.fillStyle = g;
+            hudCtx.fillText(text, x, y);
+
+            // Minimal accent underline
+            //const w = hudCtx.measureText(text).width;
+            //const ug = hudCtx.createLinearGradient(x - w / 2, y + 20, x + w / 2, y + 20);
+            //ug.addColorStop(0, '#fffff0');
+            //ug.addColorStop(1, '#f0f0ff');
+            //hudCtx.shadowBlur = 0;
+            //hudCtx.beginPath();
+            //hudCtx.moveTo(x - w / 2, y + 24);
+            //hudCtx.lineTo(x + w / 2, y + 24);
+            //hudCtx.lineWidth = 2;
+            //hudCtx.strokeStyle = ug;
+            //hudCtx.stroke();
+
+            // Text below
+            //hudCtx.font = '44px system-ui';
+            hudCtx.strokeText('Hunt continues?', x, y + 60);
+            hudCtx.fillText('Hunt continues?', x, y + 60);
+
             hudCtx.restore();
         }
 
