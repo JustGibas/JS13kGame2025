@@ -562,10 +562,11 @@
     //const BOOST_AMOUNT  = 0.3;        // +30% per stack
     //const MAX_BOOSTS    = 100;           // safety cap
     const speedBoosts = [];            // {timeLeft, amount}
-    const items = [];                  // pickup spheres {x,y,z,r,active:true}
+    const items = [];                  // pickup spheres {x,y,z,r>0 means alive}
     const obstacles = [];              // solid spheres for collision {x,y,z,r}
     const traps = [];                  // spheres spawnned by cat {x,y,z,r}
-    const playerCapsule = { radius: 0.5, height: 1.6, eyeOffset: 1.6 };
+    // Player capsule constants (smaller than an object w/ props)
+    const CR = 0.5, CH = 1.6, CE = 1.6; // capsule radius, height, eye-offset
     let playerMoveMag = 0;             // cached player movement magnitude (for chase detection)
 
     // -- MODULE: Gameplay-Cat --
@@ -589,7 +590,7 @@
     function spawnDrop(x,z){
         // Respect existing weighting (boost scarce), tweak slightly
         if(RANDOM()<0.4){
-            items.push({x, y:0.5, z, r:0.4, active:true});
+            items.push({x, y:0.5, z, r:0.4});
             if(audioCtx) {
                 //playClickSound();
                 bell(audioCtx.currentTime, 870, window.chipMusic, 0.1);
@@ -693,7 +694,7 @@
         // Animation clock
         cat.anim += sp*dt*3.5;
         // Catch detection
-        if(dP2 < (0.5+playerCapsule.radius)*(0.5+playerCapsule.radius)){
+    if(dP2 < (0.5+CR)*(0.5+CR)){
             cat.caught++; log('Cat caught #' + cat.caught);
             if(audioCtx) {
                 //playClickSound();
@@ -723,54 +724,36 @@
     }
 
     function tryPickupItems(){
-        // Closest point on capsule (horizontal only since player moves on XZ)
-        const baseY = user.y - playerCapsule.eyeOffset;
-        const topY  = baseY + playerCapsule.height;
+        // Closest point on capsule segment (vertical)
+    const baseY = user.y - CE, topY = baseY + CH;
         for (const itm of items){
-            if (!itm.active) continue;
-            // Nearest Y on capsule segment
+            if (!(itm.r>0)) continue;
             const ny = MAX(baseY, MIN(topY, itm.y));
-            const dx = itm.x - user.x;
-            const dy = itm.y - ny;
-            const dz = itm.z - user.z;
-            const dist = HYPOT(dx,dy,dz);
-            if (dist < itm.r + playerCapsule.radius){
-                itm.active = false;
-                if (speedBoosts.length < 10){
-                    speedBoosts.push({ timeLeft: 15, amount: 0.3 });
-                }
-                if(audioCtx) {
-                    //playClickSound();
-                    bell(audioCtx.currentTime, 880 * POW(2, ((RANDOM()*6)|0)/6), window.chipMusic, 0.2);
-                }
+            const dx = itm.x - user.x, dy = itm.y - ny, dz = itm.z - user.z;
+            if (HYPOT(dx,dy,dz) < itm.r + CR){
+                itm.r = 0; // mark consumed
+                if (speedBoosts.length < 10) speedBoosts.push({ timeLeft: 15, amount: 0.3 });
+                if(audioCtx) bell(audioCtx.currentTime, 880 * POW(2, ((RANDOM()*6)|0)/6), window.chipMusic, 0.2);
             }
         }
     }
 
     function resolveCollisions(prevX, prevZ){
         // Capsule vs sphere obstacles
-        const baseY = user.y - playerCapsule.eyeOffset;
-        const topY  = baseY + playerCapsule.height;
-        for (const o of obstacles.concat(traps)){
+    const baseY = user.y - CE, topY = baseY + CH;
+        const hit = o => {
             const ny = MAX(baseY, MIN(topY, o.y));
-            let dx = user.x - o.x;
-            let dy = ny - o.y;
-            let dz = user.z - o.z;
-            const dist = HYPOT(dx,dy,dz);
-            const minDist = playerCapsule.radius + o.r;
-            if (dist < minDist){
-                if (dist < 1e-4){ // avoid division by zero
-                    user.x = prevX; user.z = prevZ;
-                } else {
-                    const push = (minDist - dist);
-                    dx /= dist; dz /= dist; // horizontal push preferred
-                    user.x += dx * push;
-                    user.z += dz * push;
-                }
+            let dx = user.x - o.x, dy = ny - o.y, dz = user.z - o.z;
+            const d = HYPOT(dx,dy,dz), minD = CR + o.r;
+            if (d < minD){
+                if (d < 1e-4) { user.x = prevX; user.z = prevZ; }
+                else { const p = (minD - d)/d; user.x += dx * p; user.z += dz * p; }
             }
-        }
+        };
+        for (const o of obstacles) hit(o);
+        for (const o of traps) hit(o);
         // Ground collision (keep eye at least capsule height above 0)
-        if (user.y - playerCapsule.eyeOffset < 0) user.y = playerCapsule.eyeOffset;
+    if (user.y - CE < 0) user.y = CE;
     }
     // -- /MODULE: Gameplay-Items --
 
@@ -1695,7 +1678,7 @@
         gl.drawArrays(gl.TRIANGLES, 0, 6);
 
         // --- NEW: Render Items & Obstacles (now works because drawSphere exists) ---
-        for(const itm of items) if (itm.active) drawSphere(V,P,itm.x,itm.y,itm.z,itm.r,[0.2,1.0,0.3]);
+    for(const itm of items) if (itm.r>0) drawSphere(V,P,itm.x,itm.y,itm.z,itm.r,[0.2,1.0,0.3]);
         for(const o of obstacles) if(!o._isRock) drawSphere(V,P,o.x,o.y,o.z,o.r,[0.9,0.2,0.2]);
         for(const t of traps) drawSphere(V,P,t.x,t.y,t.z,t.r,[0.8,0.5,0.1]);
         // Render Black Cat
@@ -2067,7 +2050,7 @@
             gl.drawArrays(gl.TRIANGLES, 0, 6);
 
             // --- NEW: Render Items & Obstacles (now works because drawSphere exists) ---
-            for(const itm of items) if (itm.active) drawSphere(v.transform.inverse.matrix,v.projectionMatrix,itm.x,itm.y,itm.z,itm.r,[0.2,1.0,0.3]);
+            for(const itm of items) if (itm.r>0) drawSphere(v.transform.inverse.matrix,v.projectionMatrix,itm.x,itm.y,itm.z,itm.r,[0.2,1.0,0.3]);
             for(const o of obstacles)  if(!o._isRock) drawSphere(v.transform.inverse.matrix,v.projectionMatrix,o.x,o.y,o.z,o.r,[0.9,0.2,0.2]);
             for(const t of traps) drawSphere(v.transform.inverse.matrix,v.projectionMatrix,t.x,t.y,t.z,t.r,[0.8,0.5,0.1]);
             // Render Black Cat
