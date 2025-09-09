@@ -838,6 +838,8 @@
     let logScroll = 0;
     //let logVisible = true;
     let hudVisible = true;
+    let congratsTimer = 0;
+    let lastCaughtShown = 0;
 
     // State for HUD interaction.
     let HUD_WH_world = M4(); // World matrix of the HUD quad
@@ -1002,6 +1004,36 @@
                 // Center text vertically and with a slight left padding
                 hudCtx.fillText(lab, x + 10, y + h * 0.5);
             }
+        }
+        // --- Third HUD variant: temporary overlay on top (minimal) ---
+        if (congratsTimer > 0) {
+            hudCtx.save();
+            // Smooth fade near the end
+            const alpha = (congratsTimer > 0.5) ? 1 : MAX(0, congratsTimer / 0.5);
+            hudCtx.globalAlpha = alpha;
+            // Position (clean, unobtrusive near upper center)
+            const x = hudCan.width * 0.5 + 10;
+            const y = hudCan.height * 0.4;
+            const text = `CAT #${cat.caught} CAUGHT`;
+            // Typography
+            hudCtx.textAlign = 'center';
+            hudCtx.textBaseline = 'middle';
+            hudCtx.font = 'bold 44px system-ui';
+            // Gentle vertical gradient fill
+            const g = hudCtx.createLinearGradient(0, y - 10, 0, y + 10);
+            g.addColorStop(0, '#c0e0f0'); // bluish top
+            g.addColorStop(1, '#e0d0a0'); // yellowish bottom
+            // Thin soft stroke for readability
+            hudCtx.lineWidth = 7;
+            hudCtx.strokeStyle = 'rgba(0,0,0,0.5)';
+            hudCtx.strokeText(text, x, y);
+            hudCtx.fillStyle = g;
+            hudCtx.fillText(text, x, y);
+            // Text below
+            hudCtx.strokeText('Hunt continues?', x, y + 60);
+            hudCtx.fillText('Hunt continues?', x, y + 60);
+
+            hudCtx.restore();
         }
 
         // Upload the canvas content to the WebGL texture
@@ -1456,6 +1488,11 @@
         step(dt, mv);
         // Update black cat AI & drops
         updateCat(dt);
+        // Trigger congrats overlay on catch
+        if (cat.caught > lastCaughtShown) {
+            lastCaughtShown = cat.caught;
+            congratsTimer = 3.5;
+        }
         const moveMag = HYPOT(mv.x, mv.y);
         updateAdaptiveMusic(moveMag, dt);
         
@@ -1666,6 +1703,7 @@
 
     // Helper to update the HUD canvas content
     function updHUD(mode, hit, uiSet, dt) {
+    if (congratsTimer > 0) congratsTimer = MAX(0, congratsTimer - dt);
         drawHUDCanvas(mode, hit, uiSet, dt);
     }
 
@@ -1785,6 +1823,11 @@
         step(dt, mv);
         // Update black cat AI & drops
         updateCat(dt);
+        // Trigger congrats overlay on catch
+        if (cat.caught > lastCaughtShown) {
+            lastCaughtShown = cat.caught;
+            congratsTimer = 3.5;
+        }
         const moveMag = HYPOT(mv.x, mv.y);
         updateAdaptiveMusic(moveMag, dt);
 
