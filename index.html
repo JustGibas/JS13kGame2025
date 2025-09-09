@@ -1662,7 +1662,7 @@
         // Render MMO peers as whitish cats
         if (peers && peers.size){
             const now = performance.now();
-            peers.forEach((p,id)=>{ if (id!==myId && (now - (p.last||0)) < 15000) drawCat(V,P,p.x,0.6,p.z,p.yaw||0,t*0.003,0.06,PEER_COL); });
+            peers.forEach((p,id)=>{ if (id!==myId && (now - (p.last||0)) < 15000) drawCat(V,P,p.x,0.6,p.z,(p.yaw||0)+PI,t*0.003,0.06,PEER_COL); });
         }
 
         // Draw procedural rocks (flat-shaded, stylized)
@@ -2028,7 +2028,7 @@
             // Render MMO peers (VR eye)
             if (peers && peers.size){
                 const now = performance.now();
-                peers.forEach((p,id)=>{ if (id!==myId && (now - (p.last||0)) < 15000) drawCat(v.transform.inverse.matrix, v.projectionMatrix, p.x, 0.6, p.z, p.yaw||0, t*0.003, 0.06, PEER_COL); });
+                peers.forEach((p,id)=>{ if (id!==myId && (now - (p.last||0)) < 15000) drawCat(v.transform.inverse.matrix, v.projectionMatrix, p.x, 0.6, p.z, (p.yaw||0)+PI, t*0.003, 0.06, PEER_COL); });
             }
 
             // Draw procedural rocks (flat-shaded, stylized)
