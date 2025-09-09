@@ -961,6 +961,10 @@
     let logScroll = 0;
     let logVisible = true;
     let hudVisible = true;
+    // Temporary congrats overlay state (third HUD drawn on top)
+    let congratsTimer = 0;           // seconds to show
+    const CONGRATS_DURATION = 3.5;   // show for 3.5s
+    let lastCaughtShown = 0;         // last cat.caught value shown
 
     // State for HUD interaction.
     let HUD_WH_world = M4(); // World matrix of the HUD quad
@@ -1125,6 +1129,53 @@
                 // Center text vertically and with a slight left padding
                 hudCtx.fillText(lab, x + 10, y + h * 0.5);
             }
+        }
+
+        // --- Third HUD variant: temporary overlay on top ---
+        if (congratsTimer > 0) {
+            const a = congratsTimer / CONGRATS_DURATION; // remaining fraction
+            hudCtx.save();
+            // Hold full alpha, then fade quickly during the last 0.6s
+            const fadeT = 0.6;
+            const alpha = (congratsTimer > fadeT) ? 1 : MAX(0, congratsTimer / fadeT);
+            hudCtx.globalAlpha = alpha;
+            // --- Overlay position controls ---
+            // w, h: size of the overlay area (in canvas pixels)
+            const w = hudCan.width * 0.7;
+            const h = 100; // increase/decrease this to give more vertical space for lines
+            // x, y: top-left corner of the overlay area
+            // Horizontal center: (canvasWidth - w) * 0.5
+            const x = (hudCan.width - w) * 0.5;
+            // Vertical center: (canvasHeight - h) * 0.5
+            //  - Move up: subtract pixels (e.g., - 60)
+            //  - Move down: add pixels (e.g., + 60)
+            const y = (hudCan.height - h) + 0;
+
+            // Text rendering setup
+            hudCtx.textAlign = 'center';
+            hudCtx.textBaseline = 'middle';
+            //hudCtx.fillStyle = '#ffff00'; // yellow text color
+            // For extra readability over the scene, you can enable a soft shadow:
+            // hudCtx.shadowColor = 'rgba(0,0,0,0.6)';
+            // hudCtx.shadowBlur = 4;
+            // Title line - bigger
+            hudCtx.fillStyle = '#aaaaaa'; // text color
+            hudCtx.font = 'bold 50px system-ui';
+            // Title Y position: y + h * 0.xx (0 at top, 1 at bottom of overlay area)
+            //  - Lower the number to move the title up; raise it to move down.
+            hudCtx.fillText('BLACK CAT!', x + w / 2, y + h * 0.01);
+            // Subtitle line - smaller
+            hudCtx.fillStyle = '#77ff00'; // text color
+            hudCtx.font = '40px system-ui';
+            const msg = `CAT #${cat.caught} CAUGHT!`;
+            // Subtitle Y position
+            hudCtx.fillText(msg, x + w / 2, y + h * 0.38);
+            // Extra
+            hudCtx.fillStyle = '#22ff44'; // text color
+            hudCtx.font = 'bold 50px system-ui';
+            // Third line Y position
+            hudCtx.fillText('CAN YOU CATCH AGAIN?', x + w / 2, y + h * 0.85);
+            hudCtx.restore();
         }
 
         // Upload the canvas content to the WebGL texture
@@ -1343,6 +1394,12 @@
         // Update black cat AI & drops
         updateCat(dt);
 
+        // Trigger congrats overlay on catch
+        if (cat.caught > lastCaughtShown) {
+            lastCaughtShown = cat.caught;
+            congratsTimer = CONGRATS_DURATION;
+        }
+
         
         const moveMag = HYPOT(mv.x, mv.y);
         updateAdaptiveMusic(moveMag, dt);
@@ -1457,6 +1514,8 @@
 
     // Helper to update the HUD canvas content
     function updHUD(mode, hit, uiSet, dt) {
+    // Update overlay timer
+    if (congratsTimer > 0) congratsTimer = MAX(0, congratsTimer - dt);
         drawHUDCanvas(mode, hit, uiSet, dt);
     }
 
