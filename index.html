@@ -125,8 +125,49 @@
     let mmoEnabled = false;
     let ws = null;
     let myId = null;
-    const peers = new Map(); // id -> {x,z,yaw,last}
+    const peers = new Map(); // id -> {x,z,yaw,last,hist:[{t,x,z,yaw}], sx,sz,syaw}
     let mmoSendTimer = 0;
+
+    // Peer interpolation delay (ms). Higher = smoother but more laggy. 120ms is a good balance.
+    function lerp(a,b,t){ return a + (b-a)*t; }
+    function lerpAngle(a,b,t){
+        let d = b - a;
+        if (d > PI) d -= 2*PI; else if (d < -PI) d += 2*PI;
+        return a + d * t;
+    }
+    function pushPeerSample(p, x, z, yaw, now){
+        if (!p.hist) p.hist = [];
+        p.hist.push({ t: now, x, z, yaw });
+        p.last = now;
+        // trim old samples
+        const cutoff = now - 2000;
+        while (p.hist.length && p.hist[0].t < cutoff) p.hist.shift();
+        // also keep a compact last-known for quick fallback
+        p.x = x; p.z = z; p.yaw = yaw;
+    }
+    function samplePeer(p, targetT){
+        const h = p.hist; if (!h || h.length === 0) return null;
+        // if only one sample or target before first -> use first/last
+        if (h.length === 1) return h[0];
+        if (targetT <= h[0].t) return h[0];
+        const n = h.length;
+        if (targetT >= h[n-1].t) return h[n-1];
+        // find bracketing samples (linear scan is fine for small buffers)
+        for (let i=0; i<n-1; i++){
+            const a = h[i], b = h[i+1];
+            if (a.t <= targetT && targetT <= b.t){
+                const dt = (b.t - a.t) || 1;
+                const t = (targetT - a.t) / dt;
+                return {
+                    t: targetT,
+                    x: lerp(a.x, b.x, t),
+                    z: lerp(a.z, b.z, t),
+                    yaw: lerpAngle(a.yaw, b.yaw, t)
+                };
+            }
+        }
+        return h[n-1];
+    }
 
     function logMMO(s){ log('[MMO] ' + s); }
 
@@ -161,7 +202,7 @@
         const c = msg[0];
         switch(c){
             case '@': myId = msg.slice(1); logMMO('my id: ' + myId); return;
-            case '+': { const id = msg.slice(1); if (id && !peers.has(id)) peers.set(id, {x:0,z:0,yaw:0,last:performance.now()}); return; }
+            case '+': { const id = msg.slice(1); if (id && !peers.has(id)) peers.set(id, {x:0,z:0,yaw:0,last:performance.now(),hist:[]}); return; }
             case '-': { const id = msg.slice(1); peers.delete(id); return; }
         }
         // Strip optional direct prefix @targetId|payload -> payload
@@ -179,11 +220,12 @@
                     const x = parseFloat(parts[2]);
                     const z = parseFloat(parts[3]);
                     const yaw = parseFloat(parts[4]);
-                    const p = peers.get(id) || {x:0,z:0,yaw:0,last:0};
-                    p.x = isFinite(x)?x:p.x;
-                    p.z = isFinite(z)?z:p.z;
-                    p.yaw = isFinite(yaw)?yaw:p.yaw;
-                    p.last = performance.now();
+                    const p = peers.get(id) || {x:0,z:0,yaw:0,last:0,hist:[]};
+                    const now = performance.now();
+                    const nx = isFinite(x)?x:p.x;
+                    const nz = isFinite(z)?z:p.z;
+                    const ny = isFinite(yaw)?yaw:p.yaw;
+                    pushPeerSample(p, nx, nz, ny, now);
                     peers.set(id, p);
                 }
             }
@@ -1659,10 +1701,16 @@
         // Render Black Cat
         drawCat(V,P,cat.x,cat.y,cat.z,cat.yaw,cat.anim,0.08,[0.02,0.02,0.02]);
 
-        // Render MMO peers as whitish cats
+        // Render MMO peers as whitish cats (smoothed)
         if (peers && peers.size){
-            const now = performance.now();
-            peers.forEach((p,id)=>{ if (id!==myId && (now - (p.last||0)) < 15000) drawCat(V,P,p.x,0.6,p.z,(p.yaw||0)+PI,t*0.003,0.06,PEER_COL); });
+            const nowMs = performance.now();
+            const targetT = nowMs - 120;
+            peers.forEach((p,id)=>{
+                if (id===myId) return;
+                if ((nowMs - (p.last||0)) >= 15000) return; // stale peer
+                const s = samplePeer(p, targetT) || p;
+                drawCat(V,P,s.x,0.6,s.z,(s.yaw||0)+PI,t*0.003,0.06,PEER_COL);
+            });
         }
 
         // Draw procedural rocks (flat-shaded, stylized)
@@ -2025,10 +2073,16 @@
             // Render Black Cat
             drawCat(v.transform.inverse.matrix,v.projectionMatrix,cat.x,cat.y,cat.z,cat.yaw,cat.anim,0.08,[0.02,0.02,0.02]);
 
-            // Render MMO peers (VR eye)
+            // Render MMO peers (VR eye, smoothed)
             if (peers && peers.size){
-                const now = performance.now();
-                peers.forEach((p,id)=>{ if (id!==myId && (now - (p.last||0)) < 15000) drawCat(v.transform.inverse.matrix, v.projectionMatrix, p.x, 0.6, p.z, (p.yaw||0)+PI, t*0.003, 0.06, PEER_COL); });
+                const nowMs = performance.now();
+                const targetT = nowMs - 120;
+                peers.forEach((p,id)=>{
+                    if (id===myId) return;
+                    if ((nowMs - (p.last||0)) >= 15000) return;
+                    const s = samplePeer(p, targetT) || p;
+                    drawCat(v.transform.inverse.matrix, v.projectionMatrix, s.x, 0.6, s.z, (s.yaw||0)+PI, t*0.003, 0.06, PEER_COL);
+                });
             }
 
             // Draw procedural rocks (flat-shaded, stylized)
