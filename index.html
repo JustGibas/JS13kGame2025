@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>'Wild Cats' 13K Game 2025</title>
+    <title>'Wild Catch' 13K Game 2025</title>
     <link rel="icon" type="image/svg+xml" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="55%" x="50%" dominant-baseline="middle" text-anchor="middle" font-size="80">🐈‍⬛</text></svg>'>
     <style>
         /* Basic styles to make the canvas and joysticks fill the screen */
@@ -110,7 +110,7 @@
     const canvas = document.getElementById('canvas');
     
    // State variables for the user/camera, rendering loop, and WebGL/WebXR contexts
-    let user = { x: 0, y: 1.6, z: 2, yaw: 0, pitch: 0 }; // User position and orientation
+    let user = { x: 0, y: 1.6, z: 2, yaw: 0, pitch: 0.2 }; // User position and orientation
     let prevUserX = user.x, prevUserZ = user.z; // previous frame planar position
     let userVelX = 0, userVelZ = 0;             // planar velocity for cat pursuit
     let last = 0; // Timestamp of the last frame for calculating delta time
@@ -331,7 +331,7 @@
         const g = rayHitGround(r);
         if (g) {
             lastHit = g;
-            log('ground ' + g.map(v => v.toFixed(2)).join(','));
+            //log('ground ' + g.map(v => v.toFixed(2)).join(','));
         }
     }
 
@@ -715,6 +715,8 @@
     let audioCtx = null;
     let lastStepTime = 0;
     const stepInterval = 500; // ms between walking sounds
+    // Global toggle for step/adaptive music sounds
+    let music = true;
     
     function initAudio(){
       if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -923,7 +925,7 @@
         m.beatDur = 60/tempo; // 1 beat = quarter note
         const targetGain = (m.energy===0)?0: (0.05 + 0.2*m.energy);
         m.g.gain.setTargetAtTime(targetGain, now, 0.2);
-        while(now >= m.nextBeat){
+        while(music && now >= m.nextBeat){
             emitChipBeat(m);
             m.nextBeat += m.beatDur/2; // 8th-note resolution for more activity
         }
@@ -1024,6 +1026,10 @@
     let logScroll = 0;
     let logVisible = true;
     let hudVisible = true;
+    // Temporary congrats overlay state (third HUD drawn on top)
+    let congratsTimer = 0;           // seconds to show
+    const CONGRATS_DURATION = 3.5;   // show for 3.5s
+    let lastCaughtShown = 0;         // last cat.caught value shown
 
     // State for HUD interaction.
     let HUD_WH_world = M4(); // World matrix of the HUD quad
@@ -1035,8 +1041,9 @@
     // UI button definitions. Each object defines a button's ID, position (in UV space), label, and click handler
     let uiEnterLabel = 'Enter VR';
     const UI_MAIN = [
-        { id: 'reset', u0: 0.4, v0: 0.1, u1: 0.7, v1: 0.2, label: 'Reset', onClick: () => { playClickSound(); user.x = 0; user.z = 2; user.yaw = 0; user.pitch = 0; log('reset position'); } },
+        { id: 'reset', u0: 0.4, v0: 0.1, u1: 0.7, v1: 0.2, label: 'Reset', onClick: () => { playClickSound(); user.x = 0; user.z = 2; user.yaw = 0; user.pitch = 0.2; resetCatPosition(); log('reset position'); } },
         { id: 'vr', u0: 0.4, v0: 0.3, u1: 0.7, v1: 0.4, label: () => uiEnterLabel, onClick: () => { playClickSound(); toggleXRFromUI(); } },
+        { id: 'music', u0: 0.8, v0: 0.3, u1: 0.98, v1: 0.4, label: () => 'Music: ' + (music ? 'ON' : 'OFF'), onClick: () => { playClickSound(); music = !music; log('music ' + (music ? 'on' : 'off')); } },
         { id: 'logtog', u0: 0.85, v0: 0.5, u1: 0.98, v1: 0.6 , label: 'LOG', onClick: () => { playClickSound(); logVisible = !logVisible; } },
         { id: 'logdn', u0: 0.85, v0: 0.8, u1: 0.98, v1: 0.9, label: 'Down', onClick: () => { playClickSound(); logScroll = MAX(0, logScroll - 1); } },
         { id: 'logup', u0: 0.85, v0: 0.7, u1: 0.98, v1: 0.8, label: 'Up', onClick: () => { playClickSound(); logScroll = MIN(MAX(0, LOG.length - 1), logScroll + 1); } },
@@ -1187,6 +1194,57 @@
                 // Center text vertically and with a slight left padding
                 hudCtx.fillText(lab, x + 10, y + h * 0.5);
             }
+        }
+
+        // --- Third HUD variant: temporary overlay on top (minimal) ---
+        if (congratsTimer > 0) {
+            hudCtx.save();
+            // Smooth fade near the end
+            const fadeT = 0.5;
+            const alpha = (congratsTimer > fadeT) ? 1 : MAX(0, congratsTimer / fadeT);
+            hudCtx.globalAlpha = alpha;
+
+            // Position (clean, unobtrusive near upper center)
+            const x = hudCan.width * 0.5 + 10;
+            const y = hudCan.height * 0.4;
+            const text = `CAT #${cat.caught} CAUGHT`;
+
+            // Typography
+            hudCtx.textAlign = 'center';
+            hudCtx.textBaseline = 'middle';
+            hudCtx.font = 'bold 44px system-ui';
+
+            // Gentle vertical gradient fill
+            const g = hudCtx.createLinearGradient(0, y - 10, 0, y + 10);
+            g.addColorStop(0, '#c0e0f0'); // bluish top
+            g.addColorStop(1, '#e0d0a0'); // yellowish bottom
+
+            // Thin soft stroke for readability
+            hudCtx.lineWidth = 7;
+            hudCtx.strokeStyle = 'rgba(0,0,0,0.5)';
+            hudCtx.strokeText(text, x, y);
+            hudCtx.fillStyle = g;
+            hudCtx.fillText(text, x, y);
+
+            // Minimal accent underline
+            //const w = hudCtx.measureText(text).width;
+            //const ug = hudCtx.createLinearGradient(x - w / 2, y + 20, x + w / 2, y + 20);
+            //ug.addColorStop(0, '#fffff0');
+            //ug.addColorStop(1, '#f0f0ff');
+            //hudCtx.shadowBlur = 0;
+            //hudCtx.beginPath();
+            //hudCtx.moveTo(x - w / 2, y + 24);
+            //hudCtx.lineTo(x + w / 2, y + 24);
+            //hudCtx.lineWidth = 2;
+            //hudCtx.strokeStyle = ug;
+            //hudCtx.stroke();
+
+            // Text below
+            //hudCtx.font = '44px system-ui';
+            hudCtx.strokeText('Hunt continues?', x, y + 60);
+            hudCtx.fillText('Hunt continues?', x, y + 60);
+
+            hudCtx.restore();
         }
 
         // Upload the canvas content to the WebGL texture
@@ -2086,6 +2144,13 @@
         step(dt, mv);
         // Update black cat AI & drops
         updateCat(dt);
+
+        // Trigger congrats overlay on catch
+        if (cat.caught > lastCaughtShown) {
+            lastCaughtShown = cat.caught;
+            congratsTimer = CONGRATS_DURATION;
+        }
+
         const moveMag = HYPOT(mv.x, mv.y);
         updateAdaptiveMusic(moveMag, dt);
         
@@ -2296,6 +2361,8 @@
 
     // Helper to update the HUD canvas content
     function updHUD(mode, hit, uiSet, dt) {
+    // Update overlay timer
+    if (congratsTimer > 0) congratsTimer = MAX(0, congratsTimer - dt);
         drawHUDCanvas(mode, hit, uiSet, dt);
     }
 
@@ -2415,6 +2482,13 @@
         step(dt, mv);
         // Update black cat AI & drops
         updateCat(dt);
+
+        // Trigger congrats overlay on catch
+        if (cat.caught > lastCaughtShown) {
+            lastCaughtShown = cat.caught;
+            congratsTimer = CONGRATS_DURATION;
+        }
+
         const moveMag = HYPOT(mv.x, mv.y);
         updateAdaptiveMusic(moveMag, dt);
 
@@ -2743,9 +2817,11 @@
     (function main() {
         initXR();
         requestAnimationFrame(loop);
-        log(`App initialized ${isMobile ? '(Mobile)' : '(Desktop)'} — JustGibas VR 13K Game 2025`);
-        log('Use the top "HUD" button (or H key) to open/close HUD');
-        log('Use (WASD) to move and (Q & E) to rotate');
+        log(`Welcome Catch the black cat!`);
+        log('close HUD using Close button X (H & Esc)');
+        if (!isMobile) log('Use (WASD) to move and (Q & E) to rotate');
+        if (isMobile) log('Use left joystick to move and right joystick to rotate');
+        log('Use touch-drag to Look around');
     })();
     
     // -- /FEATURE: CORE --

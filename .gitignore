@@ -2,4 +2,5 @@
 node_modules/
 package-lock.json
 index.min.html
-index.min.zip
+index.min*.zip
+min*/
