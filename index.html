@@ -570,143 +570,90 @@
     let playerMoveMag = 0;             // cached player movement magnitude (for chase detection)
 
     // -- MODULE: Gameplay-Cat --
-    // Stylized Black Cat entity the player must catch. Cat roams near center, avoids player, drops boosts & obstacles.
+    // Stylized Black Cat the player must catch. Roams near center, avoids player, drops boosts & obstacles.
     const cat = { x:0, y:0.6, z:0, vx:0, vz:0, caught:0, drop:1.2, baseS:3, anim:0, evade:0, yaw:0 };
-    // Tracks if player is actively chasing (close & moving). Used to gate music build-up.
-    let chaseActive = false;
-    //const CAT_MAX_R = 1000;        // Hard clamp so cat never wanders too far
-    //const CAT_PREF_R = 50;       // Preferred roaming radius from origin
-    //const CAT_CATCH_R = 0.5;     // Distance threshold to count as caught
-    //const CAT_FLEE_R = 10;       // Start fleeing if player within this distance
-    //const CAT_SEEK_R = 50;      // Begin seeking player if beyond this distance
-    //const CAT_EVADE_R = 3;     // Distance to trigger perpendicular dodge
-    //const CAT_DROP_MIN = 1.9;    // Min seconds between drops (only while chased)
-    //const CAT_DROP_VAR = 0.8;    // Added random variance
+    let chaseActive = false; // true when player is close and moving
+
     function resetCatPosition(){
-        // Random point within preferred radius
-        const a = RANDOM()*PI*2; const r = RANDOM()*50*0.8;
+        const a = RANDOM()*PI*2, r = RANDOM()*40; // within preferred radius
         cat.x = COS(a)*r; cat.z = SIN(a)*r; cat.vx = cat.vz = 0;
     }
+
     function spawnDrop(x,z){
-        // Respect existing weighting (boost scarce), tweak slightly
-        if(RANDOM()<0.4){
-            items.push({x, y:0.5, z, r:0.4});
-            if(audioCtx) {
-                //playClickSound();
-                bell(audioCtx.currentTime, 870, window.chipMusic, 0.1);
-            }
-        }else{
-            traps.push({x, y:0.6, z, r:0.6});
-            if(audioCtx) {
-                //playClickSound();
-                bell(audioCtx.currentTime, 660, window.chipMusic, 0.2);
-            }
-        }
+        const boost = RANDOM()<0.4;
+        (boost?items:traps).push(boost?{x,y:0.5,z,r:0.4}:{x,y:0.6,z,r:0.6});
+        if(audioCtx){ bell(audioCtx.currentTime, boost?870:660, window.chipMusic, boost?0.1:0.2); }
         if(items.length>2) items.splice(0, items.length-2);
         if(traps.length>3) traps.splice(0, traps.length-3);
     }
+
     function updateCat(dt){
-    const dxP = u.x - cat.x, dzP = u.z - cat.z;
-        const dP2 = dxP*dxP + dzP*dzP;
+        const dxP = u.x - cat.x, dzP = u.z - cat.z;
+        const dP2 = dxP*dxP + dzP*dzP; const dist = SQRT(dP2)||1;
         let fx = 0, fz = 0;
-        const dist = SQRT(dP2)||1;
-        // Behavior tiers:
-        // 1. Seek (player far) -> move toward predicted position
-        // 2. Orbit (mid range) -> tangential movement
-        // 3. Flee (close) -> run away + evasive handled below
+
+        // Seek / Orbit / Flee
         if(dist > 50){
-            // Predictive pursuit: estimate lead time proportional to distance & relative speed
-            const relSpeed = HYPOT(userVelX, userVelZ) + 0.01;
             const lead = MIN(3, dist / (cat.baseS + 2));
-            const targetX = u.x + userVelX * lead;
-            const targetZ = u.z + userVelZ * lead;
-            const tx = targetX - cat.x, tz = targetZ - cat.z;
-            const td = HYPOT(tx, tz)||1;
-            fx += (tx/td)*5; fz += (tz/td)*5;
+            const tx = (u.x + userVelX*lead) - cat.x, tz = (u.z + userVelZ*lead) - cat.z;
+            const td = HYPOT(tx, tz)||1; fx += (tx/td)*5; fz += (tz/td)*5;
         } else if(dist > 10){
-            // Orbit band: push slightly toward player but add strong perpendicular drift
-            const nx = dxP/dist, nz = dzP/dist;
-            // Toward component keeps it from drifting away too much
-            fx += nx*1.1; fz += nz*1.1;
-            // Perpendicular (choose deterministic side using sign of sin of position sum)
-            const sign = SIN((cat.x+cat.z)*0.2) > 0 ? 1 : -1;
-            fx += (-nz*sign)*4; fz += (nx*sign)*4;
-        } else {
-            // Flee when very close
-            fx -= (dxP/dist)*5; fz -= (dzP/dist)*5;
-        }
-        // Centering band
-        const dc2 = cat.x*cat.x + cat.z*cat.z; const dc = SQRT(dc2)||1;
-        if(dc > 150){ fx += (-cat.x/dc)*((dc+1000)*1.0); fz += (-cat.z/dc)*((dc+1000)*1.0); }
-        else if(dc < 50*0.55){ fx += (cat.x/dc)*0.5; fz += (cat.z/dc)*0.5; }
-        // Obstacle avoidance (proximity repulsion + simple forward ray)
-        const spd = HYPOT(cat.vx, cat.vz) + 0.1;
-        const dirx = cat.vx/spd, dirz = cat.vz/spd;
-        const look = 2 + spd*0.6;
+            const nx = dxP/dist, nz = dzP/dist, s = SIN((cat.x+cat.z)*0.2)>0?1:-1;
+            fx += nx*1.1 + (-nz*s)*4; fz += nz*1.1 + (nx*s)*4;
+        } else { fx -= (dxP/dist)*5; fz -= (dzP/dist)*5; }
+
+        // Centering
+        const dc = SQRT(cat.x*cat.x + cat.z*cat.z)||1;
+        if(dc > 150){ const k=(dc+1000); fx += (-cat.x/dc)*k; fz += (-cat.z/dc)*k; }
+        else if(dc < 27.5){ fx += (cat.x/dc)*0.5; fz += (cat.z/dc)*0.5; }
+
+        // Obstacle avoidance (proximity + forward ray)
+        const spd = HYPOT(cat.vx, cat.vz) + 0.1, dirx = cat.vx/spd, dirz = cat.vz/spd, look = 2 + spd*0.6;
         for(const ob of obstacles){
-            const ox = ob.x - cat.x, oz = ob.z - cat.z;
-            const dist2 = ox*ox + oz*oz; const rad = ob.r + 2;
-            if(dist2 < rad*rad){ // proximity push
-                const d = SQRT(dist2)||1; fx -= (ox/d)*2.4; fz -= (oz/d)*2.4;
-            } else if(dist2 < (look*look)){ // forward ray influence
-                const ahead = (ox*dirx + oz*dirz); // projection length
+            const ox = ob.x - cat.x, oz = ob.z - cat.z, rad = ob.r + 2, d2 = ox*ox + oz*oz;
+            if(d2 < rad*rad){ const d = SQRT(d2)||1; fx -= (ox/d)*2.4; fz -= (oz/d)*2.4; }
+            else if(d2 < look*look){
+                const ahead = ox*dirx + oz*dirz;
                 if(ahead>0 && ahead<look){
-                    const perpX = ox - dirx*ahead, perpZ = oz - dirz*ahead; // lateral offset
-                    const pd2 = perpX*perpX + perpZ*perpZ;
-                    if(pd2 < rad*rad){ // steer away
-                        const pd = SQRT(pd2)||1; fx -= (perpX/pd)*2; fz -= (perpZ/pd)*2; }
+                    const px = ox - dirx*ahead, pz = oz - dirz*ahead, pd2 = px*px + pz*pz;
+                    if(pd2 < rad*rad){ const pd = SQRT(pd2)||1; fx -= (px/pd)*2; fz -= (pz/pd)*2; }
                 }
             }
         }
-        // Mild noise
-        //fx += (RANDOM()*2-1)*0.9; fz += (RANDOM()*2-1)*0.9;
-        // Evasive perpendicular burst if very close
+
+        // Evade impulse when very close
         cat.evade -= dt;
-        if(dP2 < 3*3 && cat.evade<=0){
-            const d = SQRT(dP2)||1; const nx = dxP/d, nz = dzP/d;
-            // pick perpendicular sign based on random
-            const sign = (RANDOM()<0.5)?1:-1;
-            fx += (-nz*sign)*20; fz += (nx*sign)*20; // impulse-like
-            cat.evade = 0.2; // cooldown seconds
-        }
-        // Integrate velocity
+        if(dP2 < 9 && cat.evade<=0){ const d = SQRT(dP2)||1, nx = dxP/d, nz = dzP/d, s = RANDOM()<0.5?1:-1; fx += (-nz*s)*20; fz += (nx*s)*20; cat.evade = 0.2; }
+
+        // Integrate & clamp speed
         cat.vx += fx*dt; cat.vz += fz*dt;
-        const maxS = cat.baseS + cat.caught*1.5;
-        let sp = HYPOT(cat.vx, cat.vz)||1;
+        const maxS = cat.baseS + cat.caught*1.5; let sp = HYPOT(cat.vx, cat.vz)||1;
         if(sp>maxS){ cat.vx = cat.vx/sp*maxS; cat.vz = cat.vz/sp*maxS; sp = maxS; }
         cat.x += cat.vx*dt; cat.z += cat.vz*dt;
-        // Face movement direction (only if moving sufficiently)
-        if(sp > 0.1){
-            const targetYaw = ATAN2(cat.vx, cat.vz); // note swapped to align forward with +Z
-            // Smooth interpolation
-            let dy = targetYaw - cat.yaw;
-            // wrap to [-PI,PI]
-            if(dy > PI) dy -= 2*PI; else if(dy < -PI) dy += 2*PI;
-            cat.yaw += dy * MIN(1, dt*10); // turn speed factor
+
+        // Face movement direction
+        if(sp>0.1){
+            const targetYaw = ATAN2(cat.vx, cat.vz); let dy = targetYaw - cat.yaw;
+            if(dy > PI) dy -= 2*PI; else if(dy < -PI) dy += 2*PI; cat.yaw += dy * MIN(1, dt*10);
         }
-        //const r2 = cat.x*cat.x + cat.z*cat.z; if(r2>200*200){ const r=SQRT(r2); cat.x*=200/r; cat.z*=200/r; }
+
         // Friction
         cat.vx *= (1 - 1.1*dt); cat.vz *= (1 - 1.1*dt);
-        // Chase detection (player near & moving)
-    const chased = (dP2 < 10*10 && playerMoveMag>0.15);
-    chaseActive = chased;
+
+        // Chase / drops
+        const chased = dP2 < 100 && playerMoveMag>0.15; chaseActive = chased;
         if(chased){ cat.drop -= dt; if(cat.drop<=0){ spawnDrop(cat.x, cat.z); cat.drop = 1.9 + RANDOM()*0.8; } }
-        // Animation clock
+
+        // Anim & catch
         cat.anim += sp*dt*3.5;
-        // Catch detection
-    if(dP2 < (0.5+CR)*(0.5+CR)){
-            cat.caught++; log('Cat caught #' + cat.caught);
-            if(audioCtx) {
-                //playClickSound();
-                bell(audioCtx.currentTime, 800, window.chipMusic, 0.5);
-                bell(audioCtx.currentTime+0.1, 1000, window.chipMusic, 0.3);
-                bell(audioCtx.currentTime+0.2, 1200, window.chipMusic, 0.4);
-            }
-            if(speedBoosts.length < 10) speedBoosts.push({timeLeft:15, amount:0.3});
+        if(dP2 < (0.5+CR)*(0.5+CR)){
+            cat.caught++; log('Cat caught #'+cat.caught);
+            if(audioCtx){ bell(audioCtx.currentTime,800,window.chipMusic,0.5); bell(audioCtx.currentTime+0.1,1000,window.chipMusic,0.3); bell(audioCtx.currentTime+0.2,1200,window.chipMusic,0.4); }
+            if(speedBoosts.length<10) speedBoosts.push({timeLeft:15, amount:0.3});
             resetCatPosition();
-            //for(let i=0;i<4;i++); //spawnDrop(cat.x + (RANDOM()*2-1), cat.z + (RANDOM()*2-1));
         }
     }
+
     resetCatPosition();
     // -- /MODULE: Gameplay-Cat --
 
@@ -746,7 +693,7 @@
             let dx = u.x - o.x, dy = ny - o.y, dz = u.z - o.z;
             const d = HYPOT(dx,dy,dz), minD = CR + o.r;
             if (d < minD){
-                if (d < 1e-4) { u.x = prevX; u.z = prevZ; }
+                if (d < 0.0001) { u.x = prevX; u.z = prevZ; }
                 else { const p = (minD - d)/d; u.x += dx * p; u.z += dz * p; }
             }
         };
@@ -1288,7 +1235,7 @@
 
     // Replaced fragment shader: perspective-correct cloud mapping (plane intersection), reduced velocities
     const fsSky=`#version 300 es
-    precision highp float;in vec2 uv;out vec4 o;uniform mat4 Vinv,invPV;uniform sampler2D uNoise;uniform float uTime;float n(vec2 p){return texture(uNoise,p).r;}float fbm(vec2 p){float s=0.,a=.5;s+=a*n(p+uTime*vec2(.012,.007)*.02);p*=2.;a*=.5;s+=a*n(p+uTime*vec2(-.008,.015)*.02);p*=2.;a*=.5;s+=a*n(p+uTime*vec2(.017,-.011)*.02);p*=2.;a*=.5;s+=a*n(p+uTime*vec2(-.011,-.018)*.02);return s;}void main(){vec3 ro=(Vinv*vec4(0,0,0,1)).xyz;vec4 f4=invPV*vec4(uv*2.-1.,1,1);vec3 rd=normalize(f4.xyz/f4.w-ro);float t=pow(max(rd.y*.5+.5,0.),1.2);vec3 col=mix(vec3(.2,.28,.36),vec3(.2,.2,.4),t);vec3 s=normalize(vec3(.1,.1,-.9));float sd=max(dot(rd,s),0.);float sun=smoothstep(.995,1.,sd);col+=vec3(.8,.6,.1)*(pow(sd,60.)+.4*pow(sd,12.))+vec3(1)*sun*.15;vec2 sp;float tc=(100.-ro.y)/rd.y;if(tc>0.){vec3 p=ro+rd*tc;sp=p.xz;}else{vec3 p=ro+rd*1e3;sp=p.xz;}vec2 cuv=sp*1e-4;float f=fbm(cuv);float cm=smoothstep(.25,.25+.52,f);vec2 ss=normalize(s.xz+.0001);float occ=0.;for(int i=1;i<=3;++i){vec2 p=cuv+ss*float(i)*8e-4;occ+=fbm(p);}occ/=3.;float lf=1.-clamp(occ*1.6,0.,1.);vec3 cs=vec3(.95,.98,1.)*(.45+.55*lf);cs+=.25*sun*clamp(dot(s,rd),0.,1.);col=mix(col,cs,cm*.95);o=vec4(col,1.);}`;
+    precision highp float;in vec2 uv;out vec4 o;uniform mat4 Vinv,invPV;uniform sampler2D uNoise;uniform float uTime;float n(vec2 p){return texture(uNoise,p).r;}float fbm(vec2 p){float s=0.,a=.5;s+=a*n(p+uTime*vec2(.012,.007)*.02);p*=2.;a*=.5;s+=a*n(p+uTime*vec2(-.008,.015)*.02);p*=2.;a*=.5;s+=a*n(p+uTime*vec2(.017,-.011)*.02);p*=2.;a*=.5;s+=a*n(p+uTime*vec2(-.011,-.018)*.02);return s;}void main(){vec3 ro=(Vinv*vec4(0,0,0,1)).xyz;vec4 f4=invPV*vec4(uv*2.-1.,1,1);vec3 rd=normalize(f4.xyz/f4.w-ro);float t=pow(max(rd.y*.5+.5,0.),1.2);vec3 col=mix(vec3(.2,.28,.36),vec3(.2,.2,.4),t);vec3 s=normalize(vec3(.1,.1,-.9));float sd=max(dot(rd,s),0.);float sun=smoothstep(.995,1.,sd);col+=vec3(.8,.6,.1)*(pow(sd,60.)+.4*pow(sd,12.))+vec3(1)*sun*.15;vec2 sp;float tc=(100.-ro.y)/rd.y;if(tc>0.){vec3 p=ro+rd*tc;sp=p.xz;}else{vec3 p=ro+rd*1000;sp=p.xz;}vec2 cuv=sp*0.0001;float f=fbm(cuv);float cm=smoothstep(.25,.25+.52,f);vec2 ss=normalize(s.xz+.0001);float occ=0.;for(int i=1;i<=3;++i){vec2 p=cuv+ss*float(i)*8e-4;occ+=fbm(p);}occ/=3.;float lf=1.-clamp(occ*1.6,0.,1.);vec3 cs=vec3(.95,.98,1.)*(.45+.55*lf);cs+=.25*sun*clamp(dot(s,rd),0.,1.);col=mix(col,cs,cm*.95);o=vec4(col,1.);}`;
 
     const PSKY = prog(vsSky, fsSky);
     const vaoSky = gl.createVertexArray();
@@ -1324,7 +1271,7 @@
     gl.bindVertexArray(vao);
     gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
     // A large quad to serve as the ground plane.
-    gl.bufferData(gl.ARRAY_BUFFER, new F32([-1e3,0,-1e3, 1e3,0,-1e3, 1e3,0,1e3, -1e3,0,-1e3, 1e3,0,1e3, -1e3,0,1e3]), gl.STATIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1000,0,-1000, 1000,0,-1000, 1000,0,1000, -1000,0,-1000, 1000,0,1000, -1000,0,1000]), gl.STATIC_DRAW);
     gl.enableVertexAttribArray(0);
     gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
 
@@ -1454,7 +1401,7 @@
 
     // Uses instanced rendering to draw many blades of grass efficiently
     const vsGrass = `#version 300 es
-    precision highp float;uniform mat4 V,P;uniform vec2 uCamXZ;uniform vec3 uCamRight;uniform float uTime,uCell,uSeed;uniform sampler2D uNoise;uniform float uNoiseScale;out vec3 vCol;float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}vec2 h2(vec2 p){float n=sin(dot(p,vec2(1.,113.)));return fract(vec2(262144.*n,32768.*n));}void main(){int N=170;int i=gl_InstanceID;int ix=i%N-N/2;int iz=i/N-N/2;vec2 cF=floor(uCamXZ/uCell);vec2 C=cF+vec2(float(ix),float(iz));vec2 bC=(C+vec2(.5))*uCell;vec2 tK=floor(bC/uCell)+vec2(uSeed);vec2 j=(h2(tK)-.5)*(uCell*90.9);float hR=h(tK*3.1);float wR=h(tK*7.7);float ph=h(tK*5.3)*6.283;float B=texture(uNoise,bC*uNoiseScale).r;float H=mix(.6,.9,hR);float T=float(gl_VertexID/2)/4.;float s=float(gl_VertexID%2)*2.-1.;float nS=mix(1.9,1.,smoothstep(0.,2.,1.));float W=.05*(1.-T)*(.6+.6*wR)*nS;vec2 w1=vec2(.07,.05);vec2 w2=vec2(-.03,.04);float g=.6*sin(dot(bC,w1)+uTime*.7)+.4*sin(dot(bC,w2)-uTime*1.2);float S=(.25*g)+.07*sin(uTime*1.7+ph);float b=(T*T)*S;vec2 bXZ=bC+j;vec3 Bp=vec3(bXZ.x,0.,bXZ.y);vec3 R=normalize(uCamRight);vec2 w=vec2(cos(.3*uTime),sin(.32*uTime));w*=inversesqrt(dot(w,w)+1e-3);vec3 bO=vec3(w.x,0.,w.y)*b*H;vec3 pos=Bp+R*s*W+vec3(0.,T*H,0.)+bO;vec3 d0=vec3(.12,.1,.01);vec3 d1=vec3(.45,.38,.05);vec3 l0=vec3(.05,.12,.02);vec3 l1=vec3(.3,.7,.22);vec3 c0=mix(d0,l0,B);vec3 c1=mix(d1,l1,B);vCol=mix(c0,c1,smoothstep(0.,1.,T))*(.85+.15*h(tK*11.1));gl_Position=P*V*vec4(pos,1.);}`;
+    precision highp float;uniform mat4 V,P;uniform vec2 uCamXZ;uniform vec3 uCamRight;uniform float uTime,uCell,uSeed;uniform sampler2D uNoise;uniform float uNoiseScale;out vec3 vCol;float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}vec2 h2(vec2 p){float n=sin(dot(p,vec2(1.,113.)));return fract(vec2(262144.*n,32768.*n));}void main(){int N=170;int i=gl_InstanceID;int ix=i%N-N/2;int iz=i/N-N/2;vec2 cF=floor(uCamXZ/uCell);vec2 C=cF+vec2(float(ix),float(iz));vec2 bC=(C+vec2(.5))*uCell;vec2 tK=floor(bC/uCell)+vec2(uSeed);vec2 j=(h2(tK)-.5)*(uCell*90.9);float hR=h(tK*3.1);float wR=h(tK*7.7);float ph=h(tK*5.3)*6.283;float B=texture(uNoise,bC*uNoiseScale).r;float H=mix(.6,.9,hR);float T=float(gl_VertexID/2)/4.;float s=float(gl_VertexID%2)*2.-1.;float nS=mix(1.9,1.,smoothstep(0.,2.,1.));float W=.05*(1.-T)*(.6+.6*wR)*nS;vec2 w1=vec2(.07,.05);vec2 w2=vec2(-.03,.04);float g=.6*sin(dot(bC,w1)+uTime*.7)+.4*sin(dot(bC,w2)-uTime*1.2);float S=(.25*g)+.07*sin(uTime*1.7+ph);float b=(T*T)*S;vec2 bXZ=bC+j;vec3 Bp=vec3(bXZ.x,0.,bXZ.y);vec3 R=normalize(uCamRight);vec2 w=vec2(cos(.3*uTime),sin(.32*uTime));w*=inversesqrt(dot(w,w)+0.003);vec3 bO=vec3(w.x,0.,w.y)*b*H;vec3 pos=Bp+R*s*W+vec3(0.,T*H,0.)+bO;vec3 d0=vec3(.12,.1,.01);vec3 d1=vec3(.45,.38,.05);vec3 l0=vec3(.05,.12,.02);vec3 l1=vec3(.3,.7,.22);vec3 c0=mix(d0,l0,B);vec3 c1=mix(d1,l1,B);vCol=mix(c0,c1,smoothstep(0.,1.,T))*(.85+.15*h(tK*11.1));gl_Position=P*V*vec4(pos,1.);}`;
     const fsGrass = `#version 300 es
     precision highp float;in vec3 vCol;out vec4 o;void main(){ o = vec4(vCol, 1.0); }`;
 
@@ -1905,7 +1852,7 @@
       const eye = [u.x, u.y, u.z];
       const center = [u.x - sy * cp, u.y - sp, u.z - cy * cp];
         LOOKAT(V, eye, center, [0, 1, 0]);
-    PERSP(P, 60, C.width / C.height, 0.01, 1e3);
+    PERSP(P, 60, C.width / C.height, 0.01, 1000);
         PV = MULTMAT4(M4(), P, V);
         invPV = INV(PV);
     }
