@@ -16,7 +16,7 @@
         }
 
         /* Styling for the virtual joysticks */
-        .joystick {
+        .j {
             position: fixed;
             width: 112px;
             height: 112px;
@@ -28,7 +28,7 @@
         }
 
         /* The movable part of the joystick */
-        .joystick-handle {
+        .jh {
             position: absolute;
             width: 36px;
             height: 36px;
@@ -46,7 +46,7 @@
 
         /* Media query to show joysticks only on touch-capable (coarse pointer) devices */
         @media (pointer:coarse) {
-            .joystick { display: block; }
+            .j { display: block; }
         }
     </style>
 </head>
@@ -56,8 +56,8 @@
     <canvas id="C"></canvas>
 
     <!-- HTML elements for the virtual joysticks -->
-    <div id="L" class="joystick"><div class="joystick-handle"></div></div>
-    <div id="R" class="joystick"><div class="joystick-handle"></div></div>
+    <div id="L" class="j"><div class="jh"></div></div>
+    <div id="R" class="j"><div class="jh"></div></div>
 
     <script>
     // -- FEATURE: Core --
@@ -379,7 +379,7 @@
             { side: 'L', el: document.getElementById('L') },
             { side: 'R', el: document.getElementById('R') }
         ];
-        const handleSel = s => document.querySelector('#' + s + ' .joystick-handle');
+        const handleSel = s => document.querySelector('#' + s + ' .jh');
 
         for (const j of joys) {
             const handle = handleSel(j.side);
@@ -745,7 +745,7 @@
             const ny = MAX(baseY, MIN(topY, o.y));
             let dx = u.x - o.x, dy = ny - o.y, dz = u.z - o.z;
             const d = HYPOT(dx,dy,dz), minD = CR + o.r;
-            if (d < minD){
+            if (d < minD){now
                 if (d < 1e-4) { u.x = prevX; u.z = prevZ; }
                 else { const p = (minD - d)/d; u.x += dx * p; u.z += dz * p; }
             }
@@ -1109,7 +1109,7 @@
                 hudCtx.rect(x + 8, y + 8, w - 16, h - 16);
                 hudCtx.clip();
                 hudCtx.fillStyle = '#eee';
-                hudCtx.font = '14px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+                hudCtx.font = '14px ui-monospace, system-ui';
                 const lines = LOG.slice(MAX(0, LOG.length - 8 - logScroll), LOG.length - logScroll);
                 for (let i = 0; i < lines.length; i++)
                     hudCtx.fillText(lines[i], x + 12, y + 24 + i * 16);
