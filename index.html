@@ -40,9 +40,9 @@
             pointer-events: none; /* The handle itself doesn't capture clicks */
         }
 
-        /* Positioning for left and right joysticks */
-        #leftJoy { bottom: 36px; left: 36px; }
-        #rightJoy { bottom: 36px; right: 36px; }
+    /* Positioning for left and right joysticks */
+    #L { bottom: 36px; left: 36px; }
+    #R { bottom: 36px; right: 36px; }
 
         /* Media query to show joysticks only on touch-capable (coarse pointer) devices */
         @media (pointer:coarse) {
@@ -53,11 +53,11 @@
 <body>
     <!-- The main canvas for WebGL rendering -->
     <!-- <canvas id="C"></canvas> -->
-    <canvas id="canvas"></canvas>
+    <canvas id="C"></canvas>
 
     <!-- HTML elements for the virtual joysticks -->
-    <div id="leftJoy" class="joystick"><div class="joystick-handle"></div></div>
-    <div id="rightJoy" class="joystick"><div class="joystick-handle"></div></div>
+    <div id="L" class="joystick"><div class="joystick-handle"></div></div>
+    <div id="R" class="joystick"><div class="joystick-handle"></div></div>
 
     <script>
     // -- FEATURE: Core --
@@ -107,7 +107,7 @@
 
     // const D = document
     // const C = D.getElementById('canvas');
-    const canvas = document.getElementById('canvas');
+    const C = document.getElementById('C');
     
    // State variables for the user/camera, rendering loop, and WebGL/WebXR contexts
     let user = { x: 0, y: 1.6, z: 2, yaw: 0, pitch: 0.2 }; // User position and orientation
@@ -116,7 +116,7 @@
     let last = 0; // Timestamp of the last frame for calculating delta time
     let gl, xr = null, ref = null, off = null; // WebGL and WebXR objects
 
-    gl = canvas.getContext('webgl2', { antialias: true, xrCompatible: true });
+    gl = C.getContext('webgl2', { antialias: true, xrCompatible: true });
     if (!gl) { alert('WebGL2 is required for this application.'); }
 
     // -- FEATURE: MMO --
@@ -269,11 +269,11 @@
 
     // Resize the canvas to fill the window, accounting for device pixel ratio
     function resize() {
-        const w = innerWidth, h = innerHeight, dpr = devicePixelRatio || 1;
-        canvas.width = w * dpr;
-        canvas.height = h * dpr;
-        canvas.style.width = w + 'px';
-        canvas.style.height = h + 'px';
+    const w = innerWidth, h = innerHeight, dpr = devicePixelRatio || 1;
+    C.width = w * dpr;
+    C.height = h * dpr;
+    C.style.width = w + 'px';
+    C.style.height = h + 'px';
     }
     addEventListener('resize', resize);
     resize(); // Initial resize
@@ -301,7 +301,7 @@
     // Unified input state object for keyboard, joysticks, pointer-look, and pointer coordinates
     const input = {
         keys: {},
-        joy: { left: { x: 0, y: 0, id: null }, right: { x: 0, y: 0, id: null } }, // 
+        joy: { L: { x: 0, y: 0, id: null }, R: { x: 0, y: 0, id: null } }, // 
         look: { id: null, x: 0, y: 0 },
         pointer: { x: 0, y: 0 }
     };
@@ -324,21 +324,21 @@
     document.addEventListener('keyup', e => input.keys[e.key.toLowerCase()] = false);
     
     // Pointer event listeners on the canvas for mouse-look and interaction
-    canvas.addEventListener('pointerdown', e => {
+    C.addEventListener('pointerdown', e => {
         initAudio(); // NEW: Initialize audio on first user interaction
         // Start mouse-look on left-click
         if (e.button === 0 && input.look.id === null) {
             input.look.id = e.pointerId;
             input.look.x = e.clientX;
             input.look.y = e.clientY;
-            canvas.setPointerCapture(e.pointerId); // Lock the pointer to the canvas
+            C.setPointerCapture(e.pointerId); // Lock the pointer to the canvas
         }
         // Always update pointer position for picking
         input.pointer.x = e.clientX;
         input.pointer.y = e.clientY;
     });
     
-    canvas.addEventListener('pointermove', e => {
+    C.addEventListener('pointermove', e => {
         // Update pointer position for hover effects
         input.pointer.x = e.clientX;
         input.pointer.y = e.clientY;
@@ -354,7 +354,7 @@
         }
     });
     
-    canvas.addEventListener('pointerup', e => {
+    C.addEventListener('pointerup', e => {
         // Stop mouse-look mode.
         if (e.pointerId === input.look.id) {
             input.look.id = null;
@@ -365,7 +365,7 @@
         interactDesktopAt(e.clientX, e.clientY);
     });
     
-    canvas.addEventListener('pointercancel', e => {
+    C.addEventListener('pointercancel', e => {
         if (e.pointerId === input.look.id) {
             input.look.id = null;
         }
@@ -376,10 +376,10 @@
     // --- Virtual Joysticks for Touch Devices ---
     function initJoysticks() {
         const joys = [
-            { side: 'left', el: document.getElementById('leftJoy') },
-            { side: 'right', el: document.getElementById('rightJoy') }
+            { side: 'L', el: document.getElementById('L') },
+            { side: 'R', el: document.getElementById('R') }
         ];
-        const handleSel = s => document.querySelector('#' + s + 'Joy .joystick-handle');
+        const handleSel = s => document.querySelector('#' + s + ' .joystick-handle');
 
         for (const j of joys) {
             const handle = handleSel(j.side);
@@ -389,7 +389,7 @@
             j.el.addEventListener('pointercancel', e => { if (e.pointerId === j.id) { resetJoy(j, handle); } });
         }
 
-        function updateJoy(j, e, handle) {
+    function updateJoy(j, e, handle) {
             const r = j.el.getBoundingClientRect();
             const cx = r.left + r.width / 2;
             const cy = r.top + r.height / 2;
@@ -425,7 +425,7 @@
     // -- SOLUTION: Input-Ray-Screen --
     // Creates a world-space ray from screen coordinates (for desktop mouse picking)
     function rayFromScreen(px, py) {
-        const r = canvas.getBoundingClientRect();
+    const r = C.getBoundingClientRect();
         const x = ((px - r.left) / r.width) * 2 - 1;
         const y = 1 - ((py - r.top) / r.height) * 2;
         //const near = [x, y, -1, 1], far = [x, y, 1, 1];
@@ -774,10 +774,10 @@
         // -- /SOLUTION: Gameplay-Movement-Keyboard --
     
         // -- SOLUTION: Gameplay-Movement-Joystick --
-        // Virtual joystick input
-        const jx = input.joy.left.x;
-        const jy = -input.joy.left.y;
-        const jt = -input.joy.right.x;
+    // Virtual joystick input
+    const jx = input.joy.L.x;
+    const jy = -input.joy.L.y;
+    const jt = -input.joy.R.x;
         // -- /SOLUTION: Gameplay-Movement-Joystick --
 
         // -- SOLUTION: Gameplay-Movement-VR --
@@ -1638,7 +1638,7 @@
         // NEW: update wind stereo each frame (after camera matrix updated)
     if(audioCtx) updateWind(t/1000, user.x, user.z);
         // --- Rendering ---
-        gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.viewport(0, 0, C.width, C.height);
         gl.clearColor(0, 0, 0, 1);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
@@ -1877,7 +1877,7 @@
         const eye = [user.x, user.y, user.z];
         const center = [user.x - sy * cp, user.y - sp, user.z - cy * cp];
         LOOKAT(V, eye, center, [0, 1, 0]);
-        PERSP(P, 60, canvas.width / canvas.height, 0.01, 1e3);
+    PERSP(P, 60, C.width / C.height, 0.01, 1e3);
         PV = MULTMAT4(M4(), P, V);
         invPV = INV(PV);
     }
@@ -1917,7 +1917,7 @@
                 xr = null;
                 uiEnterLabel = 'Enter VR';
                 gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-                gl.viewport(0,0,canvas.width,canvas.height);
+                gl.viewport(0,0,C.width,C.height);
                 requestAnimationFrame(loop); // Resume desktop loop
             });
 
