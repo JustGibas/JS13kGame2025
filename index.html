@@ -1409,40 +1409,40 @@
     //const ROCK_PROB = 0.01;   // spawn probability per cell
 
     // Update rocks around camera and sync to obstacles array (mark obstacles with _isRock)
-    function updateRocks(camX, camZ){
-        // remove previous rock-marked obstacles
-        for (let i = obstacles.length - 1; i >= 0; i--) {
-            if (obstacles[i]._isRock) obstacles.splice(i, 1);
-        }
-        rocks.length = 0;
-        //const c = 5; const r = 200.0;
-        const minX = FLOOR((camX - 200.0)/5);
-        const maxX = FLOOR((camX + 200.0)/5);
-        const minZ = FLOOR((camZ - 200.0)/5);
-        const maxZ = FLOOR((camZ + 200.0)/5);
-        for(let gz=minZ; gz<=maxZ; gz++){
-            for(let gx=minX; gx<=maxX; gx++){
-                const h = rockHash(gx, gz, 0.0);
-                if (h < 0.01){
-                    const jx = rockHash(gx, gz, 1.0) - 0.5;
-                    const jz = rockHash(gx, gz, 2.0) - 0.5;
-                    const px = gx*5 + (jx * 5 * 0.6) + 5*0.5;
-                    const pz = gz*5 + (jz * 5 * 0.6) + 5*0.5;
-                    const dx = px - camX, dz = pz - camZ;
-                    if (dx*dx + dz*dz <= 200.0*200.0){
-                        const seed = rockHash(gx, gz, -7.0) * 1000.0;
-                        const scale = 4.0 + rockHash(gx, gz, 5.0) * 2.; // 1.0 .. 6.0 meters
-                        const rx = px, rz = pz, ry = scale * 0.45; // small y offset
-                        const radius = scale * 1.2; // collision radius
-                        const rock = { x: rx, y: ry, z: rz, r: radius, seed, scale };
-                        rocks.push(rock);
-                        // also add to obstacles so collision code picks it up
-                        obstacles.push({ x: rx, y: ry, z: rz, r: radius, _isRock: true });
-                    }
-                }
-            }
-        }
-    }
+    //function updateRocks(camX, camZ){
+    //    // remove previous rock-marked obstacles
+    //    for (let i = obstacles.length - 1; i >= 0; i--) {
+    //        if (obstacles[i]._isRock) obstacles.splice(i, 1);
+    //    }
+    //    rocks.length = 0;
+    //    //const c = 5; const r = 200.0;
+    //    const minX = FLOOR((camX - 200.0)/5);
+    //    const maxX = FLOOR((camX + 200.0)/5);
+    //    const minZ = FLOOR((camZ - 200.0)/5);
+    //    const maxZ = FLOOR((camZ + 200.0)/5);
+    //    for(let gz=minZ; gz<=maxZ; gz++){
+    //        for(let gx=minX; gx<=maxX; gx++){
+    //            const h = rockHash(gx, gz, 0.0);
+    //            if (h < 0.01){
+    //                const jx = rockHash(gx, gz, 1.0) - 0.5;
+    //                const jz = rockHash(gx, gz, 2.0) - 0.5;
+    //                const px = gx*5 + (jx * 5 * 0.6) + 5*0.5;
+    //                const pz = gz*5 + (jz * 5 * 0.6) + 5*0.5;
+    //                const dx = px - camX, dz = pz - camZ;
+    //                if (dx*dx + dz*dz <= 200.0*200.0){
+    //                    const seed = rockHash(gx, gz, -7.0) * 1000.0;
+    //                    const scale = 4.0 + rockHash(gx, gz, 5.0) * 2.; // 1.0 .. 6.0 meters
+    //                    const rx = px, rz = pz, ry = scale * 0.45; // small y offset
+    //                    const radius = scale * 1.2; // collision radius
+    //                    const rock = { x: rx, y: ry, z: rz, r: radius, seed, scale };
+    //                    rocks.push(rock);
+    //                    // also add to obstacles so collision code picks it up
+    //                    obstacles.push({ x: rx, y: ry, z: rz, r: radius, _isRock: true });
+    //                }
+    //            }
+    //        }
+    //    }
+    //}
 
     // -- /MODULE: Scene-Rocks --
 
@@ -1582,17 +1582,9 @@
 
     // Beam for pointing ray.
     const vsBeam = `#version 300 es
-    precision highp float;
-    layout(location=0) in vec3 p;
-    uniform mat4 M,V,P;
-    void main(){
-        gl_Position=P*V*M*vec4(p,1.);
-    }`;
+    precision highp float;layout(location=0) in vec3 p;uniform mat4 M,V,P;void main(){gl_Position=P*V*M*vec4(p,1.);}`;
     const fsBeam = `#version 300 es
-    precision highp float;
-    uniform vec4 col;
-    out vec4 o;
-    void main(){ o=col; }`;
+    precision highp float;uniform vec4 col;out vec4 o;void main(){ o=col; }`;
     const PBeam = prog(vsBeam, fsBeam);
     const uMBeam = gl.getUniformLocation(PBeam, 'M'), uVBeam = gl.getUniformLocation(PBeam, 'V'), uPBeam = gl.getUniformLocation(PBeam, 'P'), uColBeam = gl.getUniformLocation(PBeam, 'col');
     const vboBeam = gl.createBuffer(), vaoBeam = gl.createVertexArray();
@@ -1607,16 +1599,51 @@
     
     // -- CORE: render --
     // --- Main Render Loop (Desktop) ---
-
+    frameCount = 0;
     function loop(t) {
         // If an immersive XR session is active, stop the desktop loop chain.
         if (xr) return;  // prevents scheduling the next frame; XR loop takes over
+        frameCount++;
         
         // Calculate delta time
         const dt = ((t - last) / 1000) || 0;
         last = t;
         // Ensure rocks near the player are generated and present in obstacles for collision resolution
-    updateRocks && updateRocks(u.x, u.z);
+        // render only ever tenth frame to save CPU
+        if (frameCount % 10 === 0) {
+            //updateRocks(u.x, u.z);
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+            if (obstacles[i]._isRock) obstacles.splice(i, 1);
+        }
+        rocks.length = 0;
+        //const c = 5; const r = 200.0;
+        const minX = FLOOR((u.x - 200.0)/5);
+        const maxX = FLOOR((u.x + 200.0)/5);
+        const minZ = FLOOR((u.z - 200.0)/5);
+        const maxZ = FLOOR((u.z + 200.0)/5);
+        for(let gz=minZ; gz<=maxZ; gz++){
+            for(let gx=minX; gx<=maxX; gx++){
+                const h = rockHash(gx, gz, 0.0);
+                if (h < 0.01){
+                    const jx = rockHash(gx, gz, 1.0) - 0.5;
+                    const jz = rockHash(gx, gz, 2.0) - 0.5;
+                    const px = gx*5 + (jx * 5 * 0.6) + 5*0.5;
+                    const pz = gz*5 + (jz * 5 * 0.6) + 5*0.5;
+                    const dx = px - u.x, dz = pz - u.z;
+                    if (dx*dx + dz*dz <= 200.0*200.0){
+                        const seed = rockHash(gx, gz, -7.0) * 1000.0;
+                        const scale = 4.0 + rockHash(gx, gz, 5.0) * 2.; // 1.0 .. 6.0 meters
+                        const rx = px, rz = pz, ry = scale * 0.45; // small y offset
+                        const radius = scale * 1.2; // collision radius
+                        const rock = { x: rx, y: ry, z: rz, r: radius, seed, scale };
+                        rocks.push(rock);
+                        // also add to obstacles so collision code picks it up
+                        obstacles.push({ x: rx, y: ry, z: rz, r: radius, _isRock: true });
+                    }
+                }
+            }
+        }
+        }
 
         // Update user position
         const mv = getMove();
@@ -1679,7 +1706,7 @@
 
         // --- NEW: Render Items & Obstacles (now works because drawSphere exists) ---
     for(const itm of items) if (itm.r>0) drawSphere(V,P,itm.x,itm.y,itm.z,itm.r,[0.2,1.0,0.3]);
-        for(const o of obstacles) if(!o._isRock) drawSphere(V,P,o.x,o.y,o.z,o.r,[0.9,0.2,0.2]);
+        //for(const o of obstacles) if(!o._isRock) drawSphere(V,P,o.x,o.y,o.z,o.r,[0.9,0.2,0.2]);
         for(const t of traps) drawSphere(V,P,t.x,t.y,t.z,t.r,[0.8,0.5,0.1]);
         // Render Black Cat
         drawCat(V,P,cat.x,cat.y,cat.z,cat.yaw,cat.anim,0.08,[0.02,0.02,0.02]);
@@ -1697,16 +1724,17 @@
         }
 
         // Draw procedural rocks (flat-shaded, stylized)
-        for(const r of rocks)
-        gl.useProgram(PROCK);
-        gl.bindVertexArray(rockVao);
-        gl.uniformMatrix4fv(uR_V, false, V);
-        gl.uniformMatrix4fv(uR_P, false, P);
-        for(const rk of rocks){
-            gl.uniform3f(uR_Pos, rk.x, rk.y, rk.z);
-            gl.uniform1f(uR_S, rk.scale);
-            gl.uniform1f(uR_Seed, rk.seed);
-            gl.drawArrays(gl.TRIANGLES, 0, rockVerts.length / 3);
+        if (rocks.length) {
+            gl.useProgram(PROCK);
+            gl.bindVertexArray(rockVao);
+            gl.uniformMatrix4fv(uR_V, false, V);
+            gl.uniformMatrix4fv(uR_P, false, P);
+            for (const rk of rocks) {
+                gl.uniform3f(uR_Pos, rk.x, rk.y, rk.z);
+                gl.uniform1f(uR_S, rk.scale);
+                gl.uniform1f(uR_Seed, rk.seed);
+                gl.drawArrays(gl.TRIANGLES, 0, rockVerts.length / 3);
+            }
             gl.enable(gl.DEPTH_TEST);
         }
 
@@ -1936,6 +1964,7 @@
         const s = frame.session;
         //if (s !== xr) return;
         s.requestAnimationFrame(onXR);
+        frameCount++;
 
         const dt = ((t - last) / 1000) || 0;
         last = t;
@@ -1945,6 +1974,43 @@
         
         // NEW: update wind stereo each frame (after camera matrix updated)
     if(audioCtx) updateWind(t/1000, u.x, u.z);
+
+    // Ensure rocks near the player are generated and present in obstacles for collision resolution
+        // render only ever tenth frame to save CPU
+        if (frameCount % 10 === 0) {
+            //updateRocks(u.x, u.z);
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+            if (obstacles[i]._isRock) obstacles.splice(i, 1);
+        }
+        rocks.length = 0;
+        //const c = 5; const r = 200.0;
+        const minX = FLOOR((u.x - 200.0)/5);
+        const maxX = FLOOR((u.x + 200.0)/5);
+        const minZ = FLOOR((u.z - 200.0)/5);
+        const maxZ = FLOOR((u.z + 200.0)/5);
+        for(let gz=minZ; gz<=maxZ; gz++){
+            for(let gx=minX; gx<=maxX; gx++){
+                const h = rockHash(gx, gz, 0.0);
+                if (h < 0.01){
+                    const jx = rockHash(gx, gz, 1.0) - 0.5;
+                    const jz = rockHash(gx, gz, 2.0) - 0.5;
+                    const px = gx*5 + (jx * 5 * 0.6) + 5*0.5;
+                    const pz = gz*5 + (jz * 5 * 0.6) + 5*0.5;
+                    const dx = px - u.x, dz = pz - u.z;
+                    if (dx*dx + dz*dz <= 200.0*200.0){
+                        const seed = rockHash(gx, gz, -7.0) * 1000.0;
+                        const scale = 4.0 + rockHash(gx, gz, 5.0) * 2.; // 1.0 .. 6.0 meters
+                        const rx = px, rz = pz, ry = scale * 0.45; // small y offset
+                        const radius = scale * 1.2; // collision radius
+                        const rock = { x: rx, y: ry, z: rz, r: radius, seed, scale };
+                        rocks.push(rock);
+                        // also add to obstacles so collision code picks it up
+                        obstacles.push({ x: rx, y: ry, z: rz, r: radius, _isRock: true });
+                    }
+                }
+            }
+        }
+        }
 
         // Apply movement based on controller input
         const mv = getMove(s);
@@ -2051,7 +2117,7 @@
 
             // --- NEW: Render Items & Obstacles (now works because drawSphere exists) ---
             for(const itm of items) if (itm.r>0) drawSphere(v.transform.inverse.matrix,v.projectionMatrix,itm.x,itm.y,itm.z,itm.r,[0.2,1.0,0.3]);
-            for(const o of obstacles)  if(!o._isRock) drawSphere(v.transform.inverse.matrix,v.projectionMatrix,o.x,o.y,o.z,o.r,[0.9,0.2,0.2]);
+            //for(const o of obstacles)  if(!o._isRock) drawSphere(v.transform.inverse.matrix,v.projectionMatrix,o.x,o.y,o.z,o.r,[0.9,0.2,0.2]);
             for(const t of traps) drawSphere(v.transform.inverse.matrix,v.projectionMatrix,t.x,t.y,t.z,t.r,[0.8,0.5,0.1]);
             // Render Black Cat
             drawCat(v.transform.inverse.matrix,v.projectionMatrix,cat.x,cat.y,cat.z,cat.yaw,cat.anim,0.08,[0.02,0.02,0.02]);
@@ -2069,16 +2135,17 @@
             }
 
             // Draw procedural rocks (flat-shaded, stylized)
-            for(const r of rocks)
-            gl.useProgram(PROCK);
-            gl.bindVertexArray(rockVao);
-            gl.uniformMatrix4fv(uR_V, false, v.transform.inverse.matrix);
-            gl.uniformMatrix4fv(uR_P, false, v.projectionMatrix);
-            for(const rk of rocks){
-                gl.uniform3f(uR_Pos, rk.x, rk.y, rk.z);
-                gl.uniform1f(uR_S, rk.scale);
-                gl.uniform1f(uR_Seed, rk.seed);
-                gl.drawArrays(gl.TRIANGLES, 0, rockVerts.length / 3);
+            if (rocks.length) {
+                gl.useProgram(PROCK);
+                gl.bindVertexArray(rockVao);
+                gl.uniformMatrix4fv(uR_V, false, v.transform.inverse.matrix);
+                gl.uniformMatrix4fv(uR_P, false, v.projectionMatrix);
+                for (const rk of rocks) {
+                    gl.uniform3f(uR_Pos, rk.x, rk.y, rk.z);
+                    gl.uniform1f(uR_S, rk.scale);
+                    gl.uniform1f(uR_Seed, rk.seed);
+                    gl.drawArrays(gl.TRIANGLES, 0, rockVerts.length / 3);
+                }
                 gl.enable(gl.DEPTH_TEST);
             }
 
