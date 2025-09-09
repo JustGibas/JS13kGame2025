@@ -745,7 +745,7 @@
             const ny = MAX(baseY, MIN(topY, o.y));
             let dx = u.x - o.x, dy = ny - o.y, dz = u.z - o.z;
             const d = HYPOT(dx,dy,dz), minD = CR + o.r;
-            if (d < minD){now
+            if (d < minD){
                 if (d < 1e-4) { u.x = prevX; u.z = prevZ; }
                 else { const p = (minD - d)/d; u.x += dx * p; u.z += dz * p; }
             }
