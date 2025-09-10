@@ -1535,7 +1535,6 @@
 
     let cachedPlants = [];
     let lastPlantCamX = 0, lastPlantCamZ = 0;
-    let plantIterCache = {}; // Cache for plant iteration counts to reduce SDF calculations
     
     const vsPlants=`#version 300 es
     layout(location=0)in vec3 a;layout(location=1)in vec2 b;uniform mat4 c,d,e;out vec2 f;void main(){f=b;gl_Position=e*d*c*vec4(a,1.0);}`;
@@ -1775,12 +1774,9 @@
                 cachedPlants = genPlants(camX, camZ);
                 lastPlantCamX = camX;
                 lastPlantCamZ = camZ;
-                // Reset cached iterations when plants regenerate
-                plantIterCache = {};
             }
 
-            for(let i = 0; i < cachedPlants.length; i++){
-                const p = cachedPlants[i];
+            for(const p of cachedPlants){
                 const px = p.px, pz = p.pz, scale = p.scale;
 
                 // Distance & LOD
@@ -1793,39 +1789,16 @@
                 //const FAR_HIDE  = 50.0;
                 if(dist < 4.0 || dist > 50.0) continue;
 
-                const key = p.gx + ',' + p.gz;
-                let iterations;
+                //const MIN_ITER = 2, MAX_ITER = 14;
+                const sstep = x => x*x*(3-2*x);
+                let a = (dist - 4.0)/(6.0-4.0); a = sstep(MIN(1, MAX(0,a)));
+                let b = (50.0 - dist)/(50.0 - 18.0); b = sstep(MIN(1, MAX(0,b)));
+                let q = a * b;
+                if(q < 0.05) continue;
 
-                // Only recalculate iterations for alternating plants each frame
-                // This cuts SDF calculations by half while still drawing all plants
-                if ((i + frameCount) % 2 === 0) {
-                    // Fallback calculation if cache miss
-                    //const MIN_ITER = 2, MAX_ITER = 16;
-                    const sstep = x => x*x*(3-2*x);
-                    let a = (dist - 4.0)/(6.0-4.0); a = sstep(MIN(1, MAX(0,a)));
-                    let b = (50.0 - dist)/(50.0 - 18.0); b = sstep(MIN(1, MAX(0,b)));
-                    let q = a * b;
-                    if(q < 0.05) continue;
-                    const target = 2 + q*(16 - 2);
-                    iterations = MAX(2, MIN(16, target)) | 0;
-                    plantIterCache[key] = iterations; // Cache the result
-                } else {
-                    // Use cached value or default if not available
-                    iterations = plantIterCache[key];
-                    if(iterations === undefined) {
-                        // Fallback calculation if cache miss
-                        //const MIN_ITER = 2, MAX_ITER = 14;
-                        const sstep = x => x*x*(3-2*x);
-                        let a = (dist - 4.0)/(6.0-4.0); a = sstep(MIN(1, MAX(0,a)));
-                        let b = (50.0 - dist)/(50.0 - 18.0); b = sstep(MIN(1, MAX(0,b)));
-                        let q = a * b;
-                        if(q < 0.05) continue;
-                        const target = 2 + q*(16 - 2);
-                        iterations = MAX(2, MIN(16, target)) | 0;
-                        plantIterCache[key] = iterations;
-                    }
-                }
-            
+                const key = p.gx + ',' + p.gz;
+                const target = 2 + q*(14 - 2);
+                const iterations = MAX(2, MIN(14, target)) | 0;
                 const plantSeed = plantHash(p.gx, p.gz, 4.0);
 
                 const angle = ATAN2(camX - px, camZ - pz);
@@ -2222,13 +2195,10 @@
                     cachedPlants = genPlants(camX, camZ);
                     lastPlantCamX = camX;
                     lastPlantCamZ = camZ;
-                    // Reset cached iterations when plants regenerate
-                    plantIterCache = {};
                 }
 
             //if (frameCount % 10 === 0) {
-            for(let i = 0; i < cachedPlants.length; i++){
-                const p = cachedPlants[i];
+            for(const p of cachedPlants){
                 const px = p.px, pz = p.pz, scale = p.scale;
 
                 // Distance & LOD
@@ -2241,37 +2211,16 @@
                 //const FAR_HIDE  = 50.0;
                 if(dist < 4.0 || dist > 50.0) continue;
 
+                //const MIN_ITER = 2, MAX_ITER = 16;
+                const sstep = x => x*x*(3-2*x);
+                let a = (dist - 4.0)/(6.0-4.0); a = sstep(MIN(1, MAX(0,a)));
+                let b = (50.0 - dist)/(50.0 - 18.0); b = sstep(MIN(1, MAX(0,b)));
+                let q = a * b;
+                if(q < 0.05) continue;
+
                 const key = p.gx + ',' + p.gz;
-                let iterations;
-
-                // Only recalculate iterations for alternating plants each frame
-                // This cuts SDF calculations by half while still drawing all plants
-                if ((i + frameCount) % 2 === 0) {
-                    //const MIN_ITER = 2, MAX_ITER = 16;
-                    const sstep = x => x*x*(3-2*x);
-                    let a = (dist - 4.0)/(6.0-4.0); a = sstep(MIN(1, MAX(0,a)));
-                    let b = (50.0 - dist)/(50.0 - 18.0); b = sstep(MIN(1, MAX(0,b)));
-                    let q = a * b;
-                    if(q < 0.05) continue;
-                    const target = 2 + q*(16 - 2);
-                    iterations = MAX(2, MIN(16, target)) | 0;
-                    plantIterCache[key] = iterations; // Cache the result
-                } else {
-                    // Use cached value or default if not available
-                    iterations = plantIterCache[key];
-                    if(iterations === undefined) {
-                        // Fallback calculation if cache miss
-                        const sstep = x => x*x*(3-2*x);
-                        let a = (dist - 4.0)/(6.0-4.0); a = sstep(MIN(1, MAX(0,a)));
-                        let b = (50.0 - dist)/(50.0 - 18.0); b = sstep(MIN(1, MAX(0,b)));
-                        let q = a * b;
-                        if(q < 0.05) continue;
-                        const target = 2 + q*(16 - 2);
-                        iterations = MAX(2, MIN(16, target)) | 0;
-                        plantIterCache[key] = iterations;
-                    }
-                }
-
+                const target = 2 + q*(16 - 2);
+                const iterations = MAX(2, MIN(16, target)) | 0;
                 const plantSeed = plantHash(p.gx, p.gz, 4.0);
 
                 const angle = ATAN2(camX - px, camZ - pz);
