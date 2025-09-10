@@ -1804,7 +1804,6 @@
                     let b = (50.0 - dist)/(50.0 - 18.0); b = sstep(MIN(1, MAX(0,b)));
                     let q = a * b;
                     if(q < 0.05) continue;
-
                     const target = 2 + q*(16 - 2);
                     iterations = MAX(2, MIN(16, target)) | 0;
                     plantIterCache[key] = iterations; // Cache the result
@@ -2252,7 +2251,6 @@
                     let b = (50.0 - dist)/(50.0 - 18.0); b = sstep(MIN(1, MAX(0,b)));
                     let q = a * b;
                     if(q < 0.05) continue;
-
                     const target = 2 + q*(16 - 2);
                     iterations = MAX(2, MIN(16, target)) | 0;
                     plantIterCache[key] = iterations; // Cache the result
