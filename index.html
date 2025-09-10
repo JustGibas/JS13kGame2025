@@ -1233,21 +1233,21 @@
 
     // A procedural skybox rendered using a single full-screen triangle
     const vsSky=`#version 300 es
-    const vec2 v[3]=vec2[3](vec2(-1.,-1.),vec2(3.,-1.),vec2(-1.,3.));out vec2 uv;void main(){uv=v[gl_VertexID]*.5+.5;gl_Position=vec4(v[gl_VertexID],0.,1.);}`;
+    const vec2 v[3]=vec2[3](vec2(-1.,-1.),vec2(3.,-1.),vec2(-1.,3.));out vec2 a;void main(){a=v[gl_VertexID]*.5+.5;gl_Position=vec4(v[gl_VertexID],0.,1.);}`;
 
-    // Replaced fragment shader: perspective-correct cloud mapping (plane intersection), reduced velocities
+    // Replaced fragment shader: perspective-correct cloud mapping, reduced velocities, minified identifiers
     const fsSky=`#version 300 es
-    precision highp float;in vec2 uv;out vec4 o;uniform mat4 Vinv,invPV;uniform sampler2D uNoise;uniform float uTime;float n(vec2 p){return texture(uNoise,p).r;}float fbm(vec2 p){float s=0.,a=.5;s+=a*n(p+uTime*vec2(.012,.007)*.02);p*=2.;a*=.5;s+=a*n(p+uTime*vec2(-.008,.015)*.02);p*=2.;a*=.5;s+=a*n(p+uTime*vec2(.017,-.011)*.02);p*=2.;a*=.5;s+=a*n(p+uTime*vec2(-.011,-.018)*.02);return s;}void main(){vec3 ro=(Vinv*vec4(0,0,0,1)).xyz;vec4 f4=invPV*vec4(uv*2.-1.,1,1);vec3 rd=normalize(f4.xyz/f4.w-ro);float t=pow(max(rd.y*.5+.5,0.),1.2);vec3 col=mix(vec3(.2,.28,.36),vec3(.2,.2,.4),t);vec3 s=normalize(vec3(.1,.1,-.9));float sd=max(dot(rd,s),0.);float sun=smoothstep(.995,1.,sd);col+=vec3(.8,.6,.1)*(pow(sd,60.)+.4*pow(sd,12.))+vec3(1)*sun*.15;vec2 sp;float tc=(100.-ro.y)/rd.y;if(tc>0.){vec3 p=ro+rd*tc;sp=p.xz;}else{vec3 p=ro+rd*1000.;sp=p.xz;}vec2 cuv=sp*.0001;float f=fbm(cuv);float cm=smoothstep(.25,.25+.52,f);vec2 ss=normalize(s.xz+.0001);float occ=0.;for(int i=1;i<=3;++i){vec2 p=cuv+ss*float(i)*8e-4;occ+=fbm(p);}occ/=3.;float lf=1.-clamp(occ*1.6,0.,1.);vec3 cs=vec3(.95,.98,1.)*(.45+.55*lf);cs+=.25*sun*clamp(dot(s,rd),0.,1.);col=mix(col,cs,cm*.95);o=vec4(col,1.);}`;
+    precision highp float;in vec2 a;out vec4 b;uniform mat4 c,d;uniform sampler2D e;uniform float f;float g(vec2 p){return texture(e,p).r;}float h(vec2 p){float s=0.,A=.5;s+=A*g(p+f*vec2(.012,.007)*.02);p*=2.;A*=.5;s+=A*g(p+f*vec2(-.008,.015)*.02);p*=2.;A*=.5;s+=A*g(p+f*vec2(.017,-.011)*.02);p*=2.;A*=.5;s+=A*g(p+f*vec2(-.011,-.018)*.02);return s;}void main(){vec3 i=(c*vec4(0,0,0,1)).xyz;vec4 j=d*vec4(a*2.-1.,1,1);vec3 k=normalize(j.xyz/j.w-i);float l=pow(max(k.y*.5+.5,0.),1.2);vec3 m=mix(vec3(.2,.28,.36),vec3(.2,.2,.4),l);vec3 n=normalize(vec3(.1,.1,-.9));float o=max(dot(k,n),0.);float p=smoothstep(.995,1.,o);m+=vec3(.8,.6,.1)*(pow(o,60.)+.4*pow(o,12.))+vec3(1)*p*.15;vec2 q;float r=(100.-i.y)/k.y;if(r>0.){vec3 C=i+k*r;q=C.xz;}else{vec3 C=i+k*1000.;q=C.xz;}vec2 s=q*.0001;float t=h(s);float u=smoothstep(.25,.25+.52,t);vec2 v=normalize(n.xz+.0001);float w=0.;for(int B=1;B<=3;++B){vec2 C=s+v*float(B)*8e-4;w+=h(C);}w/=3.;float x=1.-clamp(w*1.6,0.,1.);vec3 y=vec3(.95,.98,1.)*(.45+.55*x);y+=.25*p*clamp(dot(n,k),0.,1.);m=mix(m,y,u*.95);b=vec4(m,1.);}`;
 
     const PSKY = prog(vsSky, fsSky);
     const vaoSky = gl.createVertexArray();
-    const uVinv = gl.getUniformLocation(PSKY, 'Vinv');
-    const uInvPV = gl.getUniformLocation(PSKY, 'invPV');
+    const uVinv = gl.getUniformLocation(PSKY, 'c');
+    const uInvPV = gl.getUniformLocation(PSKY, 'd');
     //const uSun = gl.getUniformLocation(PSKY, 'sunDir');
 
     // --- new: sky shader uniform locations for noise & cloud params ---
-    const uNoiseSky = gl.getUniformLocation(PSKY, 'uNoise');
-    const uTimeSky = gl.getUniformLocation(PSKY, 'uTime');
+    const uNoiseSky = gl.getUniformLocation(PSKY, 'e');
+    const uTimeSky = gl.getUniformLocation(PSKY, 'f');
     //const uCoverage = gl.getUniformLocation(PSKY, 'uCloudCoverage');
     //const uSharpness = gl.getUniformLocation(PSKY, 'uCloudSharpness');
     //const uShadowSamples = gl.getUniformLocation(PSKY, 'uCloudShadowSamples');
@@ -1282,9 +1282,9 @@
     // -- MODULE: Gameplay-item --
     // NEW: Sphere (items/obstacles) minimal shader + geometry
     const vsSphere = `#version 300 es
-    layout(location=0) in vec3 p;uniform mat4 V,P;uniform vec3 uPos;uniform float uS;void main(){vec3 wp=p*uS+uPos;gl_Position=P*V*vec4(wp,1.0);}`;
+    layout(location=0) in vec3 p;uniform mat4 V,P;uniform vec3 uP;uniform float uS;void main(){vec3 wp=p*uS+uP;gl_Position=P*V*vec4(wp,1.0);}`;
     const fsSphere = `#version 300 es
-    precision highp float;uniform vec3 uColor;out vec4 o;void main(){ o = vec4(uColor,1.0); }`;
+    precision highp float;uniform vec3 uc;out vec4 o;void main(){ o = vec4(uc,1.0); }`;
 
     function buildSphere(lat=10, lon=12){
         const v=[];
@@ -1314,9 +1314,9 @@
     gl.vertexAttribPointer(0,3,gl.FLOAT,false,0,0);
     const uS_V = gl.getUniformLocation(PS,'V');
     const uS_P = gl.getUniformLocation(PS,'P');
-    const uS_Pos = gl.getUniformLocation(PS,'uPos');
+    const uS_Pos = gl.getUniformLocation(PS,'uP');
     const uS_S = gl.getUniformLocation(PS,'uS');
-    const uS_Color = gl.getUniformLocation(PS,'uColor');
+    const uS_Color = gl.getUniformLocation(PS,'uc');
 
     // -- /MODULE: Gameplay-item --
 
@@ -1333,10 +1333,10 @@
     // Build a low-res sphere for rock base (coarse facets)
     const rockVerts = buildSphere(6, 8); // fewer subdivisions -> larger facets
     const PRock_vs = `#version 300 es
-    layout(location=0)in vec3 p;uniform mat4 V,P;uniform vec3 uPos;uniform float uS,uSeed;out vec3 vLocal;float h(float x){return fract(sin(x)*43758.5453);}void main(){vLocal=p*uS;float n=h((vLocal.x+vLocal.y*1.7+vLocal.z*2.3)*(uSeed+1.));float o=(n-.5)*(.5*uS);vec3 w=(vLocal+normalize(vLocal)*o)+uPos;gl_Position=P*V*vec4(w,1.);}`;
+    layout(location=0)in vec3 p;uniform mat4 V,P;uniform vec3 a;uniform float b,c;out vec3 d;float h(float x){return fract(sin(x)*43758.5453);}void main(){d=p*b;float n=h((d.x+d.y*1.7+d.z*2.3)*(c+1.));float o=(n-.5)*(.5*b);vec3 w=(d+normalize(d)*o)+a;gl_Position=P*V*vec4(w,1.);}`;
 
     const PRock_fs = `#version 300 es
-    precision highp float;in vec3 vLocal;out vec4 o;uniform float uSeed;void main(){vec3 n=normalize(vLocal+vec3(0.,0.,-2.5));float s=clamp(dot(n,normalize(vec3(0.,.1,-.5))),0.,1.);float q=floor(s*4.)/4.;vec3 c=mix(vec3(.15,.1,.1),vec3(.35,.3,.2),q);o=vec4(c,1.);}`;
+    precision highp float;in vec3 d;out vec4 o;void main(){vec3 n=normalize(d+vec3(0.,0.,-2.5));float s=clamp(dot(n,normalize(vec3(0.,.1,-.5))),0.,1.);float q=floor(s*4.)/4.;vec3 c=mix(vec3(.15,.1,.1),vec3(.35,.3,.2),q);o=vec4(c,1.);}`;
 
     const PROCK = prog(PRock_vs, PRock_fs);
     const rockVao = gl.createVertexArray();
@@ -1348,9 +1348,9 @@
     gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
     const uR_V = gl.getUniformLocation(PROCK, 'V');
     const uR_P = gl.getUniformLocation(PROCK, 'P');
-    const uR_Pos = gl.getUniformLocation(PROCK, 'uPos');
-    const uR_S = gl.getUniformLocation(PROCK, 'uS');
-    const uR_Seed = gl.getUniformLocation(PROCK, 'uSeed');
+    const uR_Pos = gl.getUniformLocation(PROCK, 'a');
+    const uR_S = gl.getUniformLocation(PROCK, 'b');
+    const uR_Seed = gl.getUniformLocation(PROCK, 'c');
 
     // Parameters for rock field
     //const ROCK_CELL = 5;
@@ -1403,22 +1403,22 @@
 
     // Uses instanced rendering to draw many blades of grass efficiently
     const vsGrass = `#version 300 es
-    uniform mat4 V,P;uniform vec2 uCamXZ;uniform vec3 uCamRight;uniform float uTime,uCell,uSeed;uniform sampler2D uNoise;uniform float uNoiseScale;out vec3 vCol;float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}vec2 h2(vec2 p){float n=sin(dot(p,vec2(1.,113.)));return fract(vec2(262144.*n,32768.*n));}void main(){int N=170;int i=gl_InstanceID;int ix=i%N-N/2;int iz=i/N-N/2;vec2 cF=floor(uCamXZ/uCell);vec2 C=cF+vec2(float(ix),float(iz));vec2 bC=(C+vec2(.5))*uCell;vec2 tK=floor(bC/uCell)+vec2(uSeed);vec2 j=(h2(tK)-.5)*(uCell*90.9);float hR=h(tK*3.1);float wR=h(tK*7.7);float ph=h(tK*5.3)*6.283;float B=texture(uNoise,bC*uNoiseScale).r;float H=mix(.6,.9,hR);float T=float(gl_VertexID/2)/4.;float s=float(gl_VertexID%2)*2.-1.;float nS=mix(1.9,1.,smoothstep(0.,2.,1.));float W=.05*(1.-T)*(.6+.6*wR)*nS;vec2 w1=vec2(.07,.05);vec2 w2=vec2(-.03,.04);float g=.6*sin(dot(bC,w1)+uTime*.7)+.4*sin(dot(bC,w2)-uTime*1.2);float S=(.25*g)+.07*sin(uTime*1.7+ph);float b=(T*T)*S;vec2 bXZ=bC+j;vec3 Bp=vec3(bXZ.x,0.,bXZ.y);vec3 R=normalize(uCamRight);vec2 w=vec2(cos(.3*uTime),sin(.32*uTime));w*=inversesqrt(dot(w,w)+0.1);vec3 bO=vec3(w.x,0.,w.y)*b*H;vec3 pos=Bp+R*s*W+vec3(0.,T*H,0.)+bO;vec3 d0=vec3(.12,.1,.01);vec3 d1=vec3(.45,.38,.05);vec3 l0=vec3(.05,.12,.02);vec3 l1=vec3(.3,.7,.22);vec3 c0=mix(d0,l0,B);vec3 c1=mix(d1,l1,B);vCol=mix(c0,c1,smoothstep(0.,1.,T))*(.85+.15*h(tK*11.1));gl_Position=P*V*vec4(pos,1.);}`;
+    uniform mat4 V,P;uniform vec2 a;uniform vec3 b;uniform float c,d,e;uniform sampler2D f;uniform float g;out vec3 h;float i(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}vec2 j(vec2 p){float n=sin(dot(p,vec2(1.,113.)));return fract(vec2(262144.*n,32768.*n));}void main(){int N=170;int k=gl_InstanceID;int l=k%N-N/2;int m=k/N-N/2;vec2 o=floor(a/d);vec2 q=o+vec2(float(l),float(m));vec2 r=(q+vec2(.5))*d;vec2 s=floor(r/d)+vec2(e);vec2 t=(j(s)-.5)*(d*90.9);float u=i(s*3.1);float v=i(s*7.7);float w=i(s*5.3)*6.283;float x=texture(f,r*g).r;float y=mix(.6,.9,u);float z=float(gl_VertexID/2)/4.;float A=float(gl_VertexID%2)*2.-1.;float B=mix(1.9,1.,smoothstep(0.,2.,1.));float C=.05*(1.-z)*(.6+.6*v)*B;vec2 D=vec2(.07,.05);vec2 E=vec2(-.03,.04);float F=.6*sin(dot(r,D)+c*.7)+.4*sin(dot(r,E)-c*1.2);float G=(.25*F)+.07*sin(c*1.7+w);float H=(z*z)*G;vec2 I=r+t;vec3 J=vec3(I.x,0.,I.y);vec3 K=normalize(b);vec2 L=vec2(cos(.3*c),sin(.32*c));L*=inversesqrt(dot(L,L)+0.1);vec3 M=vec3(L.x,0.,L.y)*H*y;vec3 O=J+K*A*C+vec3(0.,z*y,0.)+M;vec3 p0=vec3(.12,.1,.01);vec3 p1=vec3(.45,.38,.05);vec3 q0=vec3(.05,.12,.02);vec3 q1=vec3(.3,.7,.22);vec3 r0=mix(p0,q0,x);vec3 r1=mix(p1,q1,x);h=mix(r0,r1,smoothstep(0.,1.,z))*(.85+.15*i(s*11.1));gl_Position=P*V*vec4(O,1.);}`;
     const fsGrass = `#version 300 es
-    precision highp float;in vec3 vCol;out vec4 o;void main(){ o = vec4(vCol, 1.0); }`;
+    precision highp float;in vec3 h;out vec4 o;void main(){ o = vec4(h, 1.0); }`;
 
     const PGRASS = prog(vsGrass, fsGrass);
     const uVG = gl.getUniformLocation(PGRASS, 'V'), uPG = gl.getUniformLocation(PGRASS, 'P');
-    const uCamXZ = gl.getUniformLocation(PGRASS, 'uCamXZ');
-    const uCamRight = gl.getUniformLocation(PGRASS, 'uCamRight');
-    const uTimeG = gl.getUniformLocation(PGRASS, 'uTime');
-    const uCell = gl.getUniformLocation(PGRASS, 'uCell');
+    const uCamXZ = gl.getUniformLocation(PGRASS, 'a');
+    const uCamRight = gl.getUniformLocation(PGRASS, 'b');
+    const uTimeG = gl.getUniformLocation(PGRASS, 'c');
+    const uCell = gl.getUniformLocation(PGRASS, 'd');
     //const uGridN = gl.getUniformLocation(PGRASS, 'uGridN');
     //const uRadius = gl.getUniformLocation(PGRASS, 'uRadius');
-    const uSeed = gl.getUniformLocation(PGRASS, 'uSeed');
+    const uSeed = gl.getUniformLocation(PGRASS, 'e');
     // NEW biome uniforms
-    const uNoise = gl.getUniformLocation(PGRASS, 'uNoise');
-    const uNoiseScale = gl.getUniformLocation(PGRASS, 'uNoiseScale');
+    const uNoise = gl.getUniformLocation(PGRASS, 'f');
+    const ns = gl.getUniformLocation(PGRASS, 'g');
 
     // The grass VAO is minimal since all vertex data is generated procedurally in the shader
     const vaoGrass = gl.createVertexArray(), vboGrass = gl.createBuffer();
@@ -1476,19 +1476,19 @@
     }
     
     const vsPlants=`#version 300 es
-    layout(location=0)in vec3 p;layout(location=1)in vec2 uv_in;uniform mat4 M,V,P;out vec2 uv;void main(){uv=uv_in;gl_Position=P*V*M*vec4(p,1.0);}`;
+    layout(location=0)in vec3 a;layout(location=1)in vec2 b;uniform mat4 c,d,e;out vec2 f;void main(){f=b;gl_Position=e*d*c*vec4(a,1.0);}`;
 
     const fsPlants = `#version 300 es
-    precision highp float;in vec2 uv;out vec4 o;uniform float uTime;uniform int uMaxIterations;uniform vec3 uPlantPos;uniform float uPlantSeed;mat3 R(float a){float c=cos(a),s=sin(a);return mat3(vec3(c,s,0),vec3(-s,c,0),vec3(0,0,1));}mat3 D(vec2 d){return mat3(vec3(1,0,0),vec3(0,1,0),vec3(d,1));}float C(vec2 p,vec2 h){p-=vec2(0.,h.y);vec2 d=abs(vec2(length(p.x),p.y))-h;return min(max(d.x,d.y),0.)+length(max(d,0.));}float hf(float x){return fract(sin(x)*43758.5453);}float h2(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}float E(vec2 p){float bA=25.7+uPlantSeed*10.;mat3 pR=R(-(bA/360.)*6.28318);mat3 nR=R(bA/360.*6.28318);int d=3+int(uPlantSeed*4.);const int B=3;int mD=1;for(int i=0;i<d;i++)mD*=B;float l=1.5;float w=.02;p=p+vec2(0,2);float t=C(p-vec2(0.,0.),vec2(w,l));float Dst=500.;int c=0;vec2 w1=vec2(.07,.05);vec2 w2=vec2(-.03,.04);float g=.6*sin(dot(uPlantPos.xz,w1)+uTime*.7)+.4*sin(dot(uPlantPos.xz,w2)-uTime*1.2);float ph=fract(sin(dot(uPlantPos.xz,vec2(12.9898,78.233)))*43758.5453)*6.283;float s=(.25*g)+.07*sin(uTime*1.7+ph);mat3 wM=R(s*.5);for(int i=0;i<uMaxIterations;++i){int O=1;for(int j=0;j<d;j++)O*=B;vec2 p_n=p;for(int j=1;j<=d;++j){float L=l/pow(2.,float(j));O/=B;int dec=c/O;int path=dec-B*(dec/B);mat3 mx;if(path==0){mx=pR*D(vec2(0,-2.*L));}else if(path==1){mx=wM*nR*D(vec2(0,-2.*L));}else{mx=wM*D(vec2(0,-4.*L));}p_n=(mx*vec3(p_n,1)).xy;float y=C(p_n,vec2(w,L));if(y-2.*L>0.){c+=O-1;break;}Dst=min(Dst,y);if(Dst<.01)break;}if(Dst<.01)break;++c;if(c>mD)break;}return min(Dst,t);}void main(){vec2 p=(uv*2.-1.)*5.;p.y+=3.;float d=E(p);float t=clamp(d,0.,.04)*25.;float a=1.-t;if(a<.05)discard;float h=clamp(uv.y,0.,1.);vec3 G=vec3(.3,.4,.1);vec3 O=vec3(.5,.4,.2);float T=hf(uPlantSeed*37.17);float v=0.85+0.3*h2(uPlantPos.xz+vec2(uPlantSeed));vec3 b=mix(G,O,smoothstep(0.,1.,T));vec3 c=mix(b*.4,b,smoothstep(0.,1.,h))*v;float n=h2(uPlantPos.xz+uv*12.34);c*=(.97+.06*n);o=vec4(c*a,a);}`;
+    precision highp float;in vec2 f;out vec4 o;uniform float g;uniform int h;uniform vec3 i;uniform float j;mat3 R(float a){float c=cos(a),s=sin(a);return mat3(vec3(c,s,0),vec3(-s,c,0),vec3(0,0,1));}mat3 D(vec2 d){return mat3(vec3(1,0,0),vec3(0,1,0),vec3(d,1));}float C(vec2 p,vec2 h){p-=vec2(0.,h.y);vec2 d=abs(vec2(length(p.x),p.y))-h;return min(max(d.x,d.y),0.)+length(max(d,0.));}float k(float x){return fract(sin(x)*43758.5453);}float l(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}float E(vec2 p){float m=25.7+j*10.;mat3 n=R(-(m/360.)*6.28318);mat3 q=R(m/360.*6.28318);int r=3+int(j*4.);const int B=3;int s=1;for(int i=0;i<r;i++)s*=B;float t=1.5;float u=.02;p=p+vec2(0,2);float v=C(p-vec2(0.,0.),vec2(u,t));float w=500.;int x=0;vec2 y=vec2(.07,.05);vec2 z=vec2(-.03,.04);float A=.6*sin(dot(i.xz,y)+g*.7)+.4*sin(dot(i.xz,z)-g*1.2);float F=fract(sin(dot(i.xz,vec2(12.9898,78.233)))*43758.5453)*6.283;float G=(.25*A)+.07*sin(g*1.7+F);mat3 H=R(G*.5);for(int i=0;i<h;++i){int I=1;for(int j=0;j<r;j++)I*=B;vec2 J=p;for(int j=1;j<=r;++j){float K=t/pow(2.,float(j));I/=B;int L=x/I;int M=L-B*(L/B);mat3 N;if(M==0){N=n*D(vec2(0,-2.*K));}else if(M==1){N=H*q*D(vec2(0,-2.*K));}else{N=H*D(vec2(0,-4.*K));}J=(N*vec3(J,1)).xy;float O=C(J,vec2(u,K));if(O-2.*K>0.){x+=I-1;break;}w=min(w,O);if(w<.01)break;}if(w<.01)break;++x;if(x>s)break;}return min(w,v);}void main(){vec2 p=(f*2.-1.)*5.;p.y+=3.;float d=E(p);float t=clamp(d,0.,.04)*25.;float a=1.-t;if(a<.05)discard;float P=clamp(f.y,0.,1.);vec3 Q=vec3(.3,.4,.1);vec3 S=vec3(.5,.4,.2);float T=k(j*37.17);float U=0.85+0.3*l(i.xz+vec2(j));vec3 b=mix(Q,S,smoothstep(0.,1.,T));vec3 c=mix(b*.4,b,smoothstep(0.,1.,P))*U;float V=l(i.xz+f*12.34);c*=(.97+.06*V);o=vec4(c*a,a);}`;
 
     const PPLANTS = prog(vsPlants, fsPlants); // Compile and link plant shader program
-    const uMPla = gl.getUniformLocation(PPLANTS, 'M'); // Get location of Model matrix uniform
-    const uVPla = gl.getUniformLocation(PPLANTS, 'V'); // Get location of View matrix uniform
-    const uPPla = gl.getUniformLocation(PPLANTS, 'P'); // Get location of Projection matrix uniform
-    const uTimePla = gl.getUniformLocation(PPLANTS, 'uTime'); // Get location of time uniform for animation
-    const uMaxIterationsPla = gl.getUniformLocation(PPLANTS, 'uMaxIterations'); // Get location of max iterations uniform
-    const uPlantPosPla = gl.getUniformLocation(PPLANTS, 'uPlantPos');
-    const uPlantSeedPla = gl.getUniformLocation(PPLANTS, 'uPlantSeed');
+    const uMPla = gl.getUniformLocation(PPLANTS, 'c'); // Get location of Model matrix uniform
+    const uVPla = gl.getUniformLocation(PPLANTS, 'd'); // Get location of View matrix uniform
+    const uPPla = gl.getUniformLocation(PPLANTS, 'e'); // Get location of Projection matrix uniform
+    const uTimePla = gl.getUniformLocation(PPLANTS, 'g'); // Get location of time uniform for animation
+    const IPla = gl.getUniformLocation(PPLANTS, 'h'); // Get location of max iterations uniform
+    const uPlantPosPla = gl.getUniformLocation(PPLANTS, 'i');
+    const uPlantSeedPla = gl.getUniformLocation(PPLANTS, 'j');
 
     const vboPlants = gl.createBuffer(), vaoPlants = gl.createVertexArray(); // Create vertex buffer and vertex array objects
     gl.bindVertexArray(vaoPlants); // Bind the vertex array object
@@ -1745,7 +1745,7 @@
                 gl.uniformMatrix4fv(uVPla, false, V);
                 gl.uniformMatrix4fv(uPPla, false, P);
                 gl.uniform1f(uTimePla, t * 0.001);
-                gl.uniform1i(uMaxIterationsPla, iterations);
+                gl.uniform1i(IPla, iterations);
                 gl.uniform3f(uPlantPosPla, px, 0, pz);
                 gl.uniform1f(uPlantSeedPla, plantSeed);
                 gl.drawArrays(gl.TRIANGLES, 0, 6);
@@ -1840,7 +1840,7 @@
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, noiseTex);
         gl.uniform1i(uNoise, 0);
-        gl.uniform1f(uNoiseScale, 0.0002); // adjust for biome size (smaller = larger biomes)
+        gl.uniform1f(ns, 0.0002); // adjust for biome size (smaller = larger biomes)
         gl.enable(gl.DEPTH_TEST);
         gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 10, gridN * gridN);
     }
@@ -2159,7 +2159,7 @@
                 gl.uniformMatrix4fv(uVPla, false, v.transform.inverse.matrix);
                 gl.uniformMatrix4fv(uPPla, false, v.projectionMatrix);
                 gl.uniform1f(uTimePla, t * 0.001);
-                gl.uniform1i(uMaxIterationsPla, iterations);
+                gl.uniform1i(IPla, iterations);
                 gl.uniform3f(uPlantPosPla, px, 0, pz);
                 gl.uniform1f(uPlantSeedPla, plantSeed);
                 gl.drawArrays(gl.TRIANGLES, 0, 6);
