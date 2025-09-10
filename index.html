@@ -1530,6 +1530,9 @@
         }
         return out;
     }
+
+    let cachedPlants = [];
+    let lastPlantCamX = 0, lastPlantCamZ = 0;
     
     const vsPlants=`#version 300 es
     layout(location=0)in vec3 a;layout(location=1)in vec2 b;uniform mat4 c,d,e;out vec2 f;void main(){f=b;gl_Position=e*d*c*vec4(a,1.0);}`;
@@ -1604,7 +1607,7 @@
     
     // -- CORE: render --
     // --- Main Render Loop (Desktop) ---
-    frameCount = 0;
+    let frameCount = 0;
     function loop(t) {
         // If an immersive XR session is active, stop the desktop loop chain.
         if (xr) return;  // prevents scheduling the next frame; XR loop takes over
@@ -1763,9 +1766,15 @@
 
             const camX = u.x;
             const camZ = u.z;
-            const plants = genPlants(camX, camZ);
 
-            for(const p of plants){
+            // Only regenerate plants every 10 frames or if camera moved significantly
+            if (frameCount % 10 === 0 || HYPOT(camX - lastPlantCamX, camZ - lastPlantCamZ) > 5.0) {
+                cachedPlants = genPlants(camX, camZ);
+                lastPlantCamX = camX;
+                lastPlantCamZ = camZ;
+            }
+
+            for(const p of cachedPlants){
                 const px = p.px, pz = p.pz, scale = p.scale;
 
                 // Distance & LOD
@@ -2177,9 +2186,17 @@
                 const worldFromView = v.transform.matrix;
                 const camX = worldFromView[12];
                 const camZ = worldFromView[14];
-                const plants = genPlants(camX, camZ);
 
-            for(const p of plants){
+                
+                // Only regenerate plants every 10 frames or if camera moved significantly
+                if (frameCount % 10 === 0 || HYPOT(camX - lastPlantCamX, camZ - lastPlantCamZ) > 5.0) {
+                    cachedPlants = genPlants(camX, camZ);
+                    lastPlantCamX = camX;
+                    lastPlantCamZ = camZ;
+                }
+
+            //if (frameCount % 10 === 0) {
+            for(const p of cachedPlants){
                 const px = p.px, pz = p.pz, scale = p.scale;
 
                 // Distance & LOD
@@ -2350,9 +2367,9 @@
         requestAnimationFrame(loop);
         log(`Welcome! Catch the black cat!`);
         log('Close HUD: X/H/Esc');
+        log('Touch-drag to Look around');
         if (!isMobile) log('Move: WASD, Rotate: Q & E');
         if (isMobile) log('Move: left, Rotate: right');
-        log('Touch-drag to Look around');
     })();
     
     // -- /FEATURE: CORE --
