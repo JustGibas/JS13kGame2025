@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>'Wild Catch' 13K Game 2025</title>
-    <meta name="author" content="Justinas Gibas" />
+    <!--meta name="author" content="Justinas Gibas" /-->
     <!--<link rel="icon" type="image/svg+xml" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="55%" x="50%" dominant-baseline="middle" text-anchor="middle" font-size="80">🐈‍⬛</text></svg>'>-->
     <style>
         /* Basic styles to make the canvas and joysticks fill the screen */
@@ -258,15 +258,17 @@
         // Body core (chain) + head
         place(0.10,0,0,0.25); place(-0.05,0,0,0.25); place(-0.20,0,0,0.24);
         place(0.38,0.18,0,0.20);
+        place(0.38,0.33,0.12,0.08);place(0.38,0.4,0.16,0.04);
+        place(0.38,0.33,-0.12,0.08);place(0.38,0.4,-0.16,0.04);
         // Animated legs and tail
         const cyc = v=>SIN(v)*amp, cy0 = cyc(anim), cy1 = cyc(anim+PI), baseY = -0.30;
         place(0.15, baseY + cy0, 0.14, 0.09);
         place(0.15, baseY + cy1,-0.14, 0.09);
         place(-0.25, baseY + cy1, 0.15, 0.09);
         place(-0.25, baseY + cy0,-0.15, 0.09);
-        place(-0.40,0.15, cy0*0.4,0.14);
+        place(-0.40,0.15, cy0*0.5,0.14);
         place(-0.55,0.25, 0,0.12);
-        place(-0.70,0.30, cy1*0.5,0.11);
+        place(-0.70,0.30, cy1*0.6,0.11);
     }
     // -- /FEATURE: MMO --
 
@@ -1568,16 +1570,16 @@
     // Reticle removed; single disc shader used for VR hand/grip indicator
 
     const vsDisc=`#version 300 es
-    layout(location=0)in vec2 p;uniform mat4 M,V,P;out vec2 uv;void main(){uv=p*.5+.5;gl_Position=P*V*M*vec4(p.x,0.,p.y,1.);}`;
+    layout(location=0)in vec2 a;uniform mat4 b,c,d;out vec2 e;void main(){e=a*.5+.5;gl_Position=d*c*b*vec4(a.x,0.,a.y,1.);}`;
 
     const fsDisc=`#version 300 es
-    precision highp float;in vec2 uv;uniform vec4 col;out vec4 o;void main(){float d=distance(uv,vec2(.5)),r=smoothstep(.5,.4,d)-smoothstep(.4,.3,d);o=vec4(col.rgb,col.a*r);if(o.a<.02)discard;}`;
+    precision highp float;in vec2 e;uniform vec4 f;out vec4 g;void main(){float h=distance(e,vec2(.5)),i=smoothstep(.5,.4,h)-smoothstep(.4,.3,h);g=vec4(f.rgb,f.a*i);if(g.a<.02)discard;}`;
 
     const PDisc = prog(vsDisc, fsDisc);
-    const uMDisc = gl.getUniformLocation(PDisc, 'M'),
-          uVDisc = gl.getUniformLocation(PDisc, 'V'),
-          uPDisc = gl.getUniformLocation(PDisc, 'P'),
-          uColDisc = gl.getUniformLocation(PDisc, 'col');
+    const uMDisc = gl.getUniformLocation(PDisc, 'b'),
+          uVDisc = gl.getUniformLocation(PDisc, 'c'),
+          uPDisc = gl.getUniformLocation(PDisc, 'd'),
+          uColDisc = gl.getUniformLocation(PDisc, 'f');
 
     const vboR = gl.createBuffer(), vaoR = gl.createVertexArray();
     gl.bindVertexArray(vaoR);
@@ -1591,11 +1593,11 @@
 
     // Beam for pointing ray.
     const vsBeam = `#version 300 es
-    layout(location=0) in vec3 p;uniform mat4 M,V,P;void main(){gl_Position=P*V*M*vec4(p,1.);}`;
+    layout(location=0)in vec3 a;uniform mat4 b,c,d;void main(){gl_Position=d*c*b*vec4(a,1.);}`;
     const fsBeam = `#version 300 es
-    precision highp float;uniform vec4 col;out vec4 o;void main(){ o=col; }`;
+    precision highp float;uniform vec4 a;out vec4 b;void main(){b=a;}`;
     const PBeam = prog(vsBeam, fsBeam);
-    const uMBeam = gl.getUniformLocation(PBeam, 'M'), uVBeam = gl.getUniformLocation(PBeam, 'V'), uPBeam = gl.getUniformLocation(PBeam, 'P'), uColBeam = gl.getUniformLocation(PBeam, 'col');
+    const uMBeam = gl.getUniformLocation(PBeam, 'b'), uVBeam = gl.getUniformLocation(PBeam, 'c'), uPBeam = gl.getUniformLocation(PBeam, 'd'), uColBeam = gl.getUniformLocation(PBeam, 'a');
     const vboBeam = gl.createBuffer(), vaoBeam = gl.createVertexArray();
     gl.bindVertexArray(vaoBeam);
     gl.bindBuffer(gl.ARRAY_BUFFER, vboBeam);
