@@ -2317,13 +2317,14 @@ const fsSky=`in vec2 a;out vec4 b;uniform mat4 c,d;uniform sampler2D e;uniform f
     (function main() {
         initXR();
         requestAnimationFrame(loop);
-        log(`Welcome! Catch the black cat!`);
+        log(`Catch the black cat!`);
         log('Close HUD: X/H/Esc');
         log('Touch-drag to Look around');
         //if (!isMobile) log('Move: WASD, Rotate: Q & E');
-        log('Move: WASD, Rotate: Q & E');
-        if (isMobile) log('Move: left joy, Rotate: right joy');
+        //log('Move: WASD, Rotate: Q & E');
+        //if (isMobile) log('Move: left joy, Rotate: right joy');
         //log('Move: left, Rotate: right');
+        log('Move: '+(isMobile ? 'left joy' : 'WASD')+', Rotate: '+(isMobile ? 'right joy' : 'Q & E'));
     })();
     
     // -- /FEATURE: CORE --
