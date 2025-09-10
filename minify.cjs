@@ -161,6 +161,8 @@ const { minify: minifyHTML } = require("html-minifier-terser");
   }
 
   // Write output.
-  try { await writeFile(outFile, html, "utf8"); console.log("Packed ->", outFile); }
+  try { await writeFile(outFile, html, "utf8"); console.log("Packed ->", outFile);
+  console.log("File size:", Buffer.byteLength(html, "utf8"), "bytes"); }
   catch (e) { console.error("Write fail:", e.message); process.exit(1); }
 })().catch(e => { console.error("Unexpected:", e); process.exit(1); });
+
