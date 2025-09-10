@@ -22,8 +22,8 @@
             width: 112px;
             height: 112px;
             border-radius: 50%;
-            background: rgba(255, 255, 200, 0.08);
-            border: 2px solid rgba(255, 255, 200, 0.25);
+            background: rgba(255, 255, 200, .08);
+            border: 2px solid rgba(255, 255, 200, .25);
             z-index: 10;
             display: none; /* Hidden by default, shown for touch devices */
         }
@@ -34,7 +34,7 @@
             width: 36px;
             height: 36px;
             border-radius: 50%;
-            background: rgba(255, 255, 150, 0.6);
+            background: rgba(255, 255, 150, .6);
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
@@ -112,7 +112,7 @@
     const C = document.getElementById('C');
     
     // State variables for the user/camera, rendering loop, and WebGL/WebXR contexts
-     let u = { x: 0, y: 1.6, z: 2, yaw: 0, pitch: 0.2 }; // User position and orientation
+     let u = { x: 0, y: 1.6, z: 2, yaw: 0, pitch: .2 }; // User position and orientation
      let prevUserX = u.x, prevUserZ = u.z; // previous frame planar position
      let userVelX = 0, userVelZ = 0;             // planar velocity for cat pursuit
     let last = 0; // Timestamp of the last frame for calculating delta time
@@ -257,19 +257,19 @@
             drawSphere(Vmat, Pmat, wx, y + ly, wz, r, col);
         }
         // Body core (chain) + head
-        place(0.10,0,0,0.25); place(-0.05,0,0,0.25); place(-0.20,0,0,0.24);
-        place(0.38,0.18,0,0.20);
-        place(0.38,0.33,0.12,0.08);place(0.38,0.4,0.16,0.04);
-        place(0.38,0.33,-0.12,0.08);place(0.38,0.4,-0.16,0.04);
+        place(.10,0,0,.25); place(-.05,0,0,.25); place(-.20,0,0,.24);
+        place(.38,.18,0,.20);
+        place(.38,.33,.12,.08);place(.38,.4,.16,.04);
+        place(.38,.33,-.12,.08);place(.38,.4,-.16,.04);
         // Animated legs and tail
-        const cyc = v=>SIN(v)*amp, cy0 = cyc(anim), cy1 = cyc(anim+PI), baseY = -0.30;
-        place(0.15, baseY + cy0, 0.14, 0.09);
-        place(0.15, baseY + cy1,-0.14, 0.09);
-        place(-0.25, baseY + cy1, 0.15, 0.09);
-        place(-0.25, baseY + cy0,-0.15, 0.09);
-        place(-0.40,0.15, cy0*0.5,0.14);
-        place(-0.55,0.25, 0,0.12);
-        place(-0.70,0.30, cy1*0.6,0.11);
+        const cyc = v=>SIN(v)*amp, cy0 = cyc(anim), cy1 = cyc(anim+PI), baseY = -.30;
+        place(.15, baseY + cy0, .14, .09);
+        place(.15, baseY + cy1,-.14, .09);
+        place(-.25, baseY + cy1, .15, .09);
+        place(-.25, baseY + cy0,-.15, .09);
+        place(-.40,.15, cy0*.5,.14);
+        place(-.55,.25, 0,.12);
+        place(-.70,.30, cy1*.6,.11);
     }
     // -- /FEATURE: MMO --
 
@@ -311,7 +311,7 @@
         look: { id: null, x: 0, y: 0 },
         pointer: { x: 0, y: 0 }
     };
-    const DZ = 0.1;    // Deadzone for joystick/gamepad axes to prevent drift
+    const DZ = .1;    // Deadzone for joystick/gamepad axes to prevent drift
     // A map to track the previous pressed state of VR controller buttons for edge detection (press/release)
     const pressedMap = new Map();
 
@@ -355,8 +355,8 @@
             const dy = e.clientY - I.look.y;
             I.look.x = e.clientX;
             I.look.y = e.clientY;
-            u.yaw += dx * 0.002;
-            u.pitch = MAX(-PI / 2+0.001, MIN(PI / 2-0.001, u.pitch - dy * 0.002));
+            u.yaw += dx * .002;
+            u.pitch = MAX(-PI/2+.001,MIN(PI/2-.001,u.pitch-dy *.002));
         }
     });
     
@@ -572,12 +572,12 @@
     const obstacles = [];              // solid spheres for collision {x,y,z,r}
     const traps = [];                  // spheres spawnned by cat {x,y,z,r}
     // Player capsule constants (smaller than an object w/ props)
-    const CR = 0.5, CH = 1.6, CE = 1.6; // capsule radius, height, eye-offset
+    const CR = .5, CH = 1.6, CE = 1.6; // capsule radius, height, eye-offset
     let playerMoveMag = 0;             // cached player movement magnitude (for chase detection)
 
     // -- MODULE: Gameplay-Cat --
     // Stylized Black Cat the player must catch. Roams near center, avoids player, drops boosts & obstacles.
-    const cat = { x:0, y:0.6, z:0, vx:0, vz:0, caught:0, drop:1.2, baseS:3, anim:0, evade:0, yaw:0 };
+    const cat = { x:0, y:.6, z:0, vx:0, vz:0, caught:0, drop:1.2, baseS:3, anim:0, evade:0, yaw:0 };
     let chaseActive = false; // true when player is close and moving
 
     function resetCatPosition(){
@@ -588,9 +588,9 @@
     }
 
     function spawnDrop(x,z){
-        const boost = RANDOM()<0.4;
-        (boost?items:traps).push(boost?{x,y:0.5,z,r:0.4}:{x,y:0.6,z,r:0.6});
-        if(audioCtx){ bell(audioCtx.currentTime, boost?870:660, window.chipMusic, boost?0.1:0.2); }
+        const boost = RANDOM()<.4;
+        (boost?items:traps).push(boost?{x,y:.5,z,r:.4}:{x,y:.6,z,r:.6});
+        if(audioCtx){ bell(audioCtx.currentTime, boost?870:660, window.chipMusic, boost?.1:.2); }
         if(items.length>100) items.splice(0, items.length-100);
         if(traps.length>3) traps.splice(0, traps.length-3);
     }
@@ -620,7 +620,7 @@
             // Get the normalized vector towards the player.
             const nx = dxP/dist, nz = dzP/dist;
             // Determine the orbit direction (clockwise/counter-clockwise) based on world position.
-            const s = SIN((u.x+u.z)*0.2)>0?1:-1;
+            const s = SIN((u.x+u.z)*.2)>0?1:-1;
             // Apply a force towards the player and a perpendicular force for orbiting.
             fx += nx*1.1 + (-nz*s)*4; fz += nz*1.1 + (nx*s)*4;
         // If the player is very close (distance < 10), the cat will flee.
@@ -644,9 +644,9 @@
         //}
 
         // Calculate the cat's current speed and direction for look-ahead checks.
-        const spd = HYPOT(cat.vx, cat.vz) + 0.1, dirx = cat.vx/spd, dirz = cat.vz/spd;
+        const spd = HYPOT(cat.vx, cat.vz) + .1, dirx = cat.vx/spd, dirz = cat.vz/spd;
         // 'look' is the distance ahead the cat will check for obstacles, scaled by its speed.
-        const look = 10 + spd*0.6;
+        const look = 10 + spd*.6;
         // Iterate through all obstacles in the scene.
         for(const ob of obstacles){
             // Calculate the vector from the cat to the obstacle.
@@ -684,7 +684,7 @@
 
         // Evade impulse when very close
         cat.evade -= dt;
-        if(dP2 < 9 && cat.evade<=0){ const d = SQRT(dP2)||1, nx = dxP/d, nz = dzP/d, s = RANDOM()<0.5?1:-1; fx += (-nz*s)*50; fz += (nx*s)*50; cat.evade = .2; }
+        if(dP2 < 9 && cat.evade<=0){ const d = SQRT(dP2)||1, nx = dxP/d, nz = dzP/d, s = RANDOM()<.5?1:-1; fx += (-nz*s)*50; fz += (nx*s)*50; cat.evade = .2; }
 
         // Integrate & clamp speed
         cat.vx += fx*dt; cat.vz += fz*dt;
@@ -693,7 +693,7 @@
         cat.x += cat.vx*dt; cat.z += cat.vz*dt;
 
         // Face movement direction
-        if(sp>0.1){
+        if(sp>.1){
             const targetYaw = ATAN2(cat.vx, cat.vz); let dy = targetYaw - cat.yaw;
             if(dy > PI) dy -= 2*PI; else if(dy < -PI) dy += 2*PI; cat.yaw += dy * MIN(1, dt*10);
         }
@@ -702,15 +702,15 @@
         cat.vx *= (1 - 1.1*dt); cat.vz *= (1 - 1.1*dt);
 
         // Chase / drops
-        const chased = dP2 < 100 && playerMoveMag>0.15; chaseActive = chased;
-        if(chased){ cat.drop -= dt; if(cat.drop<=0){ spawnDrop(cat.x, cat.z); cat.drop = 1.9 + RANDOM()*0.8; } }
+        const chased = dP2 < 100 && playerMoveMag>.15; chaseActive = chased;
+        if(chased){ cat.drop -= dt; if(cat.drop<=0){ spawnDrop(cat.x, cat.z); cat.drop = 1.9 + RANDOM()*.8; } }
 
         // Anim & catch
         cat.anim += sp*dt*3.5;
         if(dP2 < (.5+CR)*(.5+CR)){
             cat.caught++; log('Cat caught #'+cat.caught);
-            if(audioCtx){ bell(audioCtx.currentTime,800,window.chipMusic,0.5); bell(audioCtx.currentTime+0.1,1000,window.chipMusic,0.3); bell(audioCtx.currentTime+0.2,1200,window.chipMusic,0.4); }
-            if(speedBoosts.length<10) speedBoosts.push({timeLeft:15, amount:0.3});
+            if(audioCtx){ bell(audioCtx.currentTime,800,window.chipMusic,.5); bell(audioCtx.currentTime+.1,1000,window.chipMusic,.3); bell(audioCtx.currentTime+.2,1200,window.chipMusic,.4); }
+            if(speedBoosts.length<10) speedBoosts.push({timeLeft:15, amount:.3});
             resetCatPosition();
         }
     }
@@ -740,8 +740,8 @@
             const dx = itm.x - u.x, dy = itm.y - ny, dz = itm.z - u.z;
             if (HYPOT(dx,dy,dz) < itm.r + CR){
                 itm.r = 0; // mark consumed
-                if (speedBoosts.length < 10) speedBoosts.push({ timeLeft: 15, amount: 0.3 });
-                if(audioCtx) bell(audioCtx.currentTime, 880 * POW(2, ((RANDOM()*6)|0)/6), window.chipMusic, 0.2);
+                if (speedBoosts.length < 10) speedBoosts.push({ timeLeft: 15, amount: .3 });
+                if(audioCtx) bell(audioCtx.currentTime, 880 * POW(2, ((RANDOM()*6)|0)/6), window.chipMusic, .2);
             }
         }
     }
@@ -754,7 +754,7 @@
             let dx = u.x - o.x, dy = ny - o.y, dz = u.z - o.z;
             const d = HYPOT(dx,dy,dz), minD = CR + o.r;
             if (d < minD){
-                if (d < 0.0001) { u.x = prevX; u.z = prevZ; }
+                if (d < .0001) { u.x = prevX; u.z = prevZ; }
                 else { const p = (minD - d)/d; u.x += dx * p; u.z += dz * p; }
             }
         };
@@ -819,7 +819,7 @@
         const now = performance.now();
         const moveMagnitude = HYPOT(mv.x, mv.y); playerMoveMag = moveMagnitude;
         // Trigger movement music activation (only sets flag / lazy init)
-        if(moveMagnitude > 0.1 && now - lastStepTime > stepInterval){
+        if(moveMagnitude > .1 && now - lastStepTime > stepInterval){
             playStepSound(); // now activates loop system
             lastStepTime = now;
         }
@@ -870,19 +870,19 @@
     function playWindSound(){
         if(!audioCtx) return;
         const N=audioCtx.sampleRate*2, b=audioCtx.createBuffer(1,N,audioCtx.sampleRate), d=b.getChannelData(0);
-        let l=0;for(let i=0;i<N;i++){const w=RANDOM()*2-1;d[i]=l=(l+0.02*w)/1.02;}
+        let l=0;for(let i=0;i<N;i++){const w=RANDOM()*2-1;d[i]=l=(l+.02*w)/1.02;}
         const s=audioCtx.createBufferSource();s.buffer=b;s.loop=true;
         const f=audioCtx.createBiquadFilter();f.type='lowpass';f.frequency.value=300;f.Q.value=.7;
         const g=audioCtx.createGain();g.gain.value=0; s.connect(f);f.connect(g);g.connect(audioCtx.destination);s.start();
         audioCtx.windFilter=f;audioCtx.windGain=g;audioCtx.windStart=audioCtx.currentTime;
     }
     // Compact sway (mirrors grass shader math) returns sway value only.
-    function windSway(x,z,t){const g=.6*SIN(x*.07+z*.05+t*.7)+.4*SIN(x*-0.03+z*.04-t*1.2);return .25*g+.07*SIN(t*1.7);}    
+    function windSway(x,z,t){const g=.6*SIN(x*.07+z*.05+t*.7)+.4*SIN(x*-.03+z*.04-t*1.2);return .25*g+.07*SIN(t*1.7);}    
     function updateWind(timeSec,camX,camZ){
         if(!audioCtx||!audioCtx.windGain) return;const now=audioCtx.currentTime;const s=windSway(camX,camZ,timeSec);
         // Gain & brightness from sway (no stereo)
-        const gain=0.02+0.01*MAX(0,s+0.3);audioCtx.windGain.gain.setTargetAtTime(gain,now,.3);
-        const freq=250+900*MAX(0,s+0.2);audioCtx.windFilter.frequency.setTargetAtTime(freq,now,.3);
+        const gain=.02+.01*MAX(0,s+.3);audioCtx.windGain.gain.setTargetAtTime(gain,now,.3);
+        const freq=250+900*MAX(0,s+.2);audioCtx.windFilter.frequency.setTargetAtTime(freq,now,.3);
     }
     // -- /SOLUTION: Scene-Audio-Wind --
     // -- SOLUTION: Scene-Audio-Click --
@@ -895,10 +895,10 @@
         gain.connect(audioCtx.destination);
         osc.type = 'triangle';
         osc.frequency.setValueAtTime(300, t);
-        gain.gain.setValueAtTime(0.3, t);
-        gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.1);
+        gain.gain.setValueAtTime(.3, t);
+        gain.gain.exponentialRampToValueAtTime(.0001, t + .1);
         osc.start(t);
-        osc.stop(t + 0.1);    
+        osc.stop(t + .1);    
     }
     // -- /SOLUTION: Scene-Audio-Click --
     // -- SOLUTION: Scene-Audio-Step --
@@ -924,25 +924,25 @@
         if(!audioCtx||!window.chipMusic)return;const m=window.chipMusic,now=audioCtx.currentTime;
         // base engagement rise only if moving AND either chasing or has boosts
         const boostLevel = speedBoosts.length; // 0..10 typical
-        const boostFactor = MIN(1, boostLevel*0.08); // up to +0.8 contribution
-        const active = mv>0.1 && (chaseActive || boostLevel>0);
+        const boostFactor = MIN(1, boostLevel*.08); // up to +0.8 contribution
+        const active = mv>.1 && (chaseActive || boostLevel>0);
         if(active){
             // faster build if actually chasing; slower if only boosts
-            const build = (chaseActive?0.08:0.04) + 0.03*boostFactor;
+            const build = (chaseActive?.08:.04) + .03*boostFactor;
             m.eng=MIN(1,m.eng+build*dt);m.last=now;
-        } else if(now-m.last> (chaseActive?0.6:0.9)) {
+        } else if(now-m.last> (chaseActive?.6:.9)) {
             // decay slower when recently chasing
-            const decay = chaseActive?0.15:0.10;
+            const decay = chaseActive?.15:.10;
             m.eng=MAX(0,m.eng-decay*dt);
         }
         // tempo scaled also by boosts (slight) but clamp if not chasing (cap energy effect)
-        const effEng = chaseActive?m.eng: m.eng*0.6; // limit build when passive
-        const tempoBoost = 1 + boostFactor*0.25; // up to +25% at max boosts
+        const effEng = chaseActive?m.eng: m.eng*.6; // limit build when passive
+        const tempoBoost = 1 + boostFactor*.25; // up to +25% at max boosts
         const tempo = (m.b0+(m.b1-m.b0)*POW(effEng,.7))*tempoBoost;
         m.bd=60/tempo;
-        const baseGain = effEng?0.05+.18*effEng:0;
+        const baseGain = effEng?.05+.18*effEng:0;
         // small additive layer from boosts while chasing
-        const tg = baseGain + (chaseActive?boostFactor*0.05:0);
+        const tg = baseGain + (chaseActive?boostFactor*.05:0);
         m.g.gain.setTargetAtTime(tg,now,.25);
         while(music && now>=m.next){emitBeat(m);m.next+=m.bd/2;}
         if(m.eng===0&&now-m.last>5)m.g.gain.setTargetAtTime(.0001,now,1);
@@ -954,7 +954,7 @@
     }
     function kick(t,m){const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='sine';o.frequency.setValueAtTime(120,t);o.frequency.exponentialRampToValueAtTime(50,t+.18);g.gain.setValueAtTime(.001,t);g.gain.exponentialRampToValueAtTime(.2*(.4+.4*m.eng),t+.01);g.gain.exponentialRampToValueAtTime(.0001,t+.22);o.connect(g);g.connect(m.g);o.start(t);o.stop(t+.24);}    
     function snare(t,m){const n=audioCtx.createBufferSource(),B=audioCtx.createBuffer(1,audioCtx.sampleRate*.18,audioCtx.sampleRate),d=B.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(RANDOM()*2-1)*POW(1-i/d.length,1.8);n.buffer=B;const bp=audioCtx.createBiquadFilter();bp.type='bandpass';bp.frequency.value=1800;const g=audioCtx.createGain();g.gain.setValueAtTime(.001,t);g.gain.exponentialRampToValueAtTime(.35*(.4+.6*m.eng),t+.008);g.gain.exponentialRampToValueAtTime(.0001,t+.18);n.connect(bp);bp.connect(g);g.connect(m.g);n.start(t);n.stop(t+.18);}    
-    function bell(t,f,m,vol){const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='triangle';o.frequency.value=f;g.gain.setValueAtTime(.001,t);const pk=(vol||.18)*(0.5+.2*m.eng);g.gain.exponentialRampToValueAtTime(pk,t+.02);g.gain.exponentialRampToValueAtTime(.0002,t+.55);o.connect(g);g.connect(m.g);o.start(t);o.stop(t+.6);}
+    function bell(t,f,m,vol){const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='triangle';o.frequency.value=f;g.gain.setValueAtTime(.001,t);const pk=(vol||.18)*(.5+.2*m.eng);g.gain.exponentialRampToValueAtTime(pk,t+.02);g.gain.exponentialRampToValueAtTime(.0002,t+.55);o.connect(g);g.connect(m.g);o.start(t);o.stop(t+.6);}
     //function spawnCatVoice(t, f, m){
     //    // Simple formant-ish meow made from two detuned oscillators fading quickly
     //    const carrier = audioCtx.createOscillator();
@@ -998,17 +998,17 @@
     // UI button definitions. Each object defines a button's ID, position (in UV space), label, and click handler
     let uiEnterLabel = 'Enter VR';
     const UI_MAIN = [
-    { id: 'reset', u0: 0.4, v0: 0.05, u1: 0.7, v1: 0.15, label: 'Reset', onClick: () => { playClickSound(); u.x = 0; u.z = 2; u.yaw = 0; u.pitch = 0.2; resetCatPosition(); log('reset position'); } },
-        { id: 'vr', u0: 0.4, v0: 0.2, u1: 0.7, v1: 0.3, label: () => uiEnterLabel, onClick: () => { playClickSound(); toggleXRFromUI(); } },
-        { id: 'mmo', u0: 0.4, v0: 0.35, u1: 0.7, v1: 0.45, label: () => 'MMO: ' + (mmoEnabled ? 'ON' : 'OFF'), onClick: () => { playClickSound(); toggleMMO(); } },
-        { id: 'music', u0: 0.8, v0: 0.3, u1: 0.98, v1: 0.4, label: () => 'Music: ' + (music ? 'ON' : 'OFF'), onClick: () => { playClickSound(); music = !music; log('music ' + (music ? 'on' : 'off')); } },
+    { id: 'reset', u0: .4, v0: .05, u1: .7, v1: .15, label: 'Reset', onClick: () => { playClickSound(); u.x = 0; u.z = 2; u.yaw = 0; u.pitch = .2; resetCatPosition(); log('reset position'); } },
+        { id: 'vr', u0: .4, v0: .2, u1: .7, v1: .3, label: () => uiEnterLabel, onClick: () => { playClickSound(); toggleXRFromUI(); } },
+        { id: 'mmo', u0: .4, v0: .35, u1: .7, v1: .45, label: () => 'MMO: ' + (mmoEnabled ? 'ON' : 'OFF'), onClick: () => { playClickSound(); toggleMMO(); } },
+        { id: 'music', u0: .8, v0: .3, u1: .98, v1: .4, label: () => 'Music: ' + (music ? 'ON' : 'OFF'), onClick: () => { playClickSound(); music = !music; log('music ' + (music ? 'on' : 'off')); } },
         //{ id: 'logtog', u0: 0.85, v0: 0.5, u1: 0.98, v1: 0.6 , label: 'LOG', onClick: () => { playClickSound(); logVisible = !logVisible; } },
-        { id: 'logdn', u0: 0.85, v0: 0.8, u1: 0.98, v1: 0.9, label: 'Down', onClick: () => { playClickSound(); logScroll = MAX(0, logScroll - 1); } },
-        { id: 'logup', u0: 0.85, v0: 0.7, u1: 0.98, v1: 0.8, label: 'Up', onClick: () => { playClickSound(); logScroll = MIN(MAX(0, LOG.length - 1), logScroll + 1); } },
-        { id: 'hudx', u0: 0.8, v0: 0.04, u1: 0.98, v1: 0.2, label: 'Close       X', onClick: () => { playClickSound(); hudVisible = false; } }
+        { id: 'logdn', u0: .85, v0: .8, u1: .98, v1: .9, label: 'Down', onClick: () => { playClickSound(); logScroll = MAX(0, logScroll - 1); } },
+        { id: 'logup', u0: .85, v0: .7, u1: .98, v1: .8, label: 'Up', onClick: () => { playClickSound(); logScroll = MIN(MAX(0, LOG.length - 1), logScroll + 1); } },
+        { id: 'hudx', u0: .8, v0: .04, u1: .98, v1: .2, label: 'Close       X', onClick: () => { playClickSound(); hudVisible = false; } }
     ];
     const UI_TAB = [
-        { id: 'hudopen', u0: 0.4, v0: 0, u1: 0.6, v1: 0.12, label: 'HUD', onClick: () => { playClickSound(); hudVisible = true; } }
+        { id: 'hudopen', u0: .4, v0: 0, u1: .6, v1: .12, label: 'HUD', onClick: () => { playClickSound(); hudVisible = true; } }
     ];
 
     // Returns the currently active set of UI buttons
@@ -1017,10 +1017,10 @@
     // Returns the correct local transform for the HUD based on its visibility state
     function getHudTransform() {
         if (hudVisible) { // Centered panel
-            return new DOMMatrix([1,0,0,0, 0,1,0,0, 0,0,1,0, 0, -0.05, -1.15, 1]).toFloat32Array();
+            return new DOMMatrix([1,0,0,0, 0,1,0,0, 0,0,1,0, 0, -.05, -1.15, 1]).toFloat32Array();
         }
         // Top tab.
-        return new DOMMatrix([1,0,0,0, 0,1,0,0, 0,0,1,0, 0, 0.5, -1.15, 1]).toFloat32Array();
+        return new DOMMatrix([1,0,0,0, 0,1,0,0, 0,0,1,0, 0, .5, -1.15, 1]).toFloat32Array();
     }
 
     // --- HUD Interaction Needs Input-ray ---
@@ -1036,11 +1036,11 @@
         const y = o[1] + d[1] * t;
 
         // Check if the hit is within the quad's bounds
-        if (x < -0.26 || x > 0.26 || y < -0.15 || y > 0.15) return null;
+        if (x < -.26 || x > .26 || y < -.15 || y > .15) return null;
         
         // Convert local coordinates to UV coordinates
-        const u = (x + 0.26) / (0.26 * 2);
-        const v = (0.15 - y) / (0.15 * 2);
+        const u = (x + .26) / (.26 * 2);
+        const v = (.15 - y) / (.15 * 2);
 
         // Check against each button's UV bounds
         for (const b of ui) {
@@ -1153,18 +1153,18 @@
                 //hudCtx.fillText(lab, x + w / 2, y + h / 2);
                 //hudCtx.textAlign = 'left';
                 // Center text vertically and with a slight left padding
-                hudCtx.fillText(lab, x + 10, y + h * 0.5);
+                hudCtx.fillText(lab, x + 10, y + h * .5);
             }
         }
         // --- Third HUD variant: temporary overlay on top (minimal) ---
         if (congratsTimer > 0) {
             hudCtx.save();
             // Smooth fade near the end
-            const alpha = (congratsTimer > 0.5) ? 1 : MAX(0, congratsTimer / 0.5);
+            const alpha = (congratsTimer > .5) ? 1 : MAX(0, congratsTimer / .5);
             hudCtx.globalAlpha = alpha;
             // Position (clean, unobtrusive near upper center)
-            const x = hudCan.width * 0.5 + 10;
-            const y = hudCan.height * 0.4;
+            const x = hudCan.width * .5 + 10;
+            const y = hudCan.height * .4;
             const text = `CAT #${cat.caught} CAUGHT`;
             // Typography
             hudCtx.textAlign = 'center';
@@ -1176,7 +1176,7 @@
             g.addColorStop(1, '#e0d0a0'); // yellowish bottom
             // Thin soft stroke for readability
             hudCtx.lineWidth = 7;
-            hudCtx.strokeStyle = 'rgba(0,0,0,0.5)';
+            hudCtx.strokeStyle = 'rgba(0,0,0,.5)';
             hudCtx.strokeText(text, x, y);
             hudCtx.fillStyle = g;
             hudCtx.fillText(text, x, y);
@@ -1213,7 +1213,7 @@
     const vsH = `#version 300 es
     layout(location=0)in vec3 p;layout(location=1)in vec2 uv;uniform mat4 M,V,P;out vec2 U;void main(){U=uv;gl_Position=P*V*M*vec4(p,1.);}`;
     const fsH = `#version 300 es
-    precision highp float;in vec2 U;uniform sampler2D T;out vec4 o;void main(){vec4 c=texture(T,U);if(c.a<0.01)discard;o=c;}`;
+    precision highp float;in vec2 U;uniform sampler2D T;out vec4 o;void main(){vec4 c=texture(T,U);if(c.a<.01)discard;o=c;}`;
     const PH = prog(vsH, fsH);
     const uMH = gl.getUniformLocation(PH, 'M'),
           uVH = gl.getUniformLocation(PH, 'V'),
@@ -1224,7 +1224,7 @@
     gl.bindVertexArray(vaoH);
     gl.bindBuffer(gl.ARRAY_BUFFER, vboH);
     // Vertex data for the HUD quad (position and UV coordinates).
-    gl.bufferData(gl.ARRAY_BUFFER, new F32([-0.26,0.15,0, 0,1,  0.26,0.15,0, 1,1,  0.26,-0.15,0, 1,0,  -0.26,0.15,0, 0,1,  0.26,-0.15,0, 1,0,  -0.26,-0.15,0, 0,0]), gl.STATIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, new F32([-.26,.15,0, 0,1,  .26,.15,0, 1,1,  .26,-.15,0, 1,0,  -.26,.15,0, 0,1,  .26,-.15,0, 1,0,  -.26,-.15,0, 0,0]), gl.STATIC_DRAW);
     gl.enableVertexAttribArray(0); 
     gl.vertexAttribPointer(0, 3, 
     gl.FLOAT, false, 20, 0);
@@ -1272,12 +1272,12 @@
         const img = new Uint8Array(n * n * 4);
         for (let y = 0; y < n; y++) {
             for (let x = 0; x < n; x++) {
-                const u = (x + 0.5) / n;
-                const v = (y + 0.5) / n;
+                const u = (x + .5) / n;
+                const v = (y + .5) / n;
                 // sample at multiple fractional offsets then combine to get smoother noise
                 const v0 = sampleGrid(u, v);
-                const v1 = sampleGrid(u + 0.5 / n, v + 0.3 / n);
-                const val = MAX(0, MIN(1, (v0 * 0.6 + v1 * 0.4)));
+                const v1 = sampleGrid(u + .5 / n, v + .3 / n);
+                const val = MAX(0, MIN(1, (v0 * .6 + v1 * .4)));
                 const idx = (y * n + x) * 4;
                 const c = (val * 255) | 0;
                 img[idx + 0] = c;
@@ -1349,9 +1349,9 @@
     // -- MODULE: Gameplay-item --
     // NEW: Sphere (items/obstacles) minimal shader + geometry
     const vsSphere = `#version 300 es
-    layout(location=0) in vec3 p;uniform mat4 V,P;uniform vec3 a;uniform float b;void main(){vec3 wp=p*b+a;gl_Position=P*V*vec4(wp,1.0);}`;
+    layout(location=0) in vec3 p;uniform mat4 V,P;uniform vec3 a;uniform float b;void main(){vec3 wp=p*b+a;gl_Position=P*V*vec4(wp,1.);}`;
     const fsSphere = `#version 300 es
-    precision highp float;uniform vec3 c;out vec4 o;void main(){ o = vec4(c,1.0); }`;
+    precision highp float;uniform vec3 c;out vec4 o;void main(){ o = vec4(c,1.); }`;
 
     function buildSphere(lat=10, lon=12){
         const v=[];
@@ -1470,9 +1470,9 @@
 
     // Uses instanced rendering to draw many blades of grass efficiently
     const vsGrass = `#version 300 es
-    uniform mat4 V,P;uniform vec2 a;uniform vec3 b;uniform float c,d,e;uniform sampler2D f;uniform float g;out vec3 h;float i(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}vec2 j(vec2 p){float n=sin(dot(p,vec2(1.,113.)));return fract(vec2(262144.*n,32768.*n));}void main(){int N=170;int k=gl_InstanceID;int l=k%N-N/2;int m=k/N-N/2;vec2 o=floor(a/d);vec2 q=o+vec2(float(l),float(m));vec2 r=(q+vec2(.5))*d;vec2 s=floor(r/d)+vec2(e);vec2 t=(j(s)-.5)*(d*90.9);float u=i(s*3.1);float v=i(s*7.7);float w=i(s*5.3)*6.283;float x=texture(f,r*g).r;float y=mix(.6,.9,u);float z=float(gl_VertexID/2)/4.;float A=float(gl_VertexID%2)*2.-1.;float B=mix(1.9,1.,smoothstep(0.,2.,1.));float C=.05*(1.-z)*(.6+.6*v)*B;vec2 D=vec2(.07,.05);vec2 E=vec2(-.03,.04);float F=.6*sin(dot(r,D)+c*.7)+.4*sin(dot(r,E)-c*1.2);float G=(.25*F)+.07*sin(c*1.7+w);float H=(z*z)*G;vec2 I=r+t;vec3 J=vec3(I.x,0.,I.y);vec3 K=normalize(b);vec2 L=vec2(cos(.3*c),sin(.32*c));L*=inversesqrt(dot(L,L)+0.1);vec3 M=vec3(L.x,0.,L.y)*H*y;vec3 O=J+K*A*C+vec3(0.,z*y,0.)+M;vec3 p0=vec3(.12,.1,.01);vec3 p1=vec3(.45,.38,.05);vec3 q0=vec3(.05,.12,.02);vec3 q1=vec3(.3,.7,.22);vec3 r0=mix(p0,q0,x);vec3 r1=mix(p1,q1,x);h=mix(r0,r1,smoothstep(0.,1.,z))*(.85+.15*i(s*11.1));gl_Position=P*V*vec4(O,1.);}`;
+    uniform mat4 V,P;uniform vec2 a;uniform vec3 b;uniform float c,d,e;uniform sampler2D f;uniform float g;out vec3 h;float i(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}vec2 j(vec2 p){float n=sin(dot(p,vec2(1.,113.)));return fract(vec2(262144.*n,32768.*n));}void main(){int N=170;int k=gl_InstanceID;int l=k%N-N/2;int m=k/N-N/2;vec2 o=floor(a/d);vec2 q=o+vec2(float(l),float(m));vec2 r=(q+vec2(.5))*d;vec2 s=floor(r/d)+vec2(e);vec2 t=(j(s)-.5)*(d*90.9);float u=i(s*3.1);float v=i(s*7.7);float w=i(s*5.3)*6.283;float x=texture(f,r*g).r;float y=mix(.6,.9,u);float z=float(gl_VertexID/2)/4.;float A=float(gl_VertexID%2)*2.-1.;float B=mix(1.9,1.,smoothstep(0.,2.,1.));float C=.05*(1.-z)*(.6+.6*v)*B;vec2 D=vec2(.07,.05);vec2 E=vec2(-.03,.04);float F=.6*sin(dot(r,D)+c*.7)+.4*sin(dot(r,E)-c*1.2);float G=(.25*F)+.07*sin(c*1.7+w);float H=(z*z)*G;vec2 I=r+t;vec3 J=vec3(I.x,0.,I.y);vec3 K=normalize(b);vec2 L=vec2(cos(.3*c),sin(.32*c));L*=inversesqrt(dot(L,L)+.1);vec3 M=vec3(L.x,0.,L.y)*H*y;vec3 O=J+K*A*C+vec3(0.,z*y,0.)+M;vec3 p0=vec3(.12,.1,.01);vec3 p1=vec3(.45,.38,.05);vec3 q0=vec3(.05,.12,.02);vec3 q1=vec3(.3,.7,.22);vec3 r0=mix(p0,q0,x);vec3 r1=mix(p1,q1,x);h=mix(r0,r1,smoothstep(0.,1.,z))*(.85+.15*i(s*11.1));gl_Position=P*V*vec4(O,1.);}`;
     const fsGrass = `#version 300 es
-    precision highp float;in vec3 h;out vec4 o;void main(){ o = vec4(h, 1.0); }`;
+    precision highp float;in vec3 h;out vec4 o;void main(){ o = vec4(h, 1.); }`;
 
     const PGRASS = prog(vsGrass, fsGrass);
     const uVG = gl.getUniformLocation(PGRASS, 'V'), uPG = gl.getUniformLocation(PGRASS, 'P');
@@ -1517,23 +1517,23 @@
     function genPlants(cx, cz){
         //const r = PLANT_RADIUS;
         //const c = 6.0;
-        const minX = FLOOR((cx - 55)/6.0);
-        const maxX = FLOOR((cx + 55)/6.0);
-        const minZ = FLOOR((cz - 55)/6.0);
-        const maxZ = FLOOR((cz + 55)/6.0);
+        const minX = FLOOR((cx - 55)/6.);
+        const maxX = FLOOR((cx + 55)/6.);
+        const minZ = FLOOR((cz - 55)/6.);
+        const maxZ = FLOOR((cz + 55)/6.);
         const out = [];
         for(let gz=minZ; gz<=maxZ; gz++){
             for(let gx=minX; gx<=maxX; gx++){
-                const h = plantHash(gx, gz, 0.0);
+                const h = plantHash(gx, gz, .0);
                 if(h < 0.3){
                     // Stable jitter inside cell
-                    const jx = plantHash(gx, gz, 1.0) - 0.5;
-                    const jz = plantHash(gx, gz, 2.0) - 0.5;
-                    const px = gx*6.0 + (jx * 6.0 * 0.85) + 6.0*0.5;
-                    const pz = gz*6.0 + (jz * 6.0 * 0.85) + 6.0*0.5;
+                    const jx = plantHash(gx, gz, 1.) - .5;
+                    const jz = plantHash(gx, gz, 2.) - .5;
+                    const px = gx*6. + (jx * 6. * .85) + 6.*.5;
+                    const pz = gz*6. + (jz * 6. * .85) + 6.*.5;
                     const dx = px - cx, dz = pz - cz;
                     if(dx*dx + dz*dz <= 55*55){
-                        const sc = 1.8 + (plantHash(gx, gz, 3.0) * (3 - 1.8));
+                        const sc = 1.8 + (plantHash(gx, gz, 3.) * (3 - 1.8));
                         out.push({px, pz, scale: sc, gx, gz});
                     }
                 }
@@ -1546,10 +1546,10 @@
     let lastPlantCamX = 0, lastPlantCamZ = 0;
     
     const vsPlants=`#version 300 es
-    layout(location=0)in vec3 a;layout(location=1)in vec2 b;uniform mat4 c,d,e;out vec2 f;void main(){f=b;gl_Position=e*d*c*vec4(a,1.0);}`;
+    layout(location=0)in vec3 a;layout(location=1)in vec2 b;uniform mat4 c,d,e;out vec2 f;void main(){f=b;gl_Position=e*d*c*vec4(a,1.);}`;
 
     const fsPlants = `#version 300 es
-    precision highp float;in vec2 f;out vec4 o;uniform float g;uniform int h;uniform vec3 i;uniform float j;mat3 R(float a){float c=cos(a),s=sin(a);return mat3(vec3(c,s,0),vec3(-s,c,0),vec3(0,0,1));}mat3 D(vec2 d){return mat3(vec3(1,0,0),vec3(0,1,0),vec3(d,1));}float C(vec2 p,vec2 h){p-=vec2(0.,h.y);vec2 d=abs(vec2(length(p.x),p.y))-h;return min(max(d.x,d.y),0.)+length(max(d,0.));}float k(float x){return fract(sin(x)*43758.5453);}float l(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}float E(vec2 p){float m=25.7+j*10.;mat3 n=R(-(m/360.)*6.28318);mat3 q=R(m/360.*6.28318);int r=3+int(j*4.);const int B=3;int s=1;for(int i=0;i<r;i++)s*=B;float t=1.5;float u=.02;p=p+vec2(0,2);float v=C(p-vec2(0.,0.),vec2(u,t));float w=500.;int x=0;vec2 y=vec2(.07,.05);vec2 z=vec2(-.03,.04);float A=.6*sin(dot(i.xz,y)+g*.7)+.4*sin(dot(i.xz,z)-g*1.2);float F=fract(sin(dot(i.xz,vec2(12.9898,78.233)))*43758.5453)*6.283;float G=(.25*A)+.07*sin(g*1.7+F);mat3 H=R(G*.5);for(int i=0;i<h;++i){int I=1;for(int j=0;j<r;j++)I*=B;vec2 J=p;for(int j=1;j<=r;++j){float K=t/pow(2.,float(j));I/=B;int L=x/I;int M=L-B*(L/B);mat3 N;if(M==0){N=n*D(vec2(0,-2.*K));}else if(M==1){N=H*q*D(vec2(0,-2.*K));}else{N=H*D(vec2(0,-4.*K));}J=(N*vec3(J,1)).xy;float O=C(J,vec2(u,K));if(O-2.*K>0.){x+=I-1;break;}w=min(w,O);if(w<.01)break;}if(w<.01)break;++x;if(x>s)break;}return min(w,v);}void main(){vec2 p=(f*2.-1.)*5.;p.y+=3.;float d=E(p);float t=clamp(d,0.,.04)*25.;float a=1.-t;if(a<.05)discard;float P=clamp(f.y,0.,1.);vec3 Q=vec3(.3,.4,.1);vec3 S=vec3(.5,.4,.2);float T=k(j*37.17);float U=0.85+0.3*l(i.xz+vec2(j));vec3 b=mix(Q,S,smoothstep(0.,1.,T));vec3 c=mix(b*.4,b,smoothstep(0.,1.,P))*U;float V=l(i.xz+f*12.34);c*=(.97+.06*V);o=vec4(c*a,a);}`;
+    precision highp float;in vec2 f;out vec4 o;uniform float g;uniform int h;uniform vec3 i;uniform float j;mat3 R(float a){float c=cos(a),s=sin(a);return mat3(vec3(c,s,0),vec3(-s,c,0),vec3(0,0,1));}mat3 D(vec2 d){return mat3(vec3(1,0,0),vec3(0,1,0),vec3(d,1));}float C(vec2 p,vec2 h){p-=vec2(0.,h.y);vec2 d=abs(vec2(length(p.x),p.y))-h;return min(max(d.x,d.y),0.)+length(max(d,0.));}float k(float x){return fract(sin(x)*43758.5453);}float l(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}float E(vec2 p){float m=25.7+j*10.;mat3 n=R(-(m/360.)*6.28318);mat3 q=R(m/360.*6.28318);int r=3+int(j*4.);const int B=3;int s=1;for(int i=0;i<r;i++)s*=B;float t=1.5;float u=.02;p=p+vec2(0,2);float v=C(p-vec2(0.,0.),vec2(u,t));float w=500.;int x=0;vec2 y=vec2(.07,.05);vec2 z=vec2(-.03,.04);float A=.6*sin(dot(i.xz,y)+g*.7)+.4*sin(dot(i.xz,z)-g*1.2);float F=fract(sin(dot(i.xz,vec2(12.9898,78.233)))*43758.5453)*6.283;float G=(.25*A)+.07*sin(g*1.7+F);mat3 H=R(G*.5);for(int i=0;i<h;++i){int I=1;for(int j=0;j<r;j++)I*=B;vec2 J=p;for(int j=1;j<=r;++j){float K=t/pow(2.,float(j));I/=B;int L=x/I;int M=L-B*(L/B);mat3 N;if(M==0){N=n*D(vec2(0,-2.*K));}else if(M==1){N=H*q*D(vec2(0,-2.*K));}else{N=H*D(vec2(0,-4.*K));}J=(N*vec3(J,1)).xy;float O=C(J,vec2(u,K));if(O-2.*K>0.){x+=I-1;break;}w=min(w,O);if(w<.01)break;}if(w<.01)break;++x;if(x>s)break;}return min(w,v);}void main(){vec2 p=(f*2.-1.)*5.;p.y+=3.;float d=E(p);float t=clamp(d,0.,.04)*25.;float a=1.-t;if(a<.05)discard;float P=clamp(f.y,0.,1.);vec3 Q=vec3(.3,.4,.1);vec3 S=vec3(.5,.4,.2);float T=k(j*37.17);float U=.85+.3*l(i.xz+vec2(j));vec3 b=mix(Q,S,smoothstep(0.,1.,T));vec3 c=mix(b*.4,b,smoothstep(0.,1.,P))*U;float V=l(i.xz+f*12.34);c*=(.97+.06*V);o=vec4(c*a,a);}`;
 
     const PPLANTS = prog(vsPlants, fsPlants); // Compile and link plant shader program
     const uMPla = gl.getUniformLocation(PPLANTS, 'c'); // Get location of Model matrix uniform
@@ -1636,23 +1636,23 @@
         }
         rocks.length = 0;
         //const c = 5; const r = 200.0;
-        const minX = FLOOR((u.x - 200.0)/5);
-        const maxX = FLOOR((u.x + 200.0)/5);
-        const minZ = FLOOR((u.z - 200.0)/5);
-        const maxZ = FLOOR((u.z + 200.0)/5);
+        const minX = FLOOR((u.x - 200.)/5);
+        const maxX = FLOOR((u.x + 200.)/5);
+        const minZ = FLOOR((u.z - 200.)/5);
+        const maxZ = FLOOR((u.z + 200.)/5);
         for(let gz=minZ; gz<=maxZ; gz++){
             for(let gx=minX; gx<=maxX; gx++){
-                const h = rockHash(gx, gz, 0.0);
-                if (h < 0.01){
-                    const jx = rockHash(gx, gz, 1.0) - 0.5;
-                    const jz = rockHash(gx, gz, 2.0) - 0.5;
-                    const px = gx*5 + (jx * 5 * 0.6) + 5*0.5;
-                    const pz = gz*5 + (jz * 5 * 0.6) + 5*0.5;
+                const h = rockHash(gx, gz, .0);
+                if (h < .01){
+                    const jx = rockHash(gx, gz, 1.) - .5;
+                    const jz = rockHash(gx, gz, 2.) - .5;
+                    const px = gx*5 + (jx * 5 * .6) + 5*.5;
+                    const pz = gz*5 + (jz * 5 * .6) + 5*.5;
                     const dx = px - u.x, dz = pz - u.z;
-                    if (dx*dx + dz*dz <= 200.0*200.0){
-                        const seed = rockHash(gx, gz, -7.0) * 1000.0;
-                        const scale = 4.0 + rockHash(gx, gz, 5.0) * 2.; // 1.0 .. 6.0 meters
-                        const rx = px, rz = pz, ry = scale * 0.45; // small y offset
+                    if (dx*dx + dz*dz <= 200.*200.){
+                        const seed = rockHash(gx, gz, -7.) * 1000.;
+                        const scale = 4. + rockHash(gx, gz, 5.) * 2.; // 1.0 .. 6.0 meters
+                        const rx = px, rz = pz, ry = scale * .45; // small y offset
                         const radius = scale * 1.2; // collision radius
                         const rock = { x: rx, y: ry, z: rz, r: radius, seed, scale };
                         rocks.push(rock);
@@ -1701,7 +1701,7 @@
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, noiseTex);
         gl.uniform1i(uNoiseSky, 1);
-        gl.uniform1f(uTimeSky, t * 0.001);
+        gl.uniform1f(uTimeSky, t * .001);
         //gl.uniform1f(uCoverage, cloudCoverage);
         //gl.uniform1f(uSharpness, cloudSharpness);
         //gl.uniform1i(uShadowSamples, shadowSamples);
@@ -1724,11 +1724,11 @@
         gl.drawArrays(gl.TRIANGLES, 0, 6);
 
         // --- NEW: Render Items & Obstacles (now works because drawSphere exists) ---
-    for(const itm of items) if (itm.r>0) drawSphere(V,P,itm.x,itm.y,itm.z,itm.r,[0.2,1.0,0.3]);
+    for(const itm of items) if (itm.r>0) drawSphere(V,P,itm.x,itm.y,itm.z,itm.r,[.2,1.,.3]);
         //for(const o of obstacles) if(!o._isRock) drawSphere(V,P,o.x,o.y,o.z,o.r,[0.9,0.2,0.2]);
-        for(const t of traps) drawSphere(V,P,t.x,t.y,t.z,t.r,[0.8,0.5,0.1]);
+        for(const t of traps) drawSphere(V,P,t.x,t.y,t.z,t.r,[.8,.5,.1]);
         // Render Black Cat
-        drawCat(V,P,cat.x,cat.y,cat.z,cat.yaw,cat.anim,0.08,[0.02,0.02,0.02]);
+        drawCat(V,P,cat.x,cat.y,cat.z,cat.yaw,cat.anim,.08,[.02,.02,.02]);
 
         // Render MMO peers as whitish cats (smoothed)
         if (peers && peers.size){
@@ -1738,7 +1738,7 @@
                 if (id===myId) return;
                 if ((nowMs - (p.last||0)) >= 15000) return; // stale peer
                 const s = samplePeer(p, targetT) || p;
-                drawCat(V,P,s.x,0.6,s.z,(s.yaw||0)+PI,t*0.003,0.06,PEER_COL);
+                drawCat(V,P,s.x,.6,s.z,(s.yaw||0)+PI,t*.003,.06,PEER_COL);
             });
         }
 
@@ -1761,10 +1761,10 @@
         {
             const cy = COS(u.yaw), sy = SIN(u.yaw);
             const camRight = [cy, 0, -sy];
-            const timeSec = t * 0.001;
-            drawGrassPass(V, P, [u.x, u.z], camRight, timeSec, 0.8, 170, /*30.0,*/ 1.0); // Cell size, Strands number, Radius(bad), Seed
-            drawGrassPass(V, P, [u.x, u.z], camRight, timeSec, 0.3, 170, /*20.0,*/ 2.0);
-            drawGrassPass(V, P, [u.x, u.z], camRight, timeSec, 0.1, 170, /*10.0,*/ 3.0);
+            const timeSec = t * .001;
+            drawGrassPass(V, P, [u.x, u.z], camRight, timeSec, .8, 170, /*30.0,*/ 1.); // Cell size, Strands number, Radius(bad), Seed
+            drawGrassPass(V, P, [u.x, u.z], camRight, timeSec, .3, 170, /*20.0,*/ 2.);
+            drawGrassPass(V, P, [u.x, u.z], camRight, timeSec, .1, 170, /*10.0,*/ 3.);
         }
 
         // Render L-System Plants
@@ -1779,7 +1779,7 @@
             const camZ = u.z;
 
             // Only regenerate plants every 10 frames or if camera moved significantly
-            if (frameCount % 10 === 0 || HYPOT(camX - lastPlantCamX, camZ - lastPlantCamZ) > 5.0) {
+            if (frameCount % 10 === 0 || HYPOT(camX - lastPlantCamX, camZ - lastPlantCamZ) > 5.) {
                 cachedPlants = genPlants(camX, camZ);
                 lastPlantCamX = camX;
                 lastPlantCamZ = camZ;
@@ -1796,31 +1796,31 @@
                 //const NEAR_FULL = 6.0;
                 //const FAR_START = 18.0;
                 //const FAR_HIDE  = 50.0;
-                if(dist < 4.0 || dist > 50.0) continue;
+                if(dist < 4. || dist > 50.) continue;
 
                 //const MIN_ITER = 2, MAX_ITER = 14;
                 const sstep = x => x*x*(3-2*x);
-                let a = (dist - 4.0)/(6.0-4.0); a = sstep(MIN(1, MAX(0,a)));
-                let b = (50.0 - dist)/(50.0 - 18.0); b = sstep(MIN(1, MAX(0,b)));
+                let a = (dist - 4.)/(6.-4.); a = sstep(MIN(1, MAX(0,a)));
+                let b = (50. - dist)/(50. - 18.); b = sstep(MIN(1, MAX(0,b)));
                 let q = a * b;
-                if(q < 0.05) continue;
+                if(q < .05) continue;
 
                 const key = p.gx + ',' + p.gz;
                 const target = 2 + q*(14 - 2);
                 const iterations = MAX(2, MIN(14, target)) | 0;
-                const plantSeed = plantHash(p.gx, p.gz, 4.0);
+                const plantSeed = plantHash(p.gx, p.gz, 4.);
 
                 const angle = ATAN2(camX - px, camZ - pz);
                 const MPlants = new DOMMatrix()
                     .translate(px, 0, pz)
-                    .rotate(0, angle * 57.295775 /*180 / PI*/, 0) // DOMMatrix uses degrees
+                    .rotate(0, angle * D2R, 0) // DOMMatrix uses degrees
                     .scale(scale, scale, scale)
                     .toFloat32Array();
 
                 gl.uniformMatrix4fv(uMPla, false, MPlants);
                 gl.uniformMatrix4fv(uVPla, false, V);
                 gl.uniformMatrix4fv(uPPla, false, P);
-                gl.uniform1f(uTimePla, t * 0.001);
+                gl.uniform1f(uTimePla, t * .001);
                 gl.uniform1i(IPla, iterations);
                 gl.uniform3f(uPlantPosPla, px, 0, pz);
                 gl.uniform1f(uPlantSeedPla, plantSeed);
@@ -1916,7 +1916,7 @@
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, noiseTex);
         gl.uniform1i(uNoise, 0);
-        gl.uniform1f(ns, 0.0002); // adjust for biome size (smaller = larger biomes)
+        gl.uniform1f(ns, .0002); // adjust for biome size (smaller = larger biomes)
         gl.enable(gl.DEPTH_TEST);
         gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 10, gridN * gridN);
     }
@@ -1930,7 +1930,7 @@
       const eye = [u.x, u.y, u.z];
       const center = [u.x - sy * cp, u.y - sp, u.z - cy * cp];
         LOOKAT(V, eye, center, [0, 1, 0]);
-    PERSP(P, 60, C.width / C.height, 0.01, 1000);
+    PERSP(P, 60, C.width / C.height, .01, 1000);
         PV = MULTMAT4(M4(), P, V);
         invPV = INV(PV);
     }
@@ -1978,7 +1978,7 @@
             xr.requestAnimationFrame(onXR); // Start the XR render loop
 
         } catch (e) {
-            log('XR fail: ' + e.message);
+            log('XR failed: ' + e.message);
             //requestAnimationFrame(loop); // Resume desktop loop
         }
     }
@@ -2009,23 +2009,23 @@
         }
         rocks.length = 0;
         //const c = 5; const r = 200.0;
-        const minX = FLOOR((u.x - 200.0)/5);
-        const maxX = FLOOR((u.x + 200.0)/5);
-        const minZ = FLOOR((u.z - 200.0)/5);
-        const maxZ = FLOOR((u.z + 200.0)/5);
+        const minX = FLOOR((u.x - 200.)/5);
+        const maxX = FLOOR((u.x + 200.)/5);
+        const minZ = FLOOR((u.z - 200.)/5);
+        const maxZ = FLOOR((u.z + 200.)/5);
         for(let gz=minZ; gz<=maxZ; gz++){
             for(let gx=minX; gx<=maxX; gx++){
-                const h = rockHash(gx, gz, 0.0);
-                if (h < 0.01){
-                    const jx = rockHash(gx, gz, 1.0) - 0.5;
-                    const jz = rockHash(gx, gz, 2.0) - 0.5;
-                    const px = gx*5 + (jx * 5 * 0.6) + 5*0.5;
-                    const pz = gz*5 + (jz * 5 * 0.6) + 5*0.5;
+                const h = rockHash(gx, gz, .0);
+                if (h < .01){
+                    const jx = rockHash(gx, gz, 1.) - .5;
+                    const jz = rockHash(gx, gz, 2.) - .5;
+                    const px = gx*5 + (jx * 5 * .6) + 5*.5;
+                    const pz = gz*5 + (jz * 5 * .6) + 5*.5;
                     const dx = px - u.x, dz = pz - u.z;
-                    if (dx*dx + dz*dz <= 200.0*200.0){
-                        const seed = rockHash(gx, gz, -7.0) * 1000.0;
-                        const scale = 4.0 + rockHash(gx, gz, 5.0) * 2.; // 1.0 .. 6.0 meters
-                        const rx = px, rz = pz, ry = scale * 0.45; // small y offset
+                    if (dx*dx + dz*dz <= 200.*200.){
+                        const seed = rockHash(gx, gz, -7.) * 1000.;
+                        const scale = 4. + rockHash(gx, gz, 5.) * 2.; // 1.0 .. 6.0 meters
+                        const rx = px, rz = pz, ry = scale * .45; // small y offset
                         const radius = scale * 1.2; // collision radius
                         const rock = { x: rx, y: ry, z: rz, r: radius, seed, scale };
                         rocks.push(rock);
@@ -2053,7 +2053,7 @@
         updateAdaptiveMusic(moveMag, dt);
 
         // Create an offset reference space to account for user-controlled movement
-    const half = -u.yaw * 0.5;
+    const half = -u.yaw * .5;
         const rot = new XRRigidTransform({x:0,y:0,z:0}, { x:0,y:SIN(half), z:0, w:COS(half) });
         const rRef = ref.getOffsetReferenceSpace(rot);
     off = rRef.getOffsetReferenceSpace(new XRRigidTransform({x:-u.x,y:0,z:-u.z}));
@@ -2141,11 +2141,11 @@
             gl.drawArrays(gl.TRIANGLES, 0, 6);
 
             // --- NEW: Render Items & Obstacles (now works because drawSphere exists) ---
-            for(const itm of items) if (itm.r>0) drawSphere(v.transform.inverse.matrix,v.projectionMatrix,itm.x,itm.y,itm.z,itm.r,[0.2,1.0,0.3]);
+            for(const itm of items) if (itm.r>0) drawSphere(v.transform.inverse.matrix,v.projectionMatrix,itm.x,itm.y,itm.z,itm.r,[.2,1.,.3]);
             //for(const o of obstacles)  if(!o._isRock) drawSphere(v.transform.inverse.matrix,v.projectionMatrix,o.x,o.y,o.z,o.r,[0.9,0.2,0.2]);
-            for(const t of traps) drawSphere(v.transform.inverse.matrix,v.projectionMatrix,t.x,t.y,t.z,t.r,[0.8,0.5,0.1]);
+            for(const t of traps) drawSphere(v.transform.inverse.matrix,v.projectionMatrix,t.x,t.y,t.z,t.r,[.8,.5,.1]);
             // Render Black Cat
-            drawCat(v.transform.inverse.matrix,v.projectionMatrix,cat.x,cat.y,cat.z,cat.yaw,cat.anim,0.08,[0.02,0.02,0.02]);
+            drawCat(v.transform.inverse.matrix,v.projectionMatrix,cat.x,cat.y,cat.z,cat.yaw,cat.anim,.08,[.02,.02,.02]);
 
             // Render MMO peers (VR eye, smoothed)
             if (peers && peers.size){
@@ -2155,7 +2155,7 @@
                     if (id===myId) return;
                     if ((nowMs - (p.last||0)) >= 15000) return;
                     const s = samplePeer(p, targetT) || p;
-                    drawCat(v.transform.inverse.matrix, v.projectionMatrix, s.x, 0.6, s.z, (s.yaw||0)+PI, t*0.003, 0.06, PEER_COL);
+                    drawCat(v.transform.inverse.matrix, v.projectionMatrix, s.x, .6, s.z, (s.yaw||0)+PI, t*.003, .06, PEER_COL);
                 });
             }
 
@@ -2181,9 +2181,9 @@
                 const camXZ = [worldFromView[12], worldFromView[14]];
                 const camRight = [worldFromView[0], worldFromView[1], worldFromView[2]];
                 const timeSec = t * .001;
-                drawGrassPass(v.transform.inverse.matrix, v.projectionMatrix, camXZ, camRight, timeSec, 0.8, 170, /*30.0,*/ 1.0); 
-                drawGrassPass(v.transform.inverse.matrix, v.projectionMatrix, camXZ, camRight, timeSec, 0.3, 170, /*20.0,*/ 2.0);
-                drawGrassPass(v.transform.inverse.matrix, v.projectionMatrix, camXZ, camRight, timeSec, 0.1, 170, /*10.0,*/ 3.0);
+                drawGrassPass(v.transform.inverse.matrix, v.projectionMatrix, camXZ, camRight, timeSec, .8, 170, /*30.0,*/ 1.); 
+                drawGrassPass(v.transform.inverse.matrix, v.projectionMatrix, camXZ, camRight, timeSec, .3, 170, /*20.0,*/ 2.);
+                drawGrassPass(v.transform.inverse.matrix, v.projectionMatrix, camXZ, camRight, timeSec, .1, 170, /*10.0,*/ 3.);
             }
 
             // Render L-System Plants
@@ -2200,7 +2200,7 @@
 
                 
                 // Only regenerate plants every 10 frames or if camera moved significantly
-                if (frameCount % 10 === 0 || HYPOT(camX - lastPlantCamX, camZ - lastPlantCamZ) > 5.0) {
+                if (frameCount % 10 === 0 || HYPOT(camX - lastPlantCamX, camZ - lastPlantCamZ) > 5.) {
                     cachedPlants = genPlants(camX, camZ);
                     lastPlantCamX = camX;
                     lastPlantCamZ = camZ;
@@ -2218,7 +2218,7 @@
                 //const NEAR_FULL = 6.0;
                 //const FAR_START = 18.0;
                 //const FAR_HIDE  = 50.0;
-                if(dist < 4.0 || dist > 50.0) continue;
+                if(dist < 4. || dist > 50.) continue;
 
                 //const MIN_ITER = 2, MAX_ITER = 16;
                 const sstep = x => x*x*(3-2*x);
@@ -2242,7 +2242,7 @@
                 gl.uniformMatrix4fv(uMPla, false, MPlants);
                 gl.uniformMatrix4fv(uVPla, false, v.transform.inverse.matrix);
                 gl.uniformMatrix4fv(uPPla, false, v.projectionMatrix);
-                gl.uniform1f(uTimePla, t * 0.001);
+                gl.uniform1f(uTimePla, t * .001);
                 gl.uniform1i(IPla, iterations);
                 gl.uniform3f(uPlantPosPla, px, 0, pz);
                 gl.uniform1f(uPlantSeedPla, plantSeed);
@@ -2299,19 +2299,19 @@
 
             // Render Controller Indicators and Rays
             for (const src of s.inputSources) {
-                const col = [1, 1, 0.5]
+                const col = [1, 1, .5]
 
                 // Hand grip indicator
                 const grip = src.gripSpace ? frame.getPose(src.gripSpace, off) : null;
                 if (grip) {
-                    const Mhand = new DOMMatrix(grip.transform.matrix).multiply(new DOMMatrix([0.06,0,0,0, 0,0.06,0,0, 0,0,0.06,0, 0,0,0,1])).toFloat32Array();
+                    const Mhand = new DOMMatrix(grip.transform.matrix).multiply(new DOMMatrix([.06,0,0,0, 0,.06,0,0, 0,0,.06,0, 0,0,0,1])).toFloat32Array();
                     gl.useProgram(PDisc);
                     gl.bindVertexArray(vaoR);
 
                     gl.uniformMatrix4fv(uMDisc, false, Mhand);
                     gl.uniformMatrix4fv(uVDisc, false, v.transform.inverse.matrix); 
                     gl.uniformMatrix4fv(uPDisc, false, v.projectionMatrix);
-                    gl.uniform4f(uColDisc, col[0], col[1], col[2], 0.95);
+                    gl.uniform4f(uColDisc, col[0], col[1], col[2], .95);
                     gl.disable(gl.DEPTH_TEST); 
                     gl.enable(gl.BLEND); 
                     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
@@ -2325,8 +2325,8 @@
                 if (targ) {
                     const r = controllerRay(frame, src);
                     const triggerVal = (src.gamepad && src.gamepad.buttons && src.gamepad.buttons[0]) ? (src.gamepad.buttons[0].value || 0) : 0;
-                    const w = 0.004 + 0.01 * triggerVal; // Beam gets thicker when trigger is pressed
-                    let len = 3.0;
+                    const w = .004 + .01 * triggerVal; // Beam gets thicker when trigger is pressed
+                    let len = 3.;
                     //const tGround = (0 - r.o[1]) / r.d[1];
                     //if (tGround > 0) len = MIN(len, MIN(5.0, tGround));
                     const h = HUD_pick(WH, r, currentUI());
@@ -2339,7 +2339,7 @@
                     gl.uniformMatrix4fv(uMBeam, false, Mbeam); 
                     gl.uniformMatrix4fv(uVBeam, false, v.transform.inverse.matrix); 
                     gl.uniformMatrix4fv(uPBeam, false, v.projectionMatrix);
-                    gl.uniform4f(uColBeam, col[0], col[1], col[2], 0.8);
+                    gl.uniform4f(uColBeam, col[0], col[1], col[2], .8);
                     gl.disable(gl.DEPTH_TEST); 
                     gl.enable(gl.BLEND); 
                     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
