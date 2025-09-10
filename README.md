@@ -4,9 +4,7 @@ The black cat is loose in the wilds — can you catch it before it disappears in
 This is a **fast, skill-based exploration game** where sharp eyes and quick reflexes will determine your fate.
 
 ---
-
 ## 🎮 Controls
-
 **Desktop**
 - Move with **WASD**
 - Rotate with **Q / E**
@@ -21,29 +19,22 @@ This is a **fast, skill-based exploration game** where sharp eyes and quick refl
 
 **Look**
 - Touch-drag to freely look around
-
 ---
-
 ## 🌌 Story
-
 Legends say a mysterious black cat roams these lands. 
 Some believe it brings **fortune**, others whisper it’s a **shadow of bad luck**.
-
 Your task: **find it, follow it, and catch it** — but beware...
 the cat is **clever, fast, and always one step ahead.**
 
 ---
-
 ## 🛠️ From Developer
 
 This game was built during a full month of focused work — I took vacation time to dive in.
 The main goals were to:
- **learn Vanilla JS for WebXR**
- **Git branch merging**,
-using a structure of `FEATURE` → `MODULE` → `SOLUTION`
+ **Vanilla JS for WebXR**
 
 ### 🔧 Tech Stack
-- **Languages & APIs**: `Vanilla JS`, `WebGL2`, `WebAudio`, `OpenXR`
+- **Languages & APIs**: `html`,`JS`, `WebGL2`, `WebAudio`, `OpenXR`
 - **Packaging**: `7zip` (`PPMd` algorithm)
 
 ### ✨ Key Features
@@ -54,12 +45,13 @@ using a structure of `FEATURE` → `MODULE` → `SOLUTION`
 - Adaptive music system
 
 ### 📚 Learning Materials / Inspiration
+- **JS GL Math** → [Javi Agenjo: microgl.js](https://github.com/jagenjo/jstoolbits)
 - **Sky shader** → [Iñigo Quílez: Derivative](https://iquilezles.org/articles/dynclouds/)  
 - **Lindenmayer-system plants shader** → [Shadertoy example](https://www.shadertoy.com/view/XtyGzh)
 
-### 🌐 Explore More  
+### 🌐 About Developer  
 - **GitHub Repo** → [JS13kGame2025](https://github.com/JustGibas/JS13kGame2025)   
 - **Projects Showcase** → [Explore My Work](https://justinas-gibas.github.io/MyFistWebsite/index1.html#work)  
-- **Twitch** → [twitch.tv/justgibas](https://www.twitch.tv/justgibas/about)  
-- **LinkedIn** → [linkedin.com/in/justinas-gibas](https://www.linkedin.com/in/justinas-gibas)  
-🐾
+- **Twitch** → [twitch.tv/justgibas](https://www.twitch.tv/justgibas)  
+- **LinkedIn** → [linkedin.com/in/justinas-gibas](https://www.linkedin.com/in/justinas-gibas)
+# 🐾🐈‍⬛
