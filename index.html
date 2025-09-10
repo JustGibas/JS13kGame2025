@@ -907,8 +907,16 @@
             // Patterns compressed as strings (k=kick,s=snare). Bells sequence digits / letters -> index, '_' = rest
             window.chipMusic={g,eng:0,last:audioCtx.currentTime,b0:90,b1:190,bd:60/140,next:audioCtx.currentTime+.05,st:0,
                 k:"1.....1.1.1...1.",s:"....1.......1...", // spaces ignored
-                bl:"0_1_212_1_0_1_020__0343_".replace(/\s/g,''),
-                sc:[0,-1,2,3,5,7]};
+                //bl:"0_23_45_6_765_43210_35_642_10_7_".replace(/\s/g,''),
+                //sc:[0,2,3,5,7,8,11,12]};
+                //bl:"0_1_2_3_2_1_0_1_3_2_1_0_2_3_4_3_2_1_0_1_2_3_2_1_0_3_2_1_0_2_3_4_".replace(/\s/g,''),
+                //sc:[0,2,4,5,7,9,11,12]};
+                //bl:"0_23_45_6_765_43210_35_642_10_7_".replace(/\s/g,''),
+                //sc:[0,2,3,5,7,8,11,12]};
+                //bl:"0_1_2_1_0_3_2_1_0_4_2_1_0_5_2_1_".replace(/\s/g,''),
+                //sc:[0,-1,2,3,5,7]};
+                bl:"0_1_2_1_0___3_2_1_0___2_3_4_3_2_1_0___1_2_3_2_1_0___4_3_2___3_4_5_4_3___2_1_0___".replace(/\s/g,''),
+                sc:[0,2,4,5,7,9]};
         }
     }
     function updateAdaptiveMusic(mv,dt){
@@ -1340,9 +1348,9 @@
     // -- MODULE: Gameplay-item --
     // NEW: Sphere (items/obstacles) minimal shader + geometry
     const vsSphere = `#version 300 es
-    layout(location=0) in vec3 p;uniform mat4 V,P;uniform vec3 uP;uniform float uS;void main(){vec3 wp=p*uS+uP;gl_Position=P*V*vec4(wp,1.0);}`;
+    layout(location=0) in vec3 p;uniform mat4 V,P;uniform vec3 a;uniform float b;void main(){vec3 wp=p*b+a;gl_Position=P*V*vec4(wp,1.0);}`;
     const fsSphere = `#version 300 es
-    precision highp float;uniform vec3 uc;out vec4 o;void main(){ o = vec4(uc,1.0); }`;
+    precision highp float;uniform vec3 c;out vec4 o;void main(){ o = vec4(c,1.0); }`;
 
     function buildSphere(lat=10, lon=12){
         const v=[];
@@ -1372,9 +1380,9 @@
     gl.vertexAttribPointer(0,3,gl.FLOAT,false,0,0);
     const uS_V = gl.getUniformLocation(PS,'V');
     const uS_P = gl.getUniformLocation(PS,'P');
-    const uS_Pos = gl.getUniformLocation(PS,'uP');
-    const uS_S = gl.getUniformLocation(PS,'uS');
-    const uS_Color = gl.getUniformLocation(PS,'uc');
+    const uS_Pos = gl.getUniformLocation(PS,'a');
+    const uS_S = gl.getUniformLocation(PS,'b');
+    const uS_Color = gl.getUniformLocation(PS,'c');
 
     // -- /MODULE: Gameplay-item --
 
@@ -1936,7 +1944,7 @@
             log('WebXR not available');
             return;
         }
-        navigator.xr.isSessionSupported('immersive-vr').then(s => log(s ? 'VR ready: click Enter VR button' : 'VR error: try a different browser'));
+        navigator.xr.isSessionSupported('immersive-vr').then(s => log(s ? 'VR ready: Click Enter VR button' : 'VR error: try again or tinker'));
     }
     // if vr not avalable we split screen in to stereo view
 
@@ -1969,7 +1977,7 @@
             xr.requestAnimationFrame(onXR); // Start the XR render loop
 
         } catch (e) {
-            log('XR start fail: ' + e.message);
+            log('XR fail: ' + e.message);
             //requestAnimationFrame(loop); // Resume desktop loop
         }
     }
