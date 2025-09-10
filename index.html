@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>'Wild Catch' 13K Game 2025</title>
+    <title>Wild Catch</title>
     <!--meta name="author" content="Justinas Gibas" /-->
     <!--<link rel="icon" type="image/svg+xml" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="55%" x="50%" dominant-baseline="middle" text-anchor="middle" font-size="80">🐈‍⬛</text></svg>'>-->
     <style>
@@ -65,7 +65,8 @@
     // Expose Math functions to global scope
     Object.getOwnPropertyNames(Math).forEach(n => window[n.toUpperCase()] = Math[n]);
     // --- Math Library ---
-    const D2R = 0.0174532925 // or PI / 180;
+    //const D2R = 0.0174532925 // or PI / 180;
+    const D2R = PI / 180;
     const F32 = Float32Array;
     const M4 = (v) => new F32(v || [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]);
     const V3 = (v) => new F32(v || 3);
@@ -170,7 +171,7 @@
         return h[n-1];
     }
 
-    function logMMO(s){ log('[MMO] ' + s); }
+    function logMMO(s){ log('MMO: ' + s); }
 
     function toggleMMO(){
         mmoEnabled = !mmoEnabled;
@@ -2053,9 +2054,9 @@
 
         // Create an offset reference space to account for user-controlled movement
     const half = -u.yaw * 0.5;
-        const rot = new XRRigidTransform({ x: 0, y: 0, z: 0 }, { x: 0, y: SIN(half), z: 0, w: COS(half) });
+        const rot = new XRRigidTransform({x:0,y:0,z:0}, { x:0,y:SIN(half), z:0, w:COS(half) });
         const rRef = ref.getOffsetReferenceSpace(rot);
-    off = rRef.getOffsetReferenceSpace(new XRRigidTransform({ x: -u.x, y: 0, z: -u.z }));
+    off = rRef.getOffsetReferenceSpace(new XRRigidTransform({x:-u.x,y:0,z:-u.z}));
         const rel = frame.getViewerPose(off);
         if (!rel) return;
 
@@ -2121,7 +2122,7 @@
             gl.activeTexture(gl.TEXTURE1);
             gl.bindTexture(gl.TEXTURE_2D, noiseTex);
             gl.uniform1i(uNoiseSky, 1);
-            gl.uniform1f(uTimeSky, t * 0.001);
+            gl.uniform1f(uTimeSky, t * .001);
             //gl.uniform1f(uCoverage, cloudCoverage);
             //gl.uniform1f(uSharpness, cloudSharpness);
             //gl.uniform1i(uShadowSamples, shadowSamples);
@@ -2179,7 +2180,7 @@
                 const worldFromView = v.transform.matrix;
                 const camXZ = [worldFromView[12], worldFromView[14]];
                 const camRight = [worldFromView[0], worldFromView[1], worldFromView[2]];
-                const timeSec = t * 0.001;
+                const timeSec = t * .001;
                 drawGrassPass(v.transform.inverse.matrix, v.projectionMatrix, camXZ, camRight, timeSec, 0.8, 170, /*30.0,*/ 1.0); 
                 drawGrassPass(v.transform.inverse.matrix, v.projectionMatrix, camXZ, camRight, timeSec, 0.3, 170, /*20.0,*/ 2.0);
                 drawGrassPass(v.transform.inverse.matrix, v.projectionMatrix, camXZ, camRight, timeSec, 0.1, 170, /*10.0,*/ 3.0);
@@ -2221,20 +2222,20 @@
 
                 //const MIN_ITER = 2, MAX_ITER = 16;
                 const sstep = x => x*x*(3-2*x);
-                let a = (dist - 4.0)/(6.0-4.0); a = sstep(MIN(1, MAX(0,a)));
-                let b = (50.0 - dist)/(50.0 - 18.0); b = sstep(MIN(1, MAX(0,b)));
+                let a = (dist - 4.)/(6.-4.); a = sstep(MIN(1, MAX(0,a)));
+                let b = (50. - dist)/(50. - 18.); b = sstep(MIN(1, MAX(0,b)));
                 let q = a * b;
-                if(q < 0.05) continue;
+                if(q < .05) continue;
 
                 const key = p.gx + ',' + p.gz;
                 const target = 2 + q*(16 - 2);
                 const iterations = MAX(2, MIN(16, target)) | 0;
-                const plantSeed = plantHash(p.gx, p.gz, 4.0);
+                const plantSeed = plantHash(p.gx, p.gz, 4.);
 
                 const angle = ATAN2(camX - px, camZ - pz);
                 const MPlants = new DOMMatrix()
                     .translate(px, 0, pz)
-                    .rotate(0, angle * 57.295775 /*180 / PI*/, 0) // DOMMatrix uses degrees
+                    .rotate(0, angle * D2R, 0)
                     .scale(scale, scale, scale)
                     .toFloat32Array();
 
