@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>'Wild Catch' 13K Game 2025</title>
+    <meta name="author" content="Justinas Gibas" />
     <!--<link rel="icon" type="image/svg+xml" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="55%" x="50%" dominant-baseline="middle" text-anchor="middle" font-size="80">🐈‍⬛</text></svg>'>-->
     <style>
         /* Basic styles to make the canvas and joysticks fill the screen */
@@ -320,7 +321,7 @@
     document.addEventListener('keydown', e => {
         const k = e.key.toLowerCase();
         I.keys[k] = true;
-        if (k === 'h' || k === 'escape') {playClickSound(); hudVisible = !hudVisible;} // 'H' and escape key toggles HUD visibility
+        if (k === 'h'||k === 'escape'||k === 'x') {playClickSound(); hudVisible = !hudVisible;} // 'H' and escape key toggles HUD visibility
         //if (k === 'f') {playClickSound(); beastMode = !beastMode;} // 'F' key toggles beastMode
     });
     document.addEventListener('keyup', e => I.keys[e.key.toLowerCase()] = false);
@@ -579,53 +580,108 @@
     function resetCatPosition(){
         const a = RANDOM()*PI*2, r = RANDOM()*40; // within preferred radius
         cat.x = COS(a)*r; cat.z = SIN(a)*r; cat.vx = cat.vz = 0;
+        // remove obstacles and traps
+        traps.length = 0;
     }
 
     function spawnDrop(x,z){
         const boost = RANDOM()<0.4;
         (boost?items:traps).push(boost?{x,y:0.5,z,r:0.4}:{x,y:0.6,z,r:0.6});
         if(audioCtx){ bell(audioCtx.currentTime, boost?870:660, window.chipMusic, boost?0.1:0.2); }
-        if(items.length>2) items.splice(0, items.length-2);
+        if(items.length>100) items.splice(0, items.length-100);
         if(traps.length>3) traps.splice(0, traps.length-3);
     }
 
     function updateCat(dt){
+        // Calculate the vector from the cat to the player on the XZ plane.
         const dxP = u.x - cat.x, dzP = u.z - cat.z;
-        const dP2 = dxP*dxP + dzP*dzP; const dist = SQRT(dP2)||1;
+        // Calculate the squared distance to the player for performance (avoids sqrt).
+        const dP2 = dxP*dxP + dzP*dzP;
+        // Calculate the actual distance, ensuring it's not zero to prevent division by zero.
+        const dist = SQRT(dP2)||1;
+        // Initialize force accumulators for this frame.
         let fx = 0, fz = 0;
 
-        // Seek / Orbit / Flee
+        // If the player is far away (distance > 50), the cat will seek them.
         if(dist > 50){
+            // Predict the player's future position for interception, limiting the look-ahead distance.
             const lead = MIN(3, dist / (cat.baseS + 2));
+            // Calculate the vector to the player's predicted position.
             const tx = (u.x + userVelX*lead) - cat.x, tz = (u.z + userVelZ*lead) - cat.z;
-            const td = HYPOT(tx, tz)||1; fx += (tx/td)*5; fz += (tz/td)*5;
+            // Normalize the target vector to get a direction.
+            const td = HYPOT(tx, tz)||1;
+            // Apply a force towards the predicted position.
+            fx += (tx/td)*5; fz += (tz/td)*5;
+        // If the player is at a medium distance (10 to 50), the cat will orbit them.
         } else if(dist > 10){
-            const nx = dxP/dist, nz = dzP/dist, s = SIN((cat.x+cat.z)*0.2)>0?1:-1;
+            // Get the normalized vector towards the player.
+            const nx = dxP/dist, nz = dzP/dist;
+            // Determine the orbit direction (clockwise/counter-clockwise) based on world position.
+            const s = SIN((u.x+u.z)*0.2)>0?1:-1;
+            // Apply a force towards the player and a perpendicular force for orbiting.
             fx += nx*1.1 + (-nz*s)*4; fz += nz*1.1 + (nx*s)*4;
-        } else { fx -= (dxP/dist)*5; fz -= (dzP/dist)*5; }
+        // If the player is very close (distance < 10), the cat will flee.
+        } else {
+            // Apply a force directly away from the player.
+            fx -= (dxP/dist)*5; fz -= (dzP/dist)*5;
+        }
 
-        // Centering
+        // Calculate the cat's distance from the world origin.
         const dc = SQRT(cat.x*cat.x + cat.z*cat.z)||1;
-        if(dc > 150){ const k=(dc+1000); fx += (-cat.x/dc)*k; fz += (-cat.z/dc)*k; }
-        else if(dc < 27.5){ fx += (cat.x/dc)*0.5; fz += (cat.z/dc)*0.5; }
+        // If the cat is too far from the center (> 250), apply a strong force to bring it back.
+        if(dc > 250){
+            // The force increases the further away the cat is.
+            //const k=(dc-150)*0.06;
+            // Apply the centering force.
+            fx += (-cat.x/dc); fz += (-cat.z/dc);
+        // If the cat is too close to the center (< 30), apply a gentle force to push it away.
+        }// else if(dc < 30){
+        //    // Apply a gentle outward force.
+        //    fx += (cat.x/dc)*0.5; fz += (cat.z/dc)*0.5;
+        //}
 
-        // Obstacle avoidance (proximity + forward ray)
-        const spd = HYPOT(cat.vx, cat.vz) + 0.1, dirx = cat.vx/spd, dirz = cat.vz/spd, look = 2 + spd*0.6;
+        // Calculate the cat's current speed and direction for look-ahead checks.
+        const spd = HYPOT(cat.vx, cat.vz) + 0.1, dirx = cat.vx/spd, dirz = cat.vz/spd;
+        // 'look' is the distance ahead the cat will check for obstacles, scaled by its speed.
+        const look = 10 + spd*0.6;
+        // Iterate through all obstacles in the scene.
         for(const ob of obstacles){
-            const ox = ob.x - cat.x, oz = ob.z - cat.z, rad = ob.r + 2, d2 = ox*ox + oz*oz;
-            if(d2 < rad*rad){ const d = SQRT(d2)||1; fx -= (ox/d)*2.4; fz -= (oz/d)*2.4; }
-            else if(d2 < look*look){
+            // Calculate the vector from the cat to the obstacle.
+            const ox = ob.x - cat.x, oz = ob.z - cat.z;
+            // Define the avoidance radius (obstacle radius + a buffer).
+            const rad = ob.r + 1.3;
+            // Calculate the squared distance to the obstacle.
+            const d2 = ox*ox + oz*oz;
+            // If the cat is inside the avoidance radius, apply a strong repulsion force.
+            if(d2 < rad*rad){
+                // Normalize the repulsion vector.
+                const d = SQRT(d2)||1;
+                // Apply the repulsion force.
+                fx -= (ox/d)*5; fz -= (oz/d)*5;
+            // If the obstacle is within the look-ahead distance, perform a more precise check.
+            } else if(d2 < look*look){
+                // Project the obstacle's position onto the cat's forward vector.
                 const ahead = ox*dirx + oz*dirz;
+                // If the obstacle is in front of the cat and within the look-ahead distance...
                 if(ahead>0 && ahead<look){
-                    const px = ox - dirx*ahead, pz = oz - dirz*ahead, pd2 = px*px + pz*pz;
-                    if(pd2 < rad*rad){ const pd = SQRT(pd2)||1; fx -= (px/pd)*2; fz -= (pz/pd)*2; }
+                    // Calculate the perpendicular distance from the cat's path to the obstacle.
+                    const px = ox - dirx*ahead, pz = oz - dirz*ahead;
+                    // Calculate the squared perpendicular distance.
+                    const pd2 = px*px + pz*pz;
+                    // If the perpendicular distance is less than the avoidance radius, a collision is imminent.
+                    if(pd2 < rad*rad){
+                        // Normalize the perpendicular vector.
+                        const pd = SQRT(pd2)||1;
+                        // Apply a steering force away from the obstacle.
+                        fx -= (px/pd)*5; fz -= (pz/pd)*5;
+                    }
                 }
             }
         }
 
         // Evade impulse when very close
         cat.evade -= dt;
-        if(dP2 < 9 && cat.evade<=0){ const d = SQRT(dP2)||1, nx = dxP/d, nz = dzP/d, s = RANDOM()<0.5?1:-1; fx += (-nz*s)*20; fz += (nx*s)*20; cat.evade = 0.2; }
+        if(dP2 < 9 && cat.evade<=0){ const d = SQRT(dP2)||1, nx = dxP/d, nz = dzP/d, s = RANDOM()<0.5?1:-1; fx += (-nz*s)*50; fz += (nx*s)*50; cat.evade = .2; }
 
         // Integrate & clamp speed
         cat.vx += fx*dt; cat.vz += fz*dt;
@@ -648,7 +704,7 @@
 
         // Anim & catch
         cat.anim += sp*dt*3.5;
-        if(dP2 < (0.5+CR)*(0.5+CR)){
+        if(dP2 < (.5+CR)*(.5+CR)){
             cat.caught++; log('Cat caught #'+cat.caught);
             if(audioCtx){ bell(audioCtx.currentTime,800,window.chipMusic,0.5); bell(audioCtx.currentTime+0.1,1000,window.chipMusic,0.3); bell(audioCtx.currentTime+0.2,1200,window.chipMusic,0.4); }
             if(speedBoosts.length<10) speedBoosts.push({timeLeft:15, amount:0.3});
