@@ -286,6 +286,10 @@
 
     // Helper function to compile and link a shader program
     function prog(vs, fs) {
+        // Always prepend shared header (js13k-friendly, no conditional check)
+        const H = '#version 300 es\nprecision highp float;';
+        vs = H + vs;
+        fs = H + fs;
         const p = gl.createProgram();
         const v = gl.createShader(gl.VERTEX_SHADER);
         const f = gl.createShader(gl.FRAGMENT_SHADER);
@@ -1210,10 +1214,8 @@
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
     // Simple textured quad shader for the HUD
-    const vsH = `#version 300 es
-    layout(location=0)in vec3 p;layout(location=1)in vec2 uv;uniform mat4 M,V,P;out vec2 U;void main(){U=uv;gl_Position=P*V*M*vec4(p,1.);}`;
-    const fsH = `#version 300 es
-    precision highp float;in vec2 U;uniform sampler2D T;out vec4 o;void main(){vec4 c=texture(T,U);if(c.a<.01)discard;o=c;}`;
+    const vsH = `layout(location=0)in vec3 p;layout(location=1)in vec2 uv;uniform mat4 M,V,P;out vec2 U;void main(){U=uv;gl_Position=P*V*M*vec4(p,1.);}`;
+    const fsH = `in vec2 U;uniform sampler2D T;out vec4 o;void main(){vec4 c=texture(T,U);if(c.a<.01)discard;o=c;}`;
     const PH = prog(vsH, fsH);
     const uMH = gl.getUniformLocation(PH, 'M'),
           uVH = gl.getUniformLocation(PH, 'V'),
@@ -1299,12 +1301,10 @@
     makeTileableNoise(128);
 
     // A procedural skybox rendered using a single full-screen triangle
-    const vsSky=`#version 300 es
-    const vec2 v[3]=vec2[3](vec2(-1.,-1.),vec2(3.,-1.),vec2(-1.,3.));out vec2 a;void main(){a=v[gl_VertexID]*.5+.5;gl_Position=vec4(v[gl_VertexID],0.,1.);}`;
+    const vsSky=`const vec2 v[3]=vec2[3](vec2(-1.,-1.),vec2(3.,-1.),vec2(-1.,3.));out vec2 a;void main(){a=v[gl_VertexID]*.5+.5;gl_Position=vec4(v[gl_VertexID],0.,1.);}`;
 
     // Replaced fragment shader: perspective-correct cloud mapping, reduced velocities, minified identifiers
-    const fsSky=`#version 300 es
-    precision highp float;in vec2 a;out vec4 b;uniform mat4 c,d;uniform sampler2D e;uniform float f;float g(vec2 p){return texture(e,p).r;}float h(vec2 p){float s=0.,A=.5;s+=A*g(p+f*vec2(.012,.007)*.02);p*=2.;A*=.5;s+=A*g(p+f*vec2(-.008,.015)*.02);p*=2.;A*=.5;s+=A*g(p+f*vec2(.017,-.011)*.02);p*=2.;A*=.5;s+=A*g(p+f*vec2(-.011,-.018)*.02);return s;}void main(){vec3 i=(c*vec4(0,0,0,1)).xyz;vec4 j=d*vec4(a*2.-1.,1,1);vec3 k=normalize(j.xyz/j.w-i);float l=pow(max(k.y*.5+.5,0.),1.2);vec3 m=mix(vec3(.2,.28,.36),vec3(.2,.2,.4),l);vec3 n=normalize(vec3(.1,.1,-.9));float o=max(dot(k,n),0.);float p=smoothstep(.995,1.,o);m+=vec3(.8,.6,.1)*(pow(o,60.)+.4*pow(o,12.))+vec3(1)*p*.15;vec2 q;float r=(100.-i.y)/k.y;if(r>0.){vec3 C=i+k*r;q=C.xz;}else{vec3 C=i+k*1000.;q=C.xz;}vec2 s=q*.0001;float t=h(s);float u=smoothstep(.25,.25+.52,t);vec2 v=normalize(n.xz+.0001);float w=0.;for(int B=1;B<=3;++B){vec2 C=s+v*float(B)*8e-4;w+=h(C);}w/=3.;float x=1.-clamp(w*1.6,0.,1.);vec3 y=vec3(.95,.98,1.)*(.45+.55*x);y+=.25*p*clamp(dot(n,k),0.,1.);m=mix(m,y,u*.95);b=vec4(m,1.);}`;
+const fsSky=`in vec2 a;out vec4 b;uniform mat4 c,d;uniform sampler2D e;uniform float f;float g(vec2 p){return texture(e,p).r;}float h(vec2 p){float s=0.,A=.5;s+=A*g(p+f*vec2(.012,.007)*.02);p*=2.;A*=.5;s+=A*g(p+f*vec2(-.008,.015)*.02);p*=2.;A*=.5;s+=A*g(p+f*vec2(.017,-.011)*.02);p*=2.;A*=.5;s+=A*g(p+f*vec2(-.011,-.018)*.02);return s;}void main(){vec3 i=(c*vec4(0,0,0,1)).xyz;vec4 j=d*vec4(a*2.-1.,1,1);vec3 k=normalize(j.xyz/j.w-i);float l=pow(max(k.y*.5+.5,0.),1.2);vec3 m=mix(vec3(.2,.28,.36),vec3(.2,.2,.4),l);vec3 n=normalize(vec3(.1,.1,-.9));float o=max(dot(k,n),0.);float p=smoothstep(.995,1.,o);m+=vec3(.8,.6,.1)*(pow(o,60.)+.4*pow(o,12.))+vec3(1)*p*.15;vec2 q;float r=(100.-i.y)/k.y;if(r>0.){vec3 C=i+k*r;q=C.xz;}else{vec3 C=i+k*1000.;q=C.xz;}vec2 s=q*.0001;float t=h(s);float u=smoothstep(.25,.25+.52,t);vec2 v=normalize(n.xz+.0001);float w=0.;for(int B=1;B<=3;++B){vec2 C=s+v*float(B)*8e-4;w+=h(C);}w/=3.;float x=1.-clamp(w*1.6,0.,1.);vec3 y=vec3(.95,.98,1.)*(.45+.55*x);y+=.25*p*clamp(dot(n,k),0.,1.);m=mix(m,y,u*.95);b=vec4(m,1.);}`;
 
     const PSKY = prog(vsSky, fsSky);
     const vaoSky = gl.createVertexArray();
@@ -1326,10 +1326,8 @@
     // -- MODULE: Scene-Ground --
     // --- Grid Shader ---
     // A simple shader to draw a grid on the ground plane
-    const vsG=`#version 300 es
-    layout(location=0) in vec3 p;uniform mat4 M,V,P;out vec3 w;void main(){w=(M*vec4(p,1.)).xyz;gl_Position=P*V*vec4(w,1.);}`;
-    const fsG=`#version 300 es
-    precision highp float;in vec3 w;out vec4 o;float h(vec2 v){return fract(sin(dot(v,vec2(41.,289.)))*9000.);}void main(){vec2 q=floor(w.xz/.6);float r=h(q),r2=h(q+13.);vec3 c=mix(vec3(.08,.05,.02),vec3(.3,.2,.1),r)+step(.97,r2)*vec3(.1,.08,.04);o=vec4(c,1.);}`;
+    const vsG=`layout(location=0) in vec3 p;uniform mat4 M,V,P;out vec3 w;void main(){w=(M*vec4(p,1.)).xyz;gl_Position=P*V*vec4(w,1.);}`;
+    const fsG=`in vec3 w;out vec4 o;float h(vec2 v){return fract(sin(dot(v,vec2(41.,289.)))*9000.);}void main(){vec2 q=floor(w.xz/.6);float r=h(q),r2=h(q+13.);vec3 c=mix(vec3(.08,.05,.02),vec3(.3,.2,.1),r)+step(.97,r2)*vec3(.1,.08,.04);o=vec4(c,1.);}`;
 
     const PG = prog(vsG, fsG);
     const uM = gl.getUniformLocation(PG, 'M');
@@ -1348,10 +1346,8 @@
     
     // -- MODULE: Gameplay-item --
     // NEW: Sphere (items/obstacles) minimal shader + geometry
-    const vsSphere = `#version 300 es
-    layout(location=0) in vec3 p;uniform mat4 V,P;uniform vec3 a;uniform float b;void main(){vec3 wp=p*b+a;gl_Position=P*V*vec4(wp,1.);}`;
-    const fsSphere = `#version 300 es
-    precision highp float;uniform vec3 c;out vec4 o;void main(){ o = vec4(c,1.); }`;
+    const vsSphere = `layout(location=0) in vec3 p;uniform mat4 V,P;uniform vec3 a;uniform float b;void main(){vec3 wp=p*b+a;gl_Position=P*V*vec4(wp,1.);}`;
+    const fsSphere = `uniform vec3 c;out vec4 o;void main(){ o = vec4(c,1.); }`;
 
     function buildSphere(lat=10, lon=12){
         const v=[];
@@ -1399,11 +1395,9 @@
 
     // Build a low-res sphere for rock base (coarse facets)
     const rockVerts = buildSphere(6, 8); // fewer subdivisions -> larger facets
-    const PRock_vs = `#version 300 es
-    layout(location=0)in vec3 p;uniform mat4 V,P;uniform vec3 a;uniform float b,c;out vec3 d;float h(float x){return fract(sin(x)*43758.5453);}void main(){d=p*b;float n=h((d.x+d.y*1.7+d.z*2.3)*(c+1.));float o=(n-.5)*(.5*b);vec3 w=(d+normalize(d)*o)+a;gl_Position=P*V*vec4(w,1.);}`;
+    const PRock_vs = `layout(location=0)in vec3 p;uniform mat4 V,P;uniform vec3 a;uniform float b,c;out vec3 d;float h(float x){return fract(sin(x)*43758.5453);}void main(){d=p*b;float n=h((d.x+d.y*1.7+d.z*2.3)*(c+1.));float o=(n-.5)*(.5*b);vec3 w=(d+normalize(d)*o)+a;gl_Position=P*V*vec4(w,1.);}`;
 
-    const PRock_fs = `#version 300 es
-    precision highp float;in vec3 d;out vec4 o;void main(){vec3 n=normalize(d+vec3(0.,0.,-2.5));float s=clamp(dot(n,normalize(vec3(0.,.1,-.5))),0.,1.);float q=floor(s*4.)/4.;vec3 c=mix(vec3(.15,.1,.1),vec3(.35,.3,.2),q);o=vec4(c,1.);}`;
+    const PRock_fs = `in vec3 d;out vec4 o;void main(){vec3 n=normalize(d+vec3(0.,0.,-2.5));float s=clamp(dot(n,normalize(vec3(0.,.1,-.5))),0.,1.);float q=floor(s*4.)/4.;vec3 c=mix(vec3(.15,.1,.1),vec3(.35,.3,.2),q);o=vec4(c,1.);}`;
 
     const PROCK = prog(PRock_vs, PRock_fs);
     const rockVao = gl.createVertexArray();
@@ -1418,61 +1412,14 @@
     const uR_Pos = gl.getUniformLocation(PROCK, 'a');
     const uR_S = gl.getUniformLocation(PROCK, 'b');
     const uR_Seed = gl.getUniformLocation(PROCK, 'c');
-
-    // Parameters for rock field
-    //const ROCK_CELL = 5;
-    //const ROCK_RADIUS = 200.0; // generation radius
-    //const ROCK_PROB = 0.01;   // spawn probability per cell
-
-    // Update rocks around camera and sync to obstacles array (mark obstacles with _isRock)
-    //function updateRocks(camX, camZ){
-    //    // remove previous rock-marked obstacles
-    //    for (let i = obstacles.length - 1; i >= 0; i--) {
-    //        if (obstacles[i]._isRock) obstacles.splice(i, 1);
-    //    }
-    //    rocks.length = 0;
-    //    //const c = 5; const r = 200.0;
-    //    const minX = FLOOR((camX - 200.0)/5);
-    //    const maxX = FLOOR((camX + 200.0)/5);
-    //    const minZ = FLOOR((camZ - 200.0)/5);
-    //    const maxZ = FLOOR((camZ + 200.0)/5);
-    //    for(let gz=minZ; gz<=maxZ; gz++){
-    //        for(let gx=minX; gx<=maxX; gx++){
-    //            const h = rockHash(gx, gz, 0.0);
-    //            if (h < 0.01){
-    //                const jx = rockHash(gx, gz, 1.0) - 0.5;
-    //                const jz = rockHash(gx, gz, 2.0) - 0.5;
-    //                const px = gx*5 + (jx * 5 * 0.6) + 5*0.5;
-    //                const pz = gz*5 + (jz * 5 * 0.6) + 5*0.5;
-    //                const dx = px - camX, dz = pz - camZ;
-    //                if (dx*dx + dz*dz <= 200.0*200.0){
-    //                    const seed = rockHash(gx, gz, -7.0) * 1000.0;
-    //                    const scale = 4.0 + rockHash(gx, gz, 5.0) * 2.; // 1.0 .. 6.0 meters
-    //                    const rx = px, rz = pz, ry = scale * 0.45; // small y offset
-    //                    const radius = scale * 1.2; // collision radius
-    //                    const rock = { x: rx, y: ry, z: rz, r: radius, seed, scale };
-    //                    rocks.push(rock);
-    //                    // also add to obstacles so collision code picks it up
-    //                    obstacles.push({ x: rx, y: ry, z: rz, r: radius, _isRock: true });
-    //                }
-    //            }
-    //        }
-    //    }
-    //}
-
     // -- /MODULE: Scene-Rocks --
 
     // -- MODULE: Scene-Grass --
     // --- Grass Shaders ---
     // Grass rendering constants.
-    //const GRASS_SEG = 4; // Number of segments per blade of grass
-    //const GRASS_VCOUNT = (GRASS_SEG + 1) * 2; // Total vertices per blade
-
     // Uses instanced rendering to draw many blades of grass efficiently
-    const vsGrass = `#version 300 es
-    uniform mat4 V,P;uniform vec2 a;uniform vec3 b;uniform float c,d,e;uniform sampler2D f;uniform float g;out vec3 h;float i(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}vec2 j(vec2 p){float n=sin(dot(p,vec2(1.,113.)));return fract(vec2(262144.*n,32768.*n));}void main(){int N=170;int k=gl_InstanceID;int l=k%N-N/2;int m=k/N-N/2;vec2 o=floor(a/d);vec2 q=o+vec2(float(l),float(m));vec2 r=(q+vec2(.5))*d;vec2 s=floor(r/d)+vec2(e);vec2 t=(j(s)-.5)*(d*90.9);float u=i(s*3.1);float v=i(s*7.7);float w=i(s*5.3)*6.283;float x=texture(f,r*g).r;float y=mix(.6,.9,u);float z=float(gl_VertexID/2)/4.;float A=float(gl_VertexID%2)*2.-1.;float B=mix(1.9,1.,smoothstep(0.,2.,1.));float C=.05*(1.-z)*(.6+.6*v)*B;vec2 D=vec2(.07,.05);vec2 E=vec2(-.03,.04);float F=.6*sin(dot(r,D)+c*.7)+.4*sin(dot(r,E)-c*1.2);float G=(.25*F)+.07*sin(c*1.7+w);float H=(z*z)*G;vec2 I=r+t;vec3 J=vec3(I.x,0.,I.y);vec3 K=normalize(b);vec2 L=vec2(cos(.3*c),sin(.32*c));L*=inversesqrt(dot(L,L)+.1);vec3 M=vec3(L.x,0.,L.y)*H*y;vec3 O=J+K*A*C+vec3(0.,z*y,0.)+M;vec3 p0=vec3(.12,.1,.01);vec3 p1=vec3(.45,.38,.05);vec3 q0=vec3(.05,.12,.02);vec3 q1=vec3(.3,.7,.22);vec3 r0=mix(p0,q0,x);vec3 r1=mix(p1,q1,x);h=mix(r0,r1,smoothstep(0.,1.,z))*(.85+.15*i(s*11.1));gl_Position=P*V*vec4(O,1.);}`;
-    const fsGrass = `#version 300 es
-    precision highp float;in vec3 h;out vec4 o;void main(){ o = vec4(h, 1.); }`;
+    const vsGrass = `uniform mat4 V,P;uniform vec2 a;uniform vec3 b;uniform float c,d,e;uniform sampler2D f;uniform float g;out vec3 h;float i(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}vec2 j(vec2 p){float n=sin(dot(p,vec2(1.,113.)));return fract(vec2(262144.*n,32768.*n));}void main(){int N=170;int k=gl_InstanceID;int l=k%N-N/2;int m=k/N-N/2;vec2 o=floor(a/d);vec2 q=o+vec2(float(l),float(m));vec2 r=(q+vec2(.5))*d;vec2 s=floor(r/d)+vec2(e);vec2 t=(j(s)-.5)*(d*90.9);float u=i(s*3.1);float v=i(s*7.7);float w=i(s*5.3)*6.283;float x=texture(f,r*g).r;float y=mix(.6,.9,u);float z=float(gl_VertexID/2)/4.;float A=float(gl_VertexID%2)*2.-1.;float B=mix(1.9,1.,smoothstep(0.,2.,1.));float C=.05*(1.-z)*(.6+.6*v)*B;vec2 D=vec2(.07,.05);vec2 E=vec2(-.03,.04);float F=.6*sin(dot(r,D)+c*.7)+.4*sin(dot(r,E)-c*1.2);float G=(.25*F)+.07*sin(c*1.7+w);float H=(z*z)*G;vec2 I=r+t;vec3 J=vec3(I.x,0.,I.y);vec3 K=normalize(b);vec2 L=vec2(cos(.3*c),sin(.32*c));L*=inversesqrt(dot(L,L)+.1);vec3 M=vec3(L.x,0.,L.y)*H*y;vec3 O=J+K*A*C+vec3(0.,z*y,0.)+M;vec3 p0=vec3(.12,.1,.01);vec3 p1=vec3(.45,.38,.05);vec3 q0=vec3(.05,.12,.02);vec3 q1=vec3(.3,.7,.22);vec3 r0=mix(p0,q0,x);vec3 r1=mix(p1,q1,x);h=mix(r0,r1,smoothstep(0.,1.,z))*(.85+.15*i(s*11.1));gl_Position=P*V*vec4(O,1.);}`;
+    const fsGrass = `in vec3 h;out vec4 o;void main(){ o = vec4(h, 1.); }`;
 
     const PGRASS = prog(vsGrass, fsGrass);
     const uVG = gl.getUniformLocation(PGRASS, 'V'), uPG = gl.getUniformLocation(PGRASS, 'P');
@@ -1545,11 +1492,9 @@
     let cachedPlants = [];
     let lastPlantCamX = 0, lastPlantCamZ = 0;
     
-    const vsPlants=`#version 300 es
-    layout(location=0)in vec3 a;layout(location=1)in vec2 b;uniform mat4 c,d,e;out vec2 f;void main(){f=b;gl_Position=e*d*c*vec4(a,1.);}`;
+    const vsPlants=`layout(location=0)in vec3 a;layout(location=1)in vec2 b;uniform mat4 c,d,e;out vec2 f;void main(){f=b;gl_Position=e*d*c*vec4(a,1.);}`;
 
-    const fsPlants = `#version 300 es
-    precision highp float;in vec2 f;out vec4 o;uniform float g;uniform int h;uniform vec3 i;uniform float j;mat3 R(float a){float c=cos(a),s=sin(a);return mat3(vec3(c,s,0),vec3(-s,c,0),vec3(0,0,1));}mat3 D(vec2 d){return mat3(vec3(1,0,0),vec3(0,1,0),vec3(d,1));}float C(vec2 p,vec2 h){p-=vec2(0.,h.y);vec2 d=abs(vec2(length(p.x),p.y))-h;return min(max(d.x,d.y),0.)+length(max(d,0.));}float k(float x){return fract(sin(x)*43758.5453);}float l(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}float E(vec2 p){float m=25.7+j*10.;mat3 n=R(-(m/360.)*6.28318);mat3 q=R(m/360.*6.28318);int r=3+int(j*4.);const int B=3;int s=1;for(int i=0;i<r;i++)s*=B;float t=1.5;float u=.02;p=p+vec2(0,2);float v=C(p-vec2(0.,0.),vec2(u,t));float w=500.;int x=0;vec2 y=vec2(.07,.05);vec2 z=vec2(-.03,.04);float A=.6*sin(dot(i.xz,y)+g*.7)+.4*sin(dot(i.xz,z)-g*1.2);float F=fract(sin(dot(i.xz,vec2(12.9898,78.233)))*43758.5453)*6.283;float G=(.25*A)+.07*sin(g*1.7+F);mat3 H=R(G*.5);for(int i=0;i<h;++i){int I=1;for(int j=0;j<r;j++)I*=B;vec2 J=p;for(int j=1;j<=r;++j){float K=t/pow(2.,float(j));I/=B;int L=x/I;int M=L-B*(L/B);mat3 N;if(M==0){N=n*D(vec2(0,-2.*K));}else if(M==1){N=H*q*D(vec2(0,-2.*K));}else{N=H*D(vec2(0,-4.*K));}J=(N*vec3(J,1)).xy;float O=C(J,vec2(u,K));if(O-2.*K>0.){x+=I-1;break;}w=min(w,O);if(w<.01)break;}if(w<.01)break;++x;if(x>s)break;}return min(w,v);}void main(){vec2 p=(f*2.-1.)*5.;p.y+=3.;float d=E(p);float t=clamp(d,0.,.04)*25.;float a=1.-t;if(a<.05)discard;float P=clamp(f.y,0.,1.);vec3 Q=vec3(.3,.4,.1);vec3 S=vec3(.5,.4,.2);float T=k(j*37.17);float U=.85+.3*l(i.xz+vec2(j));vec3 b=mix(Q,S,smoothstep(0.,1.,T));vec3 c=mix(b*.4,b,smoothstep(0.,1.,P))*U;float V=l(i.xz+f*12.34);c*=(.97+.06*V);o=vec4(c*a,a);}`;
+    const fsPlants = `in vec2 f;out vec4 o;uniform float g;uniform int h;uniform vec3 i;uniform float j;mat3 R(float a){float c=cos(a),s=sin(a);return mat3(vec3(c,s,0),vec3(-s,c,0),vec3(0,0,1));}mat3 D(vec2 d){return mat3(vec3(1,0,0),vec3(0,1,0),vec3(d,1));}float C(vec2 p,vec2 h){p-=vec2(0.,h.y);vec2 d=abs(vec2(length(p.x),p.y))-h;return min(max(d.x,d.y),0.)+length(max(d,0.));}float k(float x){return fract(sin(x)*43758.5453);}float l(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}float E(vec2 p){float m=25.7+j*10.;mat3 n=R(-(m/360.)*6.28318);mat3 q=R(m/360.*6.28318);int r=3+int(j*4.);const int B=3;int s=1;for(int i=0;i<r;i++)s*=B;float t=1.5;float u=.02;p=p+vec2(0,2);float v=C(p-vec2(0.,0.),vec2(u,t));float w=500.;int x=0;vec2 y=vec2(.07,.05);vec2 z=vec2(-.03,.04);float A=.6*sin(dot(i.xz,y)+g*.7)+.4*sin(dot(i.xz,z)-g*1.2);float F=fract(sin(dot(i.xz,vec2(12.9898,78.233)))*43758.5453)*6.283;float G=(.25*A)+.07*sin(g*1.7+F);mat3 H=R(G*.5);for(int i=0;i<h;++i){int I=1;for(int j=0;j<r;j++)I*=B;vec2 J=p;for(int j=1;j<=r;++j){float K=t/pow(2.,float(j));I/=B;int L=x/I;int M=L-B*(L/B);mat3 N;if(M==0){N=n*D(vec2(0,-2.*K));}else if(M==1){N=H*q*D(vec2(0,-2.*K));}else{N=H*D(vec2(0,-4.*K));}J=(N*vec3(J,1)).xy;float O=C(J,vec2(u,K));if(O-2.*K>0.){x+=I-1;break;}w=min(w,O);if(w<.01)break;}if(w<.01)break;++x;if(x>s)break;}return min(w,v);}void main(){vec2 p=(f*2.-1.)*5.;p.y+=3.;float d=E(p);float t=clamp(d,0.,.04)*25.;float a=1.-t;if(a<.05)discard;float P=clamp(f.y,0.,1.);vec3 Q=vec3(.3,.4,.1);vec3 S=vec3(.5,.4,.2);float T=k(j*37.17);float U=.85+.3*l(i.xz+vec2(j));vec3 b=mix(Q,S,smoothstep(0.,1.,T));vec3 c=mix(b*.4,b,smoothstep(0.,1.,P))*U;float V=l(i.xz+f*12.34);c*=(.97+.06*V);o=vec4(c*a,a);}`;
 
     const PPLANTS = prog(vsPlants, fsPlants); // Compile and link plant shader program
     const uMPla = gl.getUniformLocation(PPLANTS, 'c'); // Get location of Model matrix uniform
@@ -1577,11 +1522,9 @@
     // -- MODULE: Scene-VR (hand disc only) --
     // Reticle removed; single disc shader used for VR hand/grip indicator
 
-    const vsDisc=`#version 300 es
-    layout(location=0)in vec2 a;uniform mat4 b,c,d;out vec2 e;void main(){e=a*.5+.5;gl_Position=d*c*b*vec4(a.x,0.,a.y,1.);}`;
+    const vsDisc=`layout(location=0)in vec2 a;uniform mat4 b,c,d;out vec2 e;void main(){e=a*.5+.5;gl_Position=d*c*b*vec4(a.x,0.,a.y,1.);}`;
 
-    const fsDisc=`#version 300 es
-    precision highp float;in vec2 e;uniform vec4 f;out vec4 g;void main(){float h=distance(e,vec2(.5)),i=smoothstep(.5,.4,h)-smoothstep(.4,.3,h);g=vec4(f.rgb,f.a*i);if(g.a<.02)discard;}`;
+    const fsDisc=`in vec2 e;uniform vec4 f;out vec4 g;void main(){float h=distance(e,vec2(.5)),i=smoothstep(.5,.4,h)-smoothstep(.4,.3,h);g=vec4(f.rgb,f.a*i);if(g.a<.02)discard;}`;
 
     const PDisc = prog(vsDisc, fsDisc);
     const uMDisc = gl.getUniformLocation(PDisc, 'b'),
@@ -1600,10 +1543,8 @@
     // -- /MODULE: Scene-VR --
 
     // Beam for pointing ray.
-    const vsBeam = `#version 300 es
-    layout(location=0)in vec3 a;uniform mat4 b,c,d;void main(){gl_Position=d*c*b*vec4(a,1.);}`;
-    const fsBeam = `#version 300 es
-    precision highp float;uniform vec4 a;out vec4 b;void main(){b=a;}`;
+    const vsBeam = `layout(location=0)in vec3 a;uniform mat4 b,c,d;void main(){gl_Position=d*c*b*vec4(a,1.);}`;
+    const fsBeam = `uniform vec4 a;out vec4 b;void main(){b=a;}`;
     const PBeam = prog(vsBeam, fsBeam);
     const uMBeam = gl.getUniformLocation(PBeam, 'b'), uVBeam = gl.getUniformLocation(PBeam, 'c'), uPBeam = gl.getUniformLocation(PBeam, 'd'), uColBeam = gl.getUniformLocation(PBeam, 'a');
     const vboBeam = gl.createBuffer(), vaoBeam = gl.createVertexArray();
