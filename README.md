@@ -54,7 +54,7 @@ using a structure of `FEATURE` → `MODULE` → `SOLUTION`
 - Adaptive music system
 
 ### 📚 Learning Materials / Inspiration
-- **Sky shader** → [Iñigo Quílez: Derivative](https://iquilezles.org/articles/derivative/)  
+- **Sky shader** → [Iñigo Quílez: Derivative](https://iquilezles.org/articles/dynclouds/)  
 - **Lindenmayer-system plants shader** → [Shadertoy example](https://www.shadertoy.com/view/XtyGzh)
 
 ### 🌐 Explore More  
@@ -62,3 +62,4 @@ using a structure of `FEATURE` → `MODULE` → `SOLUTION`
 - **Projects Showcase** → [Explore My Work](https://justinas-gibas.github.io/MyFistWebsite/index1.html#work)  
 - **Twitch** → [twitch.tv/justgibas](https://www.twitch.tv/justgibas/about)  
 - **LinkedIn** → [linkedin.com/in/justinas-gibas](https://www.linkedin.com/in/justinas-gibas)  
+🐾
