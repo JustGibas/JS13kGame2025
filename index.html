@@ -1667,10 +1667,10 @@
         // Update user position
         const mv = getMove();
         step(dt, mv);
-    // Update black cat AI & drops
+        // Update black cat AI & drops
         updateCat(dt);
-    // MMO tick (send position)
-    mmoTick(dt);
+        // MMO tick (send position)
+        mmoTick(dt);
         // Trigger congrats overlay on catch
         if (cat.caught > lastCaughtShown) {
             lastCaughtShown = cat.caught;
@@ -1681,7 +1681,7 @@
         
         // Update camera matrices
         buildViewProj();
-        // NEW: update wind stereo each frame (after camera matrix updated)
+        // Update wind stereo each frame (after camera matrix updated)
     if(audioCtx) updateWind(t/1000, u.x, u.z);
         // --- Rendering ---
     gl.viewport(0, 0, C.width, C.height);
@@ -1723,7 +1723,7 @@
         //else {gl.disable(gl.CULL_FACE);};
         gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-        // --- NEW: Render Items & Obstacles (now works because drawSphere exists) ---
+        // --- Render Items & Obstacles (now works because drawSphere exists) ---
     for(const itm of items) if (itm.r>0) drawSphere(V,P,itm.x,itm.y,itm.z,itm.r,[.2,1.,.3]);
         //for(const o of obstacles) if(!o._isRock) drawSphere(V,P,o.x,o.y,o.z,o.r,[0.9,0.2,0.2]);
         for(const t of traps) drawSphere(V,P,t.x,t.y,t.z,t.r,[.8,.5,.1]);
@@ -1945,7 +1945,7 @@
             log('WebXR not available');
             return;
         }
-        navigator.xr.isSessionSupported('immersive-vr').then(s => log(s ? 'VR ready: Click Enter VR button' : 'VR error: try again or tinker'));
+        navigator.xr.isSessionSupported('immersive-vr').then(s => log(s ? 'VR ready: Click Enter VR button' : 'VR error: reload and try again'));
     }
     // if vr not avalable we split screen in to stereo view
 
