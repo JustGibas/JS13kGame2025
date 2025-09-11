@@ -44,6 +44,4 @@ The main goals were to:
 - **JS GL Math** → [Javi Agenjo: microgl.js](https://github.com/jagenjo/jstoolbits)
 - **Sky shader** → [Iñigo Quílez: 2D dynamic clouds](https://iquilezles.org/articles/dynclouds/)  
 - **Lindenmayer-system plants shader** → [Shadertoy example](https://www.shadertoy.com/view/XtyGzh)
-
-
 # 🐾🐈‍⬛
