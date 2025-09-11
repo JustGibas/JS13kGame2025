@@ -1,26 +1,30 @@
 # 🐾 **Wild Catch** 🐈‍⬛
-Legends say a mysterious black cat roams these lands. 
-Some believe it brings **fortune**, others whisper it’s a **shadow of bad luck**.
+# Catch the black cat
+## Legends say a mysterious black cat roams these lands. Some believe it **brings fortune**, others whisper it’s a **shadow of bad luck**.
 Your goal: **find it, follow it, and catch it** — but beware...
 the cat is **clever, fast, and always one step ahead.**
 
 ---
 ## 🎮 Controls
 **Desktop**
-- Move with **WASD**
-- Rotate with **Q / E**
-- Look around with your **mouse**
+- Move with `WASD`
+- Rotate with `Q` / `E`
+- Look around with your `mouse`   
 
 **Mobile**
-- Use the **left joystick** to move
-- Use the **right joystick** to rotate
-- Look around **Touch-drag** the screen
+- Use the `left joystick` to move
+- Use the `right joystick` to rotate
+- Look around `Touch-drag` the screen
 
 **HUD**
-- Close with **X**, **H**, or **Esc**
+- Close with `X`, `H`, or `Esc`
+
+**TIP**
+- Speedup: 🟩 Green
+- Obstacle: 🟧 Orange
 
 ---
-## 🛠️ From Developer
+## 🛠️ From the Developer
 
 This game was built during a full month of focused work — I took vacation time to dive in.
 The main goals were to:
@@ -41,7 +45,8 @@ The main goals were to:
 - Pleasant visuals
 
 ### 📚 Learning Materials / Inspiration
-- **JS GL Math** → [Javi Agenjo: microgl.js](https://github.com/jagenjo/jstoolbits)
-- **Sky shader** → [Iñigo Quílez: 2D dynamic clouds](https://iquilezles.org/articles/dynclouds/)  
+
 - **Lindenmayer-system plants shader** → [Shadertoy example](https://www.shadertoy.com/view/XtyGzh)
+- **Sky shader** → [Iñigo Quílez: 2D dynamic clouds](https://iquilezles.org/articles/dynclouds/)  
+- **JS GL Math** → [Javi Agenjo: microgl.js](https://github.com/jagenjo/jstoolbits)
 # 🐾🐈‍⬛
