@@ -38,9 +38,9 @@ The main goals were to:
 - **Packaging**: `7zip` (`PPMd` algorithm)
 
 ### ✨ Key Features
-- MMO mode (via Cloudflare relay server)
 - Cross-platform: VR, mobile, and desktop
-- Unified input system (raytraced controls)
+- Unified input system (raytraced clicks)
+- MMO mode (via Cloudflare relay server)
 - Wind simulation (affecting sound, grass, and plants)
 - Adaptive music system
 
