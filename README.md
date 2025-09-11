@@ -1,7 +1,8 @@
-# 🐾 Welcome to **Wild Catch** 🐈‍⬛
-
-The black cat is loose in the wilds — can you catch it before it disappears into the night?
-This is a **fast, skill-based exploration game** where sharp eyes and quick reflexes will determine your fate.
+# 🐾 **Wild Catch** 🐈‍⬛
+Legends say a mysterious black cat roams these lands. 
+Some believe it brings **fortune**, others whisper it’s a **shadow of bad luck**.
+Your goal: **find it, follow it, and catch it** — but beware...
+the cat is **clever, fast, and always one step ahead.**
 
 ---
 ## 🎮 Controls
@@ -13,25 +14,19 @@ This is a **fast, skill-based exploration game** where sharp eyes and quick refl
 **Mobile**
 - Use the **left joystick** to move
 - Use the **right joystick** to rotate
+- Look around **Touch-drag** the screen
 
 **HUD**
 - Close with **X**, **H**, or **Esc**
-
-**Look**
-- Touch-drag to freely look around
----
-## 🌌 Story
-Legends say a mysterious black cat roams these lands. 
-Some believe it brings **fortune**, others whisper it’s a **shadow of bad luck**.
-Your task: **find it, follow it, and catch it** — but beware...
-the cat is **clever, fast, and always one step ahead.**
 
 ---
 ## 🛠️ From Developer
 
 This game was built during a full month of focused work — I took vacation time to dive in.
 The main goals were to:
- **Vanilla JS for WebXR**
+ **Vanilla JS for WebXR** - no frameworks, just raw JS browser APIs
+ **Cross-platform** - VR, mobile, and desktop
+ **13kB limit**
 
 ### 🔧 Tech Stack
 - **Languages & APIs**: `html`,`JS`, `WebGL2`, `WebAudio`, `OpenXR`
@@ -43,15 +38,12 @@ The main goals were to:
 - MMO mode (via Cloudflare relay server)
 - Wind simulation (affecting sound, grass, and plants)
 - Adaptive music system
+- Pleasant visuals
 
 ### 📚 Learning Materials / Inspiration
 - **JS GL Math** → [Javi Agenjo: microgl.js](https://github.com/jagenjo/jstoolbits)
 - **Sky shader** → [Iñigo Quílez: 2D dynamic clouds](https://iquilezles.org/articles/dynclouds/)  
 - **Lindenmayer-system plants shader** → [Shadertoy example](https://www.shadertoy.com/view/XtyGzh)
 
-### 🌐 About Developer  
-- **GitHub Repo** → [JS13kGame2025](https://github.com/JustGibas/JS13kGame2025)   
-- **Projects Showcase** → [Explore My Work](https://justinas-gibas.github.io/MyFistWebsite/index1.html#work)  
-- **Twitch** → [twitch.tv/justgibas](https://www.twitch.tv/justgibas)  
-- **LinkedIn** → [linkedin.com/in/justinas-gibas](https://www.linkedin.com/in/justinas-gibas)
+
 # 🐾🐈‍⬛
