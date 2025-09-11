@@ -1,0 +1,21 @@
+NOTICE
+======
+
+Copyright © 2025 Justinas Gibas
+
+This product includes software developed by Justinas Gibas.
+
+Third-Party Components
+----------------------
+
+The following components are created by third parties and linked here for attribution. 
+Please refer to the original sources for their respective licenses/usage terms:
+
+1. Lindenmayer-system plants shader → https://www.shadertoy.com/view/XtyGzh
+   (by Max Sills)
+
+2. Clouds shader → https://iquilezles.org/articles/dynclouds/
+   (by Iñigo Quílez)
+
+3. JS GL Math → https://github.com/jagenjo/jstoolbits
+   (by Javi Agenjo)
