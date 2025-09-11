@@ -1906,6 +1906,10 @@ const fsSky=`in vec2 a;out vec4 b;uniform mat4 c,d;uniform sampler2D e;uniform f
             xr.updateRenderState({ baseLayer: new XRWebGLLayer(xr, gl) });
             ref = await xr.requestReferenceSpace('local-floor');
 
+            // capture/lock PC mouse to use mouse in VR
+            // if user clicked on the canvas, we assume they want mouse-look
+            
+
             xr.addEventListener('end', () => {
                 //cancelAnimationFrame(onXR); // Stop XR loop
                 xr = null;
@@ -2002,8 +2006,8 @@ const fsSky=`in vec2 a;out vec4 b;uniform mat4 c,d;uniform sampler2D e;uniform f
         if (!rel) return;
 
         // -- VR Input and Interaction --
-
-        for (const src of s.inputSources) {
+        //for (const src of (s.inputSources && Symbol.iterator in Object(s.inputSources) ? s.inputSources : [])) {
+        for (const src of s.inputSources || []) {
             const gp = src.gamepad;
             if (!gp || !gp.buttons || !gp.buttons.length) continue;
 
@@ -2217,7 +2221,7 @@ const fsSky=`in vec2 a;out vec4 b;uniform mat4 c,d;uniform sampler2D e;uniform f
             const WH = new DOMMatrix(rel.transform.matrix).multiply(new DOMMatrix(T)).toFloat32Array(); // Hud snaped to eyes, bad
             HUD_WH_world = WH;
             hoverBtn = null;
-            for (const src of s.inputSources) {
+            for (const src of s.inputSources || []) {
                 const r = controllerRay(frame, src);
                 const h = HUD_pick(WH, r, currentUI());
                 if (h && h.button) { hoverBtn = h.button; break; }
@@ -2239,7 +2243,7 @@ const fsSky=`in vec2 a;out vec4 b;uniform mat4 c,d;uniform sampler2D e;uniform f
             gl.enable(gl.DEPTH_TEST);
 
             // Render Controller Indicators and Rays
-            for (const src of s.inputSources) {
+            for (const src of s.inputSources || []) {
                 const col = [1, 1, .5]
 
                 // Hand grip indicator
