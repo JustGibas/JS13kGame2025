@@ -288,7 +288,7 @@
     function prog(vs, fs) {
         // Always prepend shared header (js13k-friendly, no conditional check)
         const H = '#version 300 es\nprecision highp float;';
-        vs = H + vs;
+        vs = H + /*'#define U uniform' )+*/ vs;
         fs = H + fs;
         const p = gl.createProgram();
         const v = gl.createShader(gl.VERTEX_SHADER);
@@ -688,7 +688,7 @@
 
         // Evade impulse when very close
         cat.evade -= dt;
-        if(dP2 < 9 && cat.evade<=0){ const d = SQRT(dP2)||1, nx = dxP/d, nz = dzP/d, s = RANDOM()<.5?1:-1; fx += (-nz*s)*50; fz += (nx*s)*50; cat.evade = .2; }
+        if(dP2 < 9 && cat.evade<=0){ const d = SQRT(dP2)||1, nx = dxP/d, nz = dzP/d, s = RANDOM()<.5?1:-1; fx += (-nz*s)*50; fz += (nx*s)*50; cat.evade = .4; }
 
         // Integrate & clamp speed
         cat.vx += fx*dt; cat.vz += fz*dt;
@@ -1416,23 +1416,56 @@ const fsSky=`in vec2 a;out vec4 b;uniform mat4 c,d;uniform sampler2D e;uniform f
 
     // -- MODULE: Scene-Grass --
     // --- Grass Shaders ---
-    // Grass rendering constants.
     // Uses instanced rendering to draw many blades of grass efficiently
-    const vsGrass = `uniform mat4 V,P;uniform vec2 a;uniform vec3 b;uniform float c,d,e;uniform sampler2D f;uniform float g;out vec3 h;float i(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}vec2 j(vec2 p){float n=sin(dot(p,vec2(1.,113.)));return fract(vec2(262144.*n,32768.*n));}void main(){int N=170;int k=gl_InstanceID;int l=k%N-N/2;int m=k/N-N/2;vec2 o=floor(a/d);vec2 q=o+vec2(float(l),float(m));vec2 r=(q+vec2(.5))*d;vec2 s=floor(r/d)+vec2(e);vec2 t=(j(s)-.5)*(d*90.9);float u=i(s*3.1);float v=i(s*7.7);float w=i(s*5.3)*6.283;float x=texture(f,r*g).r;float y=mix(.6,.9,u);float z=float(gl_VertexID/2)/4.;float A=float(gl_VertexID%2)*2.-1.;float B=mix(1.9,1.,smoothstep(0.,2.,1.));float C=.05*(1.-z)*(.6+.6*v)*B;vec2 D=vec2(.07,.05);vec2 E=vec2(-.03,.04);float F=.6*sin(dot(r,D)+c*.7)+.4*sin(dot(r,E)-c*1.2);float G=(.25*F)+.07*sin(c*1.7+w);float H=(z*z)*G;vec2 I=r+t;vec3 J=vec3(I.x,0.,I.y);vec3 K=normalize(b);vec2 L=vec2(cos(.3*c),sin(.32*c));L*=inversesqrt(dot(L,L)+.1);vec3 M=vec3(L.x,0.,L.y)*H*y;vec3 O=J+K*A*C+vec3(0.,z*y,0.)+M;vec3 p0=vec3(.12,.1,.01);vec3 p1=vec3(.45,.38,.05);vec3 q0=vec3(.05,.12,.02);vec3 q1=vec3(.3,.7,.22);vec3 r0=mix(p0,q0,x);vec3 r1=mix(p1,q1,x);h=mix(r0,r1,smoothstep(0.,1.,z))*(.85+.15*i(s*11.1));gl_Position=P*V*vec4(O,1.);}`;
-    const fsGrass = `in vec3 h;out vec4 o;void main(){ o = vec4(h, 1.); }`;
-
+    const vsGrass = `
+        uniform mat4 V, P;
+        uniform vec2 c;
+        uniform vec3 r;
+        uniform float d;
+        uniform float a;
+        uniform int n;
+        uniform float s;
+        uniform sampler2D e;
+        out vec3 uCol;
+        float hash12(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453123); }
+        vec2  hash22(vec2 p){ float n = sin(dot(p, vec2(1.0,113.0))); return fract(vec2(262144.0*n, 32768.0*n)); }
+        void main(){
+            int iid = gl_InstanceID;
+            vec2 camCellF = floor(c / a);
+            vec2 cellF = camCellF + vec2(float(iid % n - n/2), float(iid / n - n/2));
+            vec2 baseCenter = (cellF + vec2(0.5)) * a;
+            vec2 tileKey = floor(baseCenter / a) + vec2(s);
+            float biome = texture(e, baseCenter * 0.0002).r;
+            float H = mix(0.6, 0.9, hash12(tileKey * 3.1));
+            float t = float(gl_VertexID / 2) / float(4);
+            float side = (gl_VertexID % 2 == 0) ? -1.0 : 1.0;
+            float nearWScale = mix(1.9, 1.0, smoothstep(0.0, 2.0, 1.0));
+            float width = 0.05 * (1.0 - t) * (0.6 + 0.6 * hash12(tileKey * 7.7)) * nearWScale;
+            float gust = 0.6 * sin(dot(baseCenter, vec2(0.07, 0.05)) + d * 0.7) + 0.4 * sin(dot(baseCenter, vec2(-0.03, 0.04)) - d * 1.2);
+            float sway = (0.25 * gust) + 0.07 * sin(d * 1.7 + hash12(tileKey * 5.3) * 6.2831853);
+            float bend = (t * t) * sway;
+            vec2 baseXZ = baseCenter + (hash22(tileKey) - 0.5) * (a * 90.9);
+            vec2 w = vec2(cos(0.3 * d), sin(0.32 * d));
+            w *= inversesqrt(dot(w,w) + 0.001);
+            vec2 windDir = w;
+            vec3 bendOff = vec3(windDir.x, 0.0, windDir.y) * bend * H;
+            vec3 pos = vec3(baseXZ.x, 0.0, baseXZ.y) + normalize(r) * (side * width) + vec3(0.0, t * H, 0.0) + bendOff;
+            vec3 c0 = mix(vec3(0.12, 0.10, 0.01), vec3(0.05, 0.12, 0.02), biome);
+            vec3 c1 = mix(vec3(0.45, 0.38, 0.05), vec3(0.30, 0.70, 0.22), biome);
+            uCol = mix(c0, c1, smoothstep(0.0, 1.0, t)) * (0.85 + 0.15 * hash12(tileKey * 11.1));
+            gl_Position = P * V * vec4(pos, 1.0);
+        }`;
+    const fsGrass = `in vec3 uCol;out vec4 o;void main(){ o = vec4(uCol, 1.0); }`;
+    //const fsGrass = `in vec3 h;out vec4 o;void main(){ o = vec4(h, 1.); }`;
     const PGRASS = prog(vsGrass, fsGrass);
     const uVG = gl.getUniformLocation(PGRASS, 'V'), uPG = gl.getUniformLocation(PGRASS, 'P');
-    const uCamXZ = gl.getUniformLocation(PGRASS, 'a');
-    const uCamRight = gl.getUniformLocation(PGRASS, 'b');
-    const uTimeG = gl.getUniformLocation(PGRASS, 'c');
-    const uCell = gl.getUniformLocation(PGRASS, 'd');
-    //const uGridN = gl.getUniformLocation(PGRASS, 'uGridN');
-    //const uRadius = gl.getUniformLocation(PGRASS, 'uRadius');
-    const uSeed = gl.getUniformLocation(PGRASS, 'e');
-    // NEW biome uniforms
-    const uNoise = gl.getUniformLocation(PGRASS, 'f');
-    const ns = gl.getUniformLocation(PGRASS, 'g');
+    const uCamXZ = gl.getUniformLocation(PGRASS, 'c');
+    const uCamRight = gl.getUniformLocation(PGRASS, 'r');
+    const uTimeG = gl.getUniformLocation(PGRASS, 'd');
+    const uCell = gl.getUniformLocation(PGRASS, 'a');
+    const uGridN = gl.getUniformLocation(PGRASS, 'n');
+    const uSeed = gl.getUniformLocation(PGRASS, 's');
+    const uNoise = gl.getUniformLocation(PGRASS, 'e');
 
     // The grass VAO is minimal since all vertex data is generated procedurally in the shader
     const vaoGrass = gl.createVertexArray(), vboGrass = gl.createBuffer();
@@ -1494,7 +1527,7 @@ const fsSky=`in vec2 a;out vec4 b;uniform mat4 c,d;uniform sampler2D e;uniform f
     
     const vsPlants=`layout(location=0)in vec3 a;layout(location=1)in vec2 b;uniform mat4 c,d,e;out vec2 f;void main(){f=b;gl_Position=e*d*c*vec4(a,1.);}`;
 
-    const fsPlants = `in vec2 f;out vec4 o;uniform float g;uniform int h;uniform vec3 i;uniform float j;mat3 R(float a){float c=cos(a),s=sin(a);return mat3(vec3(c,s,0),vec3(-s,c,0),vec3(0,0,1));}mat3 D(vec2 d){return mat3(vec3(1,0,0),vec3(0,1,0),vec3(d,1));}float C(vec2 p,vec2 h){p-=vec2(0.,h.y);vec2 d=abs(vec2(length(p.x),p.y))-h;return min(max(d.x,d.y),0.)+length(max(d,0.));}float k(float x){return fract(sin(x)*43758.5453);}float l(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}float E(vec2 p){float m=25.7+j*10.;mat3 n=R(-(m/360.)*6.28318);mat3 q=R(m/360.*6.28318);int r=3+int(j*4.);const int B=3;int s=1;for(int i=0;i<r;i++)s*=B;float t=1.5;float u=.02;p=p+vec2(0,2);float v=C(p-vec2(0.,0.),vec2(u,t));float w=500.;int x=0;vec2 y=vec2(.07,.05);vec2 z=vec2(-.03,.04);float A=.6*sin(dot(i.xz,y)+g*.7)+.4*sin(dot(i.xz,z)-g*1.2);float F=fract(sin(dot(i.xz,vec2(12.9898,78.233)))*43758.5453)*6.283;float G=(.25*A)+.07*sin(g*1.7+F);mat3 H=R(G*.5);for(int i=0;i<h;++i){int I=1;for(int j=0;j<r;j++)I*=B;vec2 J=p;for(int j=1;j<=r;++j){float K=t/pow(2.,float(j));I/=B;int L=x/I;int M=L-B*(L/B);mat3 N;if(M==0){N=n*D(vec2(0,-2.*K));}else if(M==1){N=H*q*D(vec2(0,-2.*K));}else{N=H*D(vec2(0,-4.*K));}J=(N*vec3(J,1)).xy;float O=C(J,vec2(u,K));if(O-2.*K>0.){x+=I-1;break;}w=min(w,O);if(w<.01)break;}if(w<.01)break;++x;if(x>s)break;}return min(w,v);}void main(){vec2 p=(f*2.-1.)*5.;p.y+=3.;float d=E(p);float t=clamp(d,0.,.04)*25.;float a=1.-t;if(a<.05)discard;float P=clamp(f.y,0.,1.);vec3 Q=vec3(.3,.4,.1);vec3 S=vec3(.5,.4,.2);float T=k(j*37.17);float U=.85+.3*l(i.xz+vec2(j));vec3 b=mix(Q,S,smoothstep(0.,1.,T));vec3 c=mix(b*.4,b,smoothstep(0.,1.,P))*U;float V=l(i.xz+f*12.34);c*=(.97+.06*V);o=vec4(c*a,a);}`;
+    const fsPlants = `in vec2 f;out vec4 o;uniform float g;uniform int h;uniform vec3 i;uniform float j;mat3 R(float a){float c=cos(a),s=sin(a);return mat3(vec3(c,s,0),vec3(-s,c,0),vec3(0,0,1));}mat3 D(vec2 d){return mat3(vec3(1,0,0),vec3(0,1,0),vec3(d,1));}float C(vec2 p,vec2 h){p-=vec2(0.,h.y);vec2 d=abs(vec2(length(p.x),p.y))-h;return min(max(d.x,d.y),0.)+length(max(d,0.));}float k(float x){return fract(sin(x)*43758.5453);}float l(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}float E(vec2 p){float m=25.7+j*10.;mat3 n=R(-(m/360.)*6.28318);mat3 q=R(m/360.*6.28318);int r=3+int(j*4.);const int B=3;int s=1;for(int i=0;i<r;i++)s*=B;float t=1.5;float u=.01;p=p+vec2(0,2);float v=C(p-vec2(0.,0.),vec2(u,t));float w=500.;int x=0;vec2 y=vec2(.07,.05);vec2 z=vec2(-.03,.04);float A=.6*sin(dot(i.xz,y)+g*.7)+.4*sin(dot(i.xz,z)-g*1.2);float F=fract(sin(dot(i.xz,vec2(12.9898,78.233)))*43758.5453)*6.283;float G=(.25*A)+.07*sin(g*1.7+F);mat3 H=R(G*.5);for(int i=0;i<h;++i){int I=1;for(int j=0;j<r;j++)I*=B;vec2 J=p;for(int j=1;j<=r;++j){float K=t/pow(2.,float(j));I/=B;int L=x/I;int M=L-B*(L/B);mat3 N;if(M==0){N=n*D(vec2(0,-2.*K));}else if(M==1){N=H*q*D(vec2(0,-2.*K));}else{N=H*D(vec2(0,-4.*K));}J=(N*vec3(J,1)).xy;float O=C(J,vec2(u,K));if(O-2.*K>0.){x+=I-1;break;}w=min(w,O);if(w<.01)break;}if(w<.01)break;++x;if(x>s)break;}return min(w,v);}void main(){vec2 p=(f*2.-1.)*5.;p.y+=3.;float d=E(p); if(d>.038)discard;float P=clamp(f.y,0.,1.);vec3 Q=vec3(.3,.4,.1);vec3 S=vec3(.5,.4,.2);float T=k(j*37.17);float U=.85+.3*l(i.xz+vec2(j));vec3 b=mix(Q,S,smoothstep(0.,1.,T));vec3 c=mix(b*.4,b,smoothstep(0.,1.,P))*U;float V=l(i.xz+f*12.34);c*=(.97+.06*V);o=vec4(c,1);}`;
 
     const PPLANTS = prog(vsPlants, fsPlants); // Compile and link plant shader program
     const uMPla = gl.getUniformLocation(PPLANTS, 'c'); // Get location of Model matrix uniform
@@ -1523,9 +1556,7 @@ const fsSky=`in vec2 a;out vec4 b;uniform mat4 c,d;uniform sampler2D e;uniform f
     // Reticle removed; single disc shader used for VR hand/grip indicator
 
     const vsDisc=`layout(location=0)in vec2 p;uniform mat4 M,V,P;out vec2 uv;void main(){uv=p*.5+.5;gl_Position=P*V*M*vec4(p.x,0.,p.y,1.);}`;
-
     const fsDisc=`in vec2 uv;uniform vec4 col;out vec4 o;void main(){float d=distance(uv,vec2(.5)),r=smoothstep(.5,.4,d)-smoothstep(.4,.3,d);o=vec4(col.rgb,col.a*r);if(o.a<.02)discard;}`;
-
     const PDisc = prog(vsDisc, fsDisc);
     const uMDisc = gl.getUniformLocation(PDisc, 'M'),
           uVDisc = gl.getUniformLocation(PDisc, 'V'),
@@ -1695,7 +1726,7 @@ const fsSky=`in vec2 a;out vec4 b;uniform mat4 c,d;uniform sampler2D e;uniform f
                 gl.uniform1f(uR_Seed, rk.seed);
                 gl.drawArrays(gl.TRIANGLES, 0, rockVerts.length / 3);
             }
-            gl.enable(gl.DEPTH_TEST);
+            //gl.enable(gl.DEPTH_TEST);
         }
 
         // Render Grass in multiple passes for density and LOD
@@ -1712,15 +1743,15 @@ const fsSky=`in vec2 a;out vec4 b;uniform mat4 c,d;uniform sampler2D e;uniform f
         {
             gl.useProgram(PPLANTS);
             gl.bindVertexArray(vaoPlants);
-            gl.enable(gl.BLEND);
-            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-            gl.depthMask(false); // Render transparent objects without writing to depth buffer
+            //gl.enable(gl.BLEND);
+            //gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+            //gl.depthMask(false); // Render transparent objects without writing to depth buffer
 
             const camX = u.x;
             const camZ = u.z;
 
             // Only regenerate plants every 10 frames or if camera moved significantly
-            if (frameCount % 10 === 0 || HYPOT(camX - lastPlantCamX, camZ - lastPlantCamZ) > 5.) {
+            if (frameCount % 10 === 0) {// || HYPOT(camX - lastPlantCamX, camZ - lastPlantCamZ) > 2.) {
                 cachedPlants = genPlants(camX, camZ);
                 lastPlantCamX = camX;
                 lastPlantCamZ = camZ;
@@ -1768,8 +1799,8 @@ const fsSky=`in vec2 a;out vec4 b;uniform mat4 c,d;uniform sampler2D e;uniform f
                 gl.drawArrays(gl.TRIANGLES, 0, 6);
             }
 
-            gl.depthMask(true);
-            gl.disable(gl.BLEND);
+            //gl.depthMask(true);
+            //gl.disable(gl.BLEND);
         }
 
         // Render Reticle if there's a ground hit
@@ -1842,7 +1873,7 @@ const fsSky=`in vec2 a;out vec4 b;uniform mat4 c,d;uniform sampler2D e;uniform f
     }
 
     // Helper to submit a grass draw call
-    function drawGrassPass(Vmat, Pmat, camXZ, camRight, timeSec, cell, gridN, /*radius,*/ seed) {
+    function drawGrassPass(Vmat, Pmat, camXZ, camRight, timeSec, cell, gridN, seed) {
         gl.useProgram(PGRASS);
         gl.bindVertexArray(vaoGrass);
         gl.uniformMatrix4fv(uVG, false, Vmat);
@@ -1851,14 +1882,13 @@ const fsSky=`in vec2 a;out vec4 b;uniform mat4 c,d;uniform sampler2D e;uniform f
         gl.uniform3f(uCamRight, camRight[0], camRight[1], camRight[2]);
         gl.uniform1f(uTimeG, timeSec);
         gl.uniform1f(uCell, cell);
-        //gl.uniform1i(uGridN, gridN | 0);
+        gl.uniform1i(uGridN, gridN | 0);
         gl.uniform1f(uSeed, seed);
         // Bind noise texture once per pass
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, noiseTex);
         gl.uniform1i(uNoise, 0);
-        gl.uniform1f(ns, .0002); // adjust for biome size (smaller = larger biomes)
-        gl.enable(gl.DEPTH_TEST);
+        //gl.enable(gl.DEPTH_TEST);
         gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 10, gridN * gridN);
     }
 
@@ -1871,7 +1901,7 @@ const fsSky=`in vec2 a;out vec4 b;uniform mat4 c,d;uniform sampler2D e;uniform f
       const eye = [u.x, u.y, u.z];
       const center = [u.x - sy * cp, u.y - sp, u.z - cy * cp];
         LOOKAT(V, eye, center, [0, 1, 0]);
-    PERSP(P, 60, C.width / C.height, .01, 1000);
+    PERSP(P, 60, C.width / C.height, .5, 1000.);
         PV = MULTMAT4(M4(), P, V);
         invPV = INV(PV);
     }
@@ -1908,6 +1938,7 @@ const fsSky=`in vec2 a;out vec4 b;uniform mat4 c,d;uniform sampler2D e;uniform f
 
             // capture/lock PC mouse to use mouse in VR
             // if user clicked on the canvas, we assume they want mouse-look
+            //C.setPointerCapture(e.pointerId);
             
 
             xr.addEventListener('end', () => {
@@ -1953,11 +1984,11 @@ const fsSky=`in vec2 a;out vec4 b;uniform mat4 c,d;uniform sampler2D e;uniform f
             if (obstacles[i]._isRock) obstacles.splice(i, 1);
         }
         rocks.length = 0;
-        //const c = 5; const r = 200.0;
-        const minX = FLOOR((u.x - 200.)/5);
-        const maxX = FLOOR((u.x + 200.)/5);
-        const minZ = FLOOR((u.z - 200.)/5);
-        const maxZ = FLOOR((u.z + 200.)/5);
+        //const c = 5; const r = 400.0;
+        const minX = FLOOR((u.x - 400.)/5);
+        const maxX = FLOOR((u.x + 400.)/5);
+        const minZ = FLOOR((u.z - 400.)/5);
+        const maxZ = FLOOR((u.z + 400.)/5);
         for(let gz=minZ; gz<=maxZ; gz++){
             for(let gx=minX; gx<=maxX; gx++){
                 const h = rockHash(gx, gz, .0);
@@ -2016,7 +2047,7 @@ const fsSky=`in vec2 a;out vec4 b;uniform mat4 c,d;uniform sampler2D e;uniform f
 
             // On button press (edge detection)
             if (now && !prev) {
-                playClickSound();
+                //playClickSound();
                 const r = rayFrom('VR', frame, src);
                 const viewer = frame.getViewerPose(off);
                 if (viewer) {
@@ -2042,7 +2073,7 @@ const fsSky=`in vec2 a;out vec4 b;uniform mat4 c,d;uniform sampler2D e;uniform f
         gl.bindFramebuffer(gl.FRAMEBUFFER, s.renderState.baseLayer.framebuffer);
         gl.clearColor(0, 0, 0, 1);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-        gl.enable(gl.DEPTH_TEST);
+        //gl.enable(gl.DEPTH_TEST);
 
         // Render the scene for each eye
         for (const v of rel.views) {
@@ -2116,7 +2147,7 @@ const fsSky=`in vec2 a;out vec4 b;uniform mat4 c,d;uniform sampler2D e;uniform f
                     gl.uniform1f(uR_Seed, rk.seed);
                     gl.drawArrays(gl.TRIANGLES, 0, rockVerts.length / 3);
                 }
-                gl.enable(gl.DEPTH_TEST);
+                //gl.enable(gl.DEPTH_TEST);
             }
 
 
@@ -2135,9 +2166,9 @@ const fsSky=`in vec2 a;out vec4 b;uniform mat4 c,d;uniform sampler2D e;uniform f
             {
                 gl.useProgram(PPLANTS);
                 gl.bindVertexArray(vaoPlants);
-                gl.enable(gl.BLEND);
-                gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-                gl.depthMask(false); // Render transparent objects without writing to depth buffer
+                //gl.enable(gl.BLEND);
+                //gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+                //gl.depthMask(false); // Render transparent objects without writing to depth buffer
 
                 const worldFromView = v.transform.matrix;
                 const camX = worldFromView[12];
@@ -2145,7 +2176,7 @@ const fsSky=`in vec2 a;out vec4 b;uniform mat4 c,d;uniform sampler2D e;uniform f
 
                 
                 // Only regenerate plants every 10 frames or if camera moved significantly
-                if (frameCount % 10 === 0 || HYPOT(camX - lastPlantCamX, camZ - lastPlantCamZ) > 5.) {
+                if (frameCount % 10 === 0) {// || HYPOT(camX - lastPlantCamX, camZ - lastPlantCamZ) > 5.) {
                     cachedPlants = genPlants(camX, camZ);
                     lastPlantCamX = camX;
                     lastPlantCamZ = camZ;
@@ -2180,7 +2211,7 @@ const fsSky=`in vec2 a;out vec4 b;uniform mat4 c,d;uniform sampler2D e;uniform f
                 const angle = ATAN2(camX - px, camZ - pz);
                 const MPlants = new DOMMatrix()
                     .translate(px, 0, pz)
-                    .rotate(0, angle / D2R, 0) // fix: radians->degrees (was *D2R)
+                    .rotate(0, angle / D2R, 0)
                     .scale(scale, scale, scale)
                     .toFloat32Array();
 
@@ -2194,8 +2225,8 @@ const fsSky=`in vec2 a;out vec4 b;uniform mat4 c,d;uniform sampler2D e;uniform f
                 gl.drawArrays(gl.TRIANGLES, 0, 6);
             }
 
-            gl.depthMask(true);
-            gl.disable(gl.BLEND);
+            //gl.depthMask(true);
+            //gl.disable(gl.BLEND);
             }
 
             // Render Reticle
