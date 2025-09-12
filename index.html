@@ -1238,9 +1238,9 @@
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
-    // Simple textured quad shader for the HUD
-    const vsMVP = `layout(location=0)in vec3 p;layout(location=1)in vec2 uv;uniform mat4 M,V,P;out vec2 U;out vec3 W;void main(){vec4 wpos=M*vec4(p,1.);W=wpos.xyz;U=uv;gl_Position=P*V*wpos;}`;
-    const fsH = `in vec2 U;uniform sampler2D T;out vec4 o;void main(){vec4 c=texture(T,U);if(c.a<.01)discard;o=c;}`;
+    // Simple textured quad shader for the HUD (unified MVP)
+    const vsMVP = `layout(location=0)in vec3 p;layout(location=1)in vec2 uv;uniform mat4 M,V,P;out vec2 f;out vec3 W;void main(){vec4 wpos=M*vec4(p,1.);W=wpos.xyz;f=uv;gl_Position=P*V*wpos;}`;
+    const fsH = `in vec2 f;uniform sampler2D T;out vec4 o;void main(){vec4 c=texture(T,f);if(c.a<.01)discard;o=c;}`;
     const PH = prog(vsMVP, fsH);
     const uMH = gl.getUniformLocation(PH, 'M'),
           uVH = gl.getUniformLocation(PH, 'V'),
@@ -1370,7 +1370,7 @@
     
     // -- MODULE: Gameplay-item --
     // NEW: Sphere (items/obstacles) minimal shader + geometry
-    const vsSphere = `layout(location=0) in vec3 p;uniform mat4 V,P;uniform vec3 a;uniform float b;void main(){vec3 wp=p*b+a;gl_Position=P*V*vec4(wp,1.);}`;
+    // Reuse vsMVP by passing model matrix with translate+scale
     const fsSphere = `uniform vec3 c;out vec4 o;void main(){ o = vec4(c,1.); }`;
 
     function buildSphere(lat=10, lon=12){
@@ -1390,7 +1390,7 @@
     }
     function sph(t,p){ return [SIN(t)*COS(p), COS(t), SIN(t)*SIN(p)]; }
 
-    const PS = prog(vsSphere, fsSphere);
+    const PS = prog(vsMVP, fsSphere);
     const sphereVao = gl.createVertexArray();
     const sphereBuf = gl.createBuffer();
     gl.bindVertexArray(sphereVao);
@@ -1399,10 +1399,9 @@
     gl.bufferData(gl.ARRAY_BUFFER, sphereVerts, gl.STATIC_DRAW);
     gl.enableVertexAttribArray(0);
     gl.vertexAttribPointer(0,3,gl.FLOAT,false,0,0);
+    const uS_M = gl.getUniformLocation(PS,'M');
     const uS_V = gl.getUniformLocation(PS,'V');
     const uS_P = gl.getUniformLocation(PS,'P');
-    const uS_Pos = gl.getUniformLocation(PS,'a');
-    const uS_S = gl.getUniformLocation(PS,'b');
     const uS_Color = gl.getUniformLocation(PS,'c');
 
     // -- /MODULE: Gameplay-item --
@@ -1512,14 +1511,12 @@
     let cachedPlants = [];
     let lastPlantCamX = 0, lastPlantCamZ = 0;
     
-    const vsPlants=`layout(location=0)in vec3 a;layout(location=1)in vec2 b;uniform mat4 c,d,e;out vec2 f;void main(){f=b;gl_Position=e*d*c*vec4(a,1.);}`;
+    const fsPlants=`in vec2 f;out vec4 o;uniform float g;uniform int h;uniform vec3 i;uniform float j;mat3 R(float a){float c=cos(a),s=sin(a);return mat3(vec3(c,s,0),vec3(-s,c,0),vec3(0,0,1));}mat3 D(vec2 d){return mat3(vec3(1,0,0),vec3(0,1,0),vec3(d,1));}float C(vec2 p,vec2 h){p-=vec2(0.,h.y);vec2 d=abs(p)-h;return min(max(d.x,d.y),0.)+length(max(d,0.));}float k(float x){return fract(sin(x)*43758.5453);}float l(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}float E(vec2 p){float m=25.7+j*10.;mat3 n=R(-m*.01745),q=R(m*.01745);int r=3+int(j*4.),s=1;for(int a=0;a<r;a++)s*=3;float t=1.5,u=.002;p+=vec2(0,2);float v=C(p,vec2(u,t)),w=1e9;int x=0;vec2 y=vec2(.07,.05),z=vec2(-.03,.04);float A=.6*sin(dot(i.xz,y)+g*.7)+.4*sin(dot(i.xz,z)-g*1.2);float F=fract(sin(dot(i.xz,vec2(12.9898,78.233)))*43758.5453)*6.283;float G=.25*A+.07*sin(g*1.7+F);mat3 H=R(G*.5);for(int a=0;a<h;++a){int I=s;vec2 J=p;for(int j=1;j<=r;++j){float K=t/exp2(float(j));I/=3;int L=x/I;int M=L-3*(L/3);mat3 N;if(M==0)N=n*D(vec2(0,-2.*K));else if(M==1)N=H*q*D(vec2(0,-2.*K));else N=H*D(vec2(0,-4.*K));J=(N*vec3(J,1)).xy;float O=C(J,vec2(u,K));if(O>2.*K){x+=I-1;break;}w=min(w,O);if(w<.01)break;}if(w<.01||++x>s)break;}return min(w,v);}void main(){vec2 p=(f*2.-1.)*5.;p.y+=3.;if(E(p)>.038)discard;float P=clamp(f.y,0.,1.),T=k(j*37.17),U=.85+.3*l(i.xz+vec2(j));vec3 Q=vec3(.3,.4,.1),S=vec3(.5,.4,.2),b=mix(Q,S,smoothstep(0.,1.,T));vec3 c=mix(b*.4,b,smoothstep(0.,1.,P))*U;c*=.97+.06*l(i.xz+f*12.34);o=vec4(c,1);}`; 
 
-    const fsPlants=`in vec2 f;out vec4 o;uniform float g;uniform int h;uniform vec3 i;uniform float j;mat3 R(float a){float c=cos(a),s=sin(a);return mat3(vec3(c,s,0),vec3(-s,c,0),vec3(0,0,1));}mat3 D(vec2 d){return mat3(vec3(1,0,0),vec3(0,1,0),vec3(d,1));}float C(vec2 p,vec2 h){p-=vec2(0.,h.y);vec2 d=abs(p)-h;return min(max(d.x,d.y),0.)+length(max(d,0.));}float k(float x){return fract(sin(x)*43758.5453);}float l(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}float E(vec2 p){float m=25.7+j*10.;mat3 n=R(-m*.01745),q=R(m*.01745);int r=3+int(j*4.),s=1;for(int a=0;a<r;a++)s*=3;float t=1.5,u=.01;p+=vec2(0,2);float v=C(p,vec2(u,t)),w=1e9;int x=0;vec2 y=vec2(.07,.05),z=vec2(-.03,.04);float A=.6*sin(dot(i.xz,y)+g*.7)+.4*sin(dot(i.xz,z)-g*1.2);float F=fract(sin(dot(i.xz,vec2(12.9898,78.233)))*43758.5453)*6.283;float G=.25*A+.07*sin(g*1.7+F);mat3 H=R(G*.5);for(int a=0;a<h;++a){int I=s;vec2 J=p;for(int j=1;j<=r;++j){float K=t/exp2(float(j));I/=3;int L=x/I;int M=L-3*(L/3);mat3 N;if(M==0)N=n*D(vec2(0,-2.*K));else if(M==1)N=H*q*D(vec2(0,-2.*K));else N=H*D(vec2(0,-4.*K));J=(N*vec3(J,1)).xy;float O=C(J,vec2(u,K));if(O>2.*K){x+=I-1;break;}w=min(w,O);if(w<.01)break;}if(w<.01||++x>s)break;}return min(w,v);}void main(){vec2 p=(f*2.-1.)*5.;p.y+=3.;if(E(p)>.038)discard;float P=clamp(f.y,0.,1.),T=k(j*37.17),U=.85+.3*l(i.xz+vec2(j));vec3 Q=vec3(.3,.4,.1),S=vec3(.5,.4,.2),b=mix(Q,S,smoothstep(0.,1.,T));vec3 c=mix(b*.4,b,smoothstep(0.,1.,P))*U;c*=.97+.06*l(i.xz+f*12.34);o=vec4(c,1);}`; 
-
-    const PPLANTS = prog(vsPlants, fsPlants); // Compile and link plant shader program
-    const uMPla = gl.getUniformLocation(PPLANTS, 'c'); // Get location of Model matrix uniform
-    const uVPla = gl.getUniformLocation(PPLANTS, 'd'); // Get location of View matrix uniform
-    const uPPla = gl.getUniformLocation(PPLANTS, 'e'); // Get location of Projection matrix uniform
+    const PPLANTS = prog(vsMVP, fsPlants); // Use unified vertex shader
+    const uMPla = gl.getUniformLocation(PPLANTS, 'M');
+    const uVPla = gl.getUniformLocation(PPLANTS, 'V');
+    const uPPla = gl.getUniformLocation(PPLANTS, 'P');
     const uTimePla = gl.getUniformLocation(PPLANTS, 'g'); // Get location of time uniform for animation
     const IPla = gl.getUniformLocation(PPLANTS, 'h'); // Get location of max iterations uniform
     const uPlantPosPla = gl.getUniformLocation(PPLANTS, 'i');
@@ -1561,9 +1558,8 @@
     // -- /MODULE: Scene-VR --
 
     // Beam for pointing ray.
-        const vsBeam = `layout(location=0) in vec3 p;uniform mat4 M,V,P;void main(){gl_Position=P*V*M*vec4(p,1.);}`;
     const fsBeam = `uniform vec4 col;out vec4 o;void main(){ o=col; }`;
-    const PBeam = prog(vsBeam, fsBeam);
+    const PBeam = prog(vsMVP, fsBeam);
     const uMBeam = gl.getUniformLocation(PBeam, 'M'), uVBeam = gl.getUniformLocation(PBeam, 'V'), uPBeam = gl.getUniformLocation(PBeam, 'P'), uColBeam = gl.getUniformLocation(PBeam, 'col');
     const vboBeam = gl.createBuffer(), vaoBeam = gl.createVertexArray();
     gl.bindVertexArray(vaoBeam);
@@ -1577,28 +1573,28 @@
     
     // -- CORE: render --
     // --- Main Render Loop (Desktop) ---
-    let frameCount = 0;
+    //let frameCount = 0;
     function loop(t) {
         // If an immersive XR session is active, stop the desktop loop chain.
         if (xr) return;  // prevents scheduling the next frame; XR loop takes over
-        frameCount++;
+        //frameCount++;
         
         // Calculate delta time
         const dt = ((t - last) / 1000) || 0;
         last = t;
         // Ensure rocks near the player are generated and present in obstacles for collision resolution
         // render only ever tenth frame to save CPU
-        if (frameCount % 10 === 0) {
+        //if (frameCount % 10 === 0) {
             //updateRocks(u.x, u.z);
             for (let i = obstacles.length - 1; i >= 0; i--) {
             if (obstacles[i]._isRock) obstacles.splice(i, 1);
         }
         rocks.length = 0;
         //const c = 5; const r = 200.0;
-        const minX = FLOOR((u.x - 200.)/5);
-        const maxX = FLOOR((u.x + 200.)/5);
-        const minZ = FLOOR((u.z - 200.)/5);
-        const maxZ = FLOOR((u.z + 200.)/5);
+        const minX = FLOOR((u.x - 300.)/5);
+        const maxX = FLOOR((u.x + 300.)/5);
+        const minZ = FLOOR((u.z - 300.)/5);
+        const maxZ = FLOOR((u.z + 300.)/5);
         for(let gz=minZ; gz<=maxZ; gz++){
             for(let gx=minX; gx<=maxX; gx++){
                 const h = rockHash(gx, gz, .0);
@@ -1608,7 +1604,7 @@
                     const px = gx*5 + (jx * 5 * .6) + 5*.5;
                     const pz = gz*5 + (jz * 5 * .6) + 5*.5;
                     const dx = px - u.x, dz = pz - u.z;
-                    if (dx*dx + dz*dz <= 200.*200.){
+                    if (dx*dx + dz*dz <= 300.*300.){
                         const seed = rockHash(gx, gz, -7.) * 1000.;
                         const scale = 4. + rockHash(gx, gz, 5.) * 2.; // 1.0 .. 6.0 meters
                         const rx = px, rz = pz, ry = scale * .45; // small y offset
@@ -1621,7 +1617,7 @@
                 }
             }
         }
-        }
+        //}
 
         // Update user position
         const mv = getMove();
@@ -1635,8 +1631,9 @@
             lastCaughtShown = cat.caught;
             congratsTimer = 3.5;
         }
-        const moveMag = HYPOT(mv.x, mv.y);
-        updateAdaptiveMusic(moveMag, dt);
+        //const moveMag = HYPOT(mv.x, mv.y);
+        //updateAdaptiveMusic(moveMag, dt);
+        updateAdaptiveMusic(HYPOT(mv.x, mv.y), dt);
         
         // Update camera matrices
         buildViewProj();
@@ -1738,11 +1735,11 @@
             const camZ = u.z;
 
             // Only regenerate plants every 10 frames or if camera moved significantly
-            if (frameCount % 10 === 0) {// || HYPOT(camX - lastPlantCamX, camZ - lastPlantCamZ) > 2.) {
+            //if (frameCount % 10 === 0) {// || HYPOT(camX - lastPlantCamX, camZ - lastPlantCamZ) > 2.) {
                 cachedPlants = genPlants(camX, camZ, 55);
                 lastPlantCamX = camX;
                 lastPlantCamZ = camZ;
-            }
+            //}
 
             for(const p of cachedPlants){
                 const px = p.px, pz = p.pz, scale = p.scale;
@@ -1765,8 +1762,9 @@
                 if(q < .05) continue;
 
                 const key = p.gx + ',' + p.gz;
-                const target = 2 + q*(14 - 2);
-                const iterations = MAX(2, MIN(14, target)) | 0;
+                //const target = 2 + q*(14 - 2);
+                //const iterations = MAX(2, MIN(14, target)) | 0;
+                const iterations = MAX(2, MIN(14, 2 + q*(14 - 2))) | 0;
                 const plantSeed = plantHash(p.gx, p.gz, 4.);
 
                 const angle = ATAN2(camX - px, camZ - pz);
@@ -1851,10 +1849,10 @@
     function drawSphere(V,P,x,y,z,r,col){
         gl.useProgram(PS);
         gl.bindVertexArray(sphereVao);
+        const Msp = translateScale(x,y,z,r,r,r);
+        gl.uniformMatrix4fv(uS_M,false,Msp);
         gl.uniformMatrix4fv(uS_V,false,V);
         gl.uniformMatrix4fv(uS_P,false,P);
-        gl.uniform3f(uS_Pos,x,y,z);
-        gl.uniform1f(uS_S,r);
         gl.uniform3f(uS_Color,col[0],col[1],col[2]);
         gl.drawArrays(gl.TRIANGLES,0,sphereVerts.length/3);
     }
@@ -1903,7 +1901,7 @@
             log('WebXR not available');
             return;
         }
-        navigator.xr.isSessionSupported('immersive-vr').then(s => log(s ? 'VR ready: Click Enter VR button' : 'VR error: reload and try again'));
+        //navigator.xr.isSessionSupported('immersive-vr').then(s => log(s ? 'VR ready: Click Enter VR button' : 'VR error: reload and try again'));
     }
     // if vr not avalable we split screen in to stereo view
 
@@ -1941,6 +1939,7 @@
 
             last = 0;
             xr.requestAnimationFrame(onXR); // Start the XR render loop
+            resetCatPosition();
 
         } catch (e) {
             log('XR failed: ' + e.message);
@@ -1954,7 +1953,7 @@
         const s = frame.session;
         //if (s !== xr) return;
         s.requestAnimationFrame(onXR);
-        frameCount++;
+        //frameCount++;
         
         const dt = ((t - last) / 1000) || 0;
         last = t;
@@ -1967,7 +1966,7 @@
         
         // Ensure rocks near the player are generated and present in obstacles for collision resolution
         // render only ever tenth frame to save CPU
-        if (frameCount % 10 === 0) {
+        //if (frameCount % 10 === 0) {
             //updateRocks(u.x, u.z);
             for (let i = obstacles.length - 1; i >= 0; i--) {
                 if (obstacles[i]._isRock) obstacles.splice(i, 1);
@@ -2000,7 +1999,7 @@
                     }
                 }
             }
-        }
+        //}
         
         // Apply movement based on controller input
         const mv = getMove(s);
@@ -2014,8 +2013,9 @@
             lastCaughtShown = cat.caught;
             congratsTimer = 5.5;
         }
-        const moveMag = HYPOT(mv.x, mv.y);
-        updateAdaptiveMusic(moveMag, dt);
+        //const moveMag = HYPOT(mv.x, mv.y);
+        //updateAdaptiveMusic(moveMag, dt);
+        updateAdaptiveMusic(HYPOT(mv.x, mv.y), dt);
         
         // Create an offset reference space to account for user-controlled movement
         const half = -u.yaw * .5;
@@ -2165,11 +2165,11 @@
 
                 
                 // Only regenerate plants every 10 frames or if camera moved significantly
-                if (frameCount % 10 === 0) {// || HYPOT(camX - lastPlantCamX, camZ - lastPlantCamZ) > 5.) {
+                ///if (frameCount % 10 === 0) {// || HYPOT(camX - lastPlantCamX, camZ - lastPlantCamZ) > 5.) {
                     cachedPlants = genPlants(camX, camZ,120);
                     lastPlantCamX = camX;
                     lastPlantCamZ = camZ;
-                }
+                //}
 
             //if (frameCount % 10 === 0) {
             for(const p of cachedPlants){
@@ -2193,8 +2193,9 @@
                 if(q < .05) continue;
 
                 const key = p.gx + ',' + p.gz;
-                const target = 2 + q*(16 - 2);
-                const iterations = MAX(2, MIN(16, target)) | 0;
+                //const target = 2 + q*(16 - 2);
+                //const iterations = MAX(2, MIN(16, target)) | 0;
+                const iterations = MAX(2, MIN(16, 2 + q*(14 - 2))) | 0;
                 const plantSeed = plantHash(p.gx, p.gz, 4.);
 
                 const angle = ATAN2(camX - px, camZ - pz);
