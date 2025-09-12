@@ -119,7 +119,7 @@
     let gl, xr = null, ref = null, off = null; // WebGL and WebXR objects
 
     gl = C.getContext('webgl2', { antialias: true, xrCompatible: true });
-    if (!gl) { alert('Need WebGL2'); }
+    //if (!gl) { alert('Need WebGL2'); }
 
     // -- FEATURE: MMO --
     // Minimal MMO support using JS13k relay. Toggle via HUD. Other players are drawn as whitish cats.
@@ -630,17 +630,17 @@
         // If the player is very close (distance < 10), the cat will flee.
         } else {
             // Apply a force directly away from the player.
-            fx -= (dxP/dist)*5*(1+cat.caught*.4); fz -= (dzP/dist)*5*(1+cat.caught*.4);
+            fx -= (dxP/dist)*4*(1+cat.caught*.4); fz -= (dzP/dist)*4*(1+cat.caught*.4);
         }
 
         // Calculate the cat's distance from the world origin.
         const dc = SQRT(cat.x*cat.x + cat.z*cat.z)||1;
-        // If the cat is too far from the center (> 250), apply a strong force to bring it back.
-        if(dc > 250){
+        // If the cat is too far from the center (> 150), apply a strong force to bring it back.
+        if(dc > 150){
             // The force increases the further away the cat is.
             //const k=(dc-150)*0.06;
             // Apply the centering force.
-            fx += (-cat.x/dc*2); fz += (-cat.z/dc*2);
+            fx += (-cat.x/dc*10); fz += (-cat.z/dc*10);
         // If the cat is too close to the center (< 30), apply a gentle force to push it away.
         }// else if(dc < 30){
         //    // Apply a gentle outward force.
@@ -688,7 +688,7 @@
 
         // Evade impulse when very close
         cat.evade -= dt;
-        if(dP2 < 9 && cat.evade<=0){ const d = SQRT(dP2)||1, nx = dxP/d, nz = dzP/d, s = RANDOM()<.5?1:-1; fx += (-nz*s)*50*(1+cat.caught*.2); fz += (nx*s)*50*(1+cat.caught*.2); cat.evade = .8 / SQRT(1 + cat.caught*.9); }
+        if(dP2 < 9 && cat.evade<=0){ const d = SQRT(dP2)||1, nx = dxP/d, nz = dzP/d, s = RANDOM()<.5?1:-1; fx += (-nz*s)*50*(1+cat.caught*.2); fz += (nx*s)*50*(1+cat.caught*.2); cat.evade = .9 / SQRT(1 + cat.caught*.9); }
 
         // Integrate & clamp speed
         cat.vx += fx*dt; cat.vz += fz*dt;
@@ -712,7 +712,9 @@
         // Anim & catch
         cat.anim += sp*dt*3.5;//3.5 radians per meter
         if(dP2 < 1/*(.5+CR)*(.5+CR)*/){
-            cat.caught++; log('Cat caught #'+cat.caught/* +date.now */);
+            //cat.caught++; log('Cat caught #'+cat.caught +' at '+Date.now() );
+            //log(`Cat caught #${++cat.caught} @ ${new Date().toISOString().slice(11,23)}`);
+            log(`Cat caught #${++cat.caught} @ ${new Date().toISOString().replace('T',' ').slice(0,23)}`);
             if(audioCtx){ bell(audioCtx.currentTime,800,window.chipMusic,.5); bell(audioCtx.currentTime+.1,1000,window.chipMusic,.3); bell(audioCtx.currentTime+.2,1200,window.chipMusic,.4); }
             if(speedBoosts.length<10) speedBoosts.push({timeLeft:15, amount:.3});
             resetCatPosition();
