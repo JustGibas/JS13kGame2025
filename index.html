@@ -1251,6 +1251,9 @@
     const vsMVP = `layout(location=0)in vec3 p;layout(location=1)in vec2 uv;uniform mat4 M,V,P;out vec2 f;out vec3 W;void main(){vec4 wpos=M*vec4(p,1.);W=wpos.xyz;f=uv;gl_Position=P*V*wpos;}`;
     const fsH = `in vec2 f;uniform sampler2D T;out vec4 o;void main(){vec4 c=texture(T,f);if(c.a<.01)discard;o=c;}`;
     const PH = prog(vsMVP, fsH);
+    // Shared solid-color fragment program (reused by spheres and beam)
+    const fsColor = `uniform vec4 col;out vec4 o;void main(){o=col;}`;
+    const PC = prog(vsMVP, fsColor);
     const uMH = gl.getUniformLocation(PH, 'M'),
           uVH = gl.getUniformLocation(PH, 'V'),
           uPH = gl.getUniformLocation(PH, 'P'),
@@ -1378,9 +1381,7 @@
     // -- /MODULE: Scene-Ground --
     
     // -- MODULE: Gameplay-item --
-    // NEW: Sphere (items/obstacles) minimal shader + geometry
-    // Reuse vsMVP by passing model matrix with translate+scale
-    const fsSphere = `uniform vec3 c;out vec4 o;void main(){ o = vec4(c,1.); }`;
+    // NEW: Sphere (items/obstacles) minimal shader + geometry (uses shared PC)
 
     function buildSphere(lat=10, lon=12){
         const v=[];
@@ -1399,7 +1400,6 @@
     }
     function sph(t,p){ return [SIN(t)*COS(p), COS(t), SIN(t)*SIN(p)]; }
 
-    const PS = prog(vsMVP, fsSphere);
     const sphereVao = gl.createVertexArray();
     const sphereBuf = gl.createBuffer();
     gl.bindVertexArray(sphereVao);
@@ -1408,10 +1408,10 @@
     gl.bufferData(gl.ARRAY_BUFFER, sphereVerts, gl.STATIC_DRAW);
     gl.enableVertexAttribArray(0);
     gl.vertexAttribPointer(0,3,gl.FLOAT,false,0,0);
-    const uS_M = gl.getUniformLocation(PS,'M');
-    const uS_V = gl.getUniformLocation(PS,'V');
-    const uS_P = gl.getUniformLocation(PS,'P');
-    const uS_Color = gl.getUniformLocation(PS,'c');
+    const uS_M = gl.getUniformLocation(PC,'M');
+    const uS_V = gl.getUniformLocation(PC,'V');
+    const uS_P = gl.getUniformLocation(PC,'P');
+    const uS_Color = gl.getUniformLocation(PC,'col');
 
     // -- /MODULE: Gameplay-item --
 
@@ -1566,10 +1566,8 @@
 
     // -- /MODULE: Scene-VR --
 
-    // Beam for pointing ray.
-    const fsBeam = `uniform vec4 col;out vec4 o;void main(){ o=col; }`;
-    const PBeam = prog(vsMVP, fsBeam);
-    const uMBeam = gl.getUniformLocation(PBeam, 'M'), uVBeam = gl.getUniformLocation(PBeam, 'V'), uPBeam = gl.getUniformLocation(PBeam, 'P'), uColBeam = gl.getUniformLocation(PBeam, 'col');
+    // Beam for pointing ray (reuses PC shared color program)
+    const uMBeam = gl.getUniformLocation(PC, 'M'), uVBeam = gl.getUniformLocation(PC, 'V'), uPBeam = gl.getUniformLocation(PC, 'P'), uColBeam = gl.getUniformLocation(PC, 'col');
     const vboBeam = gl.createBuffer(), vaoBeam = gl.createVertexArray();
     gl.bindVertexArray(vaoBeam);
     gl.bindBuffer(gl.ARRAY_BUFFER, vboBeam);
@@ -1859,13 +1857,13 @@
 
     // Helper to submit a sphere draw call
     function drawSphere(V,P,x,y,z,r,col){
-        gl.useProgram(PS);
+        gl.useProgram(PC);
         gl.bindVertexArray(sphereVao);
         const Msp = translateScale(x,y,z,r,r,r);
         gl.uniformMatrix4fv(uS_M,false,Msp);
         gl.uniformMatrix4fv(uS_V,false,V);
         gl.uniformMatrix4fv(uS_P,false,P);
-        gl.uniform3f(uS_Color,col[0],col[1],col[2]);
+        gl.uniform4f(uS_Color,col[0],col[1],col[2],1);
         gl.drawArrays(gl.TRIANGLES,0,sphereVerts.length/3);
     }
 
@@ -2315,7 +2313,7 @@
                     
                     const S = new DOMMatrix([w,0,0,0, 0,w,0,0, 0,0,-len,0, 0,0,0,1]);
                     const Mbeam = new DOMMatrix(targ.transform.matrix).multiply(S).toFloat32Array();
-                    gl.useProgram(PBeam); 
+                    gl.useProgram(PC); 
                     gl.bindVertexArray(vaoBeam);
                     gl.uniformMatrix4fv(uMBeam, false, Mbeam); 
                     gl.uniformMatrix4fv(uVBeam, false, v.transform.inverse.matrix); 
