@@ -2277,7 +2277,11 @@
                 // Hand grip indicator
                 const grip = src.gripSpace ? frame.getPose(src.gripSpace, off) : null;
                 if (grip) {
-                    const Mhand = new DOMMatrix(grip.transform.matrix).multiply(new DOMMatrix([.06,0,0,0, 0,.06,0,0, 0,0,.06,0, 0,0,0,1])).toFloat32Array();
+                    //const Mhand = new DOMMatrix(grip.transform.matrix).multiply(new DOMMatrix([.06,0,0,0, 0,.06,0,0, 0,0,.06,0, 0,0,0,1])).toFloat32Array();
+                    const Mhand = new DOMMatrix(grip.transform.matrix).multiply(new DOMMatrix([.1,0,0,0, 0,.1,0,0, 0,0,.1,0, 0,0,0,1])).rotate(90,0,0).translate(0,-.5,0).toFloat32Array();
+                    //const Mhand = new DOMMatrix(grip.transform.matrix)
+                    //    .multiply(new DOMMatrix().translate(0,-1,0).rotate(90,0,0).scale(.1,1,.1))
+                    //    .toFloat32Array();
                     gl.useProgram(PDisc);
                     gl.bindVertexArray(vaoPlants);
 
