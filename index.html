@@ -275,22 +275,15 @@
     // -- /FEATURE: MMO --
 
     // Resize the canvas to fill the window, accounting for device pixel ratio
-    //function resize() {
-    //const w = innerWidth, h = innerHeight, dpr = devicePixelRatio || 1;
-    //C.width = w * dpr;
-    //C.height = h * dpr;
-    //C.style.width = w + 'px';
-    //C.style.height = h + 'px';
-    //}
-    //addEventListener('resize', resize);
-    //resize(); // Initial resize
-
-    function resize(){
-      const dpr=devicePixelRatio||1;
-      C.width=innerWidth*dpr; C.height=innerHeight*dpr;
-      C.style.width=innerWidth+'px'; C.style.height=innerHeight+'px';
+    function resize() {
+    const w = innerWidth, h = innerHeight, dpr = devicePixelRatio || 1;
+    C.width = w * dpr;
+    C.height = h * dpr;
+    C.style.width = w + 'px';
+    C.style.height = h + 'px';
     }
-    onresize=resize; resize();
+    addEventListener('resize', resize);
+    resize(); // Initial resize
 
     // Helper function to compile and link a shader program
     function prog(vs, fs) {
