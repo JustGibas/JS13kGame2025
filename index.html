@@ -248,7 +248,7 @@
     }
 
     // Unified cat model renderer (used for main cat and peers)
-    const PEER_COL = [.88,.88,.94];
+    const PEER_COL = [.7,.7,.8];
     function drawCat(Vmat, Pmat, x, y, z, yaw, anim, amp, col){
         const cy = COS(yaw-20), sy = SIN(yaw-20);
         function place(lx, ly, lz, r){
@@ -341,7 +341,7 @@
             I.look.id = e.pointerId;
             I.look.x = e.clientX;
             I.look.y = e.clientY;
-            C.setPointerCapture(e.pointerId); // Lock the pointer to the canvas
+            xr ? C.requestPointerLock() : C.setPointerCapture(e.pointerId);
         }
         // Always update pointer position for picking
         I.pointer.x = e.clientX;
@@ -870,23 +870,33 @@
 
     }
     // -- SOLUTION: Scene-Audio-Wind --
-    // Minimal wind: one looping brown-noise buffer -> lowpass -> gain.
+    // Spatial wind (stereo ILD/ITD) with brown noise source
     function playWindSound(){
         if(!audioCtx) return;
-        const N=audioCtx.sampleRate*2, b=audioCtx.createBuffer(1,N,audioCtx.sampleRate), d=b.getChannelData(0);
-        let l=0;for(let i=0;i<N;i++){const w=RANDOM()*2-1;d[i]=l=(l+.02*w)/1.02;}
+        const N=audioCtx.sampleRate*3,b=audioCtx.createBuffer(1,N,audioCtx.sampleRate),d=b.getChannelData(0);
+        let l=0;for(let i=0;i<N;i++){const w=RANDOM()*2-1;d[i]=l=(l+.01*w)/1.03;}
         const s=audioCtx.createBufferSource();s.buffer=b;s.loop=true;
-        const f=audioCtx.createBiquadFilter();f.type='lowpass';f.frequency.value=300;f.Q.value=.7;
-        const g=audioCtx.createGain();g.gain.value=0; s.connect(f);f.connect(g);g.connect(audioCtx.destination);s.start();
-        audioCtx.windFilter=f;audioCtx.windGain=g;audioCtx.windStart=audioCtx.currentTime;
+        const f=audioCtx.createBiquadFilter();f.type='lowpass';f.frequency.value=200;f.Q.value=1.1;
+        const lD=audioCtx.createDelay(.01), rD=audioCtx.createDelay(.01);
+        const lG=audioCtx.createGain(), rG=audioCtx.createGain();
+        const mix=audioCtx.createChannelMerger(2), m=audioCtx.createGain();
+        s.connect(f);f.connect(lD);f.connect(rD);lD.connect(lG);rD.connect(rG);lG.connect(mix,0,0);rG.connect(mix,0,1);mix.connect(m);m.connect(audioCtx.destination);
+        const t=audioCtx.currentTime;m.gain.setValueAtTime(0,t);m.gain.linearRampToValueAtTime(.2,t+4);s.start();
+        audioCtx.windSource=s;audioCtx.windFilter=f;audioCtx.windMaster=m;audioCtx.windLeftGain=lG;audioCtx.windRightGain=rG;audioCtx.windLeftDelay=lD;audioCtx.windRightDelay=rD;
     }
-    // Compact sway (mirrors grass shader math) returns sway value only.
-    function windSway(x,z,t){const g=.6*SIN(x*.07+z*.05+t*.7)+.4*SIN(x*-.03+z*.04-t*1.2);return .25*g+.07*SIN(t*1.7);}    
-    function updateWind(timeSec,camX,camZ){
-        if(!audioCtx||!audioCtx.windGain) return;const now=audioCtx.currentTime;const s=windSway(camX,camZ,timeSec);
-        // Gain & brightness from sway (no stereo)
-        const gain=.02+.01*MAX(0,s+.3);audioCtx.windGain.gain.setTargetAtTime(gain,now,.3);
-        const freq=250+900*MAX(0,s+.2);audioCtx.windFilter.frequency.setTargetAtTime(freq,now,.3);
+    // gust & sway like grass shader
+    function computeGustAt(x,z,t){const g=.6*SIN(x*.07+z*.05+t*.7)+.4*SIN(x*-.03+z*.04-t*1.2);return{gust:g,sway:.25*g+.07*SIN(t*1.7)};}
+    // derive local flow dir from gradient
+    function computeWindVector(x,z,t){const e=.5;const gX1=computeGustAt(x+e,z,t).gust,gX0=computeGustAt(x-e,z,t).gust,gZ1=computeGustAt(x,z+e,t).gust,gZ0=computeGustAt(x,z-e,t).gust;let gx=(gX1-gX0)/(2*e),gz=(gZ1-gZ0)/(2*e);let vx=-gz,vz=gx;const L=HYPOT(vx,vz)||1;vx/=L;vz/=L;const rot=.2*SIN(t*.05),cr=COS(rot),sr=SIN(rot);return{x:vx*cr-vz*sr,z:vx*sr+vz*cr,speed:L};}
+    function updateWind(timeSec,camX,camZ,yaw){
+        const ac=audioCtx;if(!ac||!ac.windMaster)return;const now=ac.currentTime;const s=computeGustAt(camX,camZ,timeSec);const w=computeWindVector(camX,camZ,timeSec);
+        // loudness/brightness
+        let g=.04+.3*s.sway;g=MAX(.01,MIN(1,g));ac.windMaster.gain.setTargetAtTime(g,now,.2);
+        const freq=200+((s.sway+.32)/.64)*1200;ac.windFilter.frequency.setTargetAtTime(freq,now,.2);
+        // stereo cues from relative angle
+        const a=ATAN2(SIN(ATAN2(w.x,w.z)-yaw),COS(ATAN2(w.x,w.z)-yaw));const pan=SIN(a);
+        const ild=.2;ac.windLeftGain.gain.setTargetAtTime(1-ild*pan,now,.15);ac.windRightGain.gain.setTargetAtTime(1+ild*pan,now,.1);
+        const itd=.0007*pan;ac.windLeftDelay.delayTime.setTargetAtTime(itd>0?itd:0,now,.05);ac.windRightDelay.delayTime.setTargetAtTime(itd<0?-itd:0,now,.05);
     }
     // -- /SOLUTION: Scene-Audio-Wind --
     // -- SOLUTION: Scene-Audio-Click --
@@ -1505,7 +1515,7 @@
     
     const vsPlants=`layout(location=0)in vec3 a;layout(location=1)in vec2 b;uniform mat4 c,d,e;out vec2 f;void main(){f=b;gl_Position=e*d*c*vec4(a,1.);}`;
 
-    const fsPlants = `in vec2 f;out vec4 o;uniform float g;uniform int h;uniform vec3 i;uniform float j;mat3 R(float a){float c=cos(a),s=sin(a);return mat3(vec3(c,s,0),vec3(-s,c,0),vec3(0,0,1));}mat3 D(vec2 d){return mat3(vec3(1,0,0),vec3(0,1,0),vec3(d,1));}float C(vec2 p,vec2 h){p-=vec2(0.,h.y);vec2 d=abs(vec2(length(p.x),p.y))-h;return min(max(d.x,d.y),0.)+length(max(d,0.));}float k(float x){return fract(sin(x)*43758.5453);}float l(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}float E(vec2 p){float m=25.7+j*10.;mat3 n=R(-(m/360.)*6.28318);mat3 q=R(m/360.*6.28318);int r=3+int(j*4.);const int B=3;int s=1;for(int i=0;i<r;i++)s*=B;float t=1.5;float u=.01;p=p+vec2(0,2);float v=C(p-vec2(0.,0.),vec2(u,t));float w=500.;int x=0;vec2 y=vec2(.07,.05);vec2 z=vec2(-.03,.04);float A=.6*sin(dot(i.xz,y)+g*.7)+.4*sin(dot(i.xz,z)-g*1.2);float F=fract(sin(dot(i.xz,vec2(12.9898,78.233)))*43758.5453)*6.283;float G=(.25*A)+.07*sin(g*1.7+F);mat3 H=R(G*.5);for(int i=0;i<h;++i){int I=1;for(int j=0;j<r;j++)I*=B;vec2 J=p;for(int j=1;j<=r;++j){float K=t/pow(2.,float(j));I/=B;int L=x/I;int M=L-B*(L/B);mat3 N;if(M==0){N=n*D(vec2(0,-2.*K));}else if(M==1){N=H*q*D(vec2(0,-2.*K));}else{N=H*D(vec2(0,-4.*K));}J=(N*vec3(J,1)).xy;float O=C(J,vec2(u,K));if(O-2.*K>0.){x+=I-1;break;}w=min(w,O);if(w<.01)break;}if(w<.01)break;++x;if(x>s)break;}return min(w,v);}void main(){vec2 p=(f*2.-1.)*5.;p.y+=3.;float d=E(p); if(d>.038)discard;float P=clamp(f.y,0.,1.);vec3 Q=vec3(.3,.4,.1);vec3 S=vec3(.5,.4,.2);float T=k(j*37.17);float U=.85+.3*l(i.xz+vec2(j));vec3 b=mix(Q,S,smoothstep(0.,1.,T));vec3 c=mix(b*.4,b,smoothstep(0.,1.,P))*U;float V=l(i.xz+f*12.34);c*=(.97+.06*V);o=vec4(c,1);}`;
+    const fsPlants=`in vec2 f;out vec4 o;uniform float g;uniform int h;uniform vec3 i;uniform float j;mat3 R(float a){float c=cos(a),s=sin(a);return mat3(vec3(c,s,0),vec3(-s,c,0),vec3(0,0,1));}mat3 D(vec2 d){return mat3(vec3(1,0,0),vec3(0,1,0),vec3(d,1));}float C(vec2 p,vec2 h){p-=vec2(0.,h.y);vec2 d=abs(p)-h;return min(max(d.x,d.y),0.)+length(max(d,0.));}float k(float x){return fract(sin(x)*43758.5453);}float l(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}float E(vec2 p){float m=25.7+j*10.;mat3 n=R(-m*.01745),q=R(m*.01745);int r=3+int(j*4.),s=1;for(int a=0;a<r;a++)s*=3;float t=1.5,u=.01;p+=vec2(0,2);float v=C(p,vec2(u,t)),w=1e9;int x=0;vec2 y=vec2(.07,.05),z=vec2(-.03,.04);float A=.6*sin(dot(i.xz,y)+g*.7)+.4*sin(dot(i.xz,z)-g*1.2);float F=fract(sin(dot(i.xz,vec2(12.9898,78.233)))*43758.5453)*6.283;float G=.25*A+.07*sin(g*1.7+F);mat3 H=R(G*.5);for(int a=0;a<h;++a){int I=s;vec2 J=p;for(int j=1;j<=r;++j){float K=t/exp2(float(j));I/=3;int L=x/I;int M=L-3*(L/3);mat3 N;if(M==0)N=n*D(vec2(0,-2.*K));else if(M==1)N=H*q*D(vec2(0,-2.*K));else N=H*D(vec2(0,-4.*K));J=(N*vec3(J,1)).xy;float O=C(J,vec2(u,K));if(O>2.*K){x+=I-1;break;}w=min(w,O);if(w<.01)break;}if(w<.01||++x>s)break;}return min(w,v);}void main(){vec2 p=(f*2.-1.)*5.;p.y+=3.;if(E(p)>.038)discard;float P=clamp(f.y,0.,1.),T=k(j*37.17),U=.85+.3*l(i.xz+vec2(j));vec3 Q=vec3(.3,.4,.1),S=vec3(.5,.4,.2),b=mix(Q,S,smoothstep(0.,1.,T));vec3 c=mix(b*.4,b,smoothstep(0.,1.,P))*U;c*=.97+.06*l(i.xz+f*12.34);o=vec4(c,1);}`; 
 
     const PPLANTS = prog(vsPlants, fsPlants); // Compile and link plant shader program
     const uMPla = gl.getUniformLocation(PPLANTS, 'c'); // Get location of Model matrix uniform
@@ -1632,9 +1642,9 @@
         // Update camera matrices
         buildViewProj();
         // Update wind stereo each frame (after camera matrix updated)
-    if(audioCtx) updateWind(t/1000, u.x, u.z);
+    if(audioCtx) updateWind(t/1000, u.x, u.z, u.yaw);
         // --- Rendering ---
-    gl.viewport(0, 0, C.width, C.height);
+        gl.viewport(0, 0, C.width, C.height);
         gl.clearColor(0, 0, 0, 1);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
@@ -1920,6 +1930,8 @@
             
 
             xr.addEventListener('end', () => {
+                // If the canvas holds pointer lock, release it when exiting VR
+                document.exitPointerLock();
                 //cancelAnimationFrame(onXR); // Stop XR loop
                 xr = null;
                 uiEnterLabel = 'Enter VR';
@@ -1952,7 +1964,7 @@
         if (!pose) return;
         
         // NEW: update wind stereo each frame (after camera matrix updated)
-        if(audioCtx) updateWind(t/1000, u.x, u.z);
+        if(audioCtx) updateWind(t/1000, u.x, u.z, u.yaw);
         
         // Ensure rocks near the player are generated and present in obstacles for collision resolution
         // render only ever tenth frame to save CPU
