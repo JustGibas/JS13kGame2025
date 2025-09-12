@@ -118,7 +118,8 @@
     let last = 0; // Timestamp of the last frame for calculating delta time
     let gl, xr = null, ref = null, off = null; // WebGL and WebXR objects
 
-    gl = C.getContext('webgl2', { antialias: true, xrCompatible: true });
+    //gl = C.getContext('webgl2', { antialias: true, xrCompatible: true });
+    gl = C.getContext('webgl2', { xrCompatible: true });
     //if (!gl) { alert('Need WebGL2'); }
 
     // -- FEATURE: MMO --
@@ -274,15 +275,22 @@
     // -- /FEATURE: MMO --
 
     // Resize the canvas to fill the window, accounting for device pixel ratio
-    function resize() {
-    const w = innerWidth, h = innerHeight, dpr = devicePixelRatio || 1;
-    C.width = w * dpr;
-    C.height = h * dpr;
-    C.style.width = w + 'px';
-    C.style.height = h + 'px';
+    //function resize() {
+    //const w = innerWidth, h = innerHeight, dpr = devicePixelRatio || 1;
+    //C.width = w * dpr;
+    //C.height = h * dpr;
+    //C.style.width = w + 'px';
+    //C.style.height = h + 'px';
+    //}
+    //addEventListener('resize', resize);
+    //resize(); // Initial resize
+
+    function resize(){
+      const dpr=devicePixelRatio||1;
+      C.width=innerWidth*dpr; C.height=innerHeight*dpr;
+      C.style.width=innerWidth+'px'; C.style.height=innerHeight+'px';
     }
-    addEventListener('resize', resize);
-    resize(); // Initial resize
+    onresize=resize; resize();
 
     // Helper function to compile and link a shader program
     function prog(vs, fs) {
@@ -1099,7 +1107,7 @@
             //hudCtx.fillText('Timer: ' + ((window.t=(window.t||0)+dt).toFixed(1)), 320, 60);
             //hudCtx.fillText('Timer: '+(window.t0=window.t0||performance.now(),((performance.now()-window.t0)/1000).toFixed(1)), 320, 60);
             //hudCtx.fillText('Timer: '+ timer, 320, 60);
-            hudCtx.fillText('Minutes: '+ timer, 320, 60);
+            hudCtx.fillText("Min's: "+ timer, 320, 60);
 
             hudCtx.textAlign = 'left';
             hudCtx.textBaseline = 'alphabetic';
@@ -1131,7 +1139,7 @@
             hudCtx.fillText(`Cat Caught: ${cat.caught}`, 20, 100);
             //hudCtx.fillText('Timer: ' + ((window.t=(window.t||0)+dt).toFixed(1)), 130, 100);
             //timer = ((window.t=(window.t||0)+dt).toFixed(1));
-            hudCtx.fillText('Minutes: ' + timer, 130, 100);
+            hudCtx.fillText("Min's: " + timer, 130, 100);
             //hudCtx.fillText('Timer: '+(window.t0=window.t0||performance.now(),((performance.now()-window.t0)/1000).toFixed(1)), 320, 100);
 
             // MMO status line
