@@ -1548,21 +1548,15 @@
     // -- MODULE: Scene-VR (hand disc only) --
     // Reticle removed; single disc shader used for VR hand/grip indicator
 
-    const vsDisc=`layout(location=0)in vec2 p;uniform mat4 M,V,P;out vec2 uv;void main(){uv=p*.5+.5;gl_Position=P*V*M*vec4(p.x,0.,p.y,1.);}`;
-    const fsDisc=`in vec2 uv;uniform vec4 col;out vec4 o;void main(){float d=distance(uv,vec2(.5)),r=smoothstep(.5,.4,d)-smoothstep(.4,.3,d);o=vec4(col.rgb,col.a*r);if(o.a<.02)discard;}`;
-    const PDisc = prog(vsDisc, fsDisc);
+    // Use shared vsMVP for disc and a tiny fragment shader that reads the same uv varying name 'f'
+    const fsDisc=`in vec2 f;uniform vec4 col;out vec4 o;void main(){float d=distance(f,vec2(.5)),r=smoothstep(.5,.4,d)-smoothstep(.4,.3,d);o=vec4(col.rgb,col.a*r);if(o.a<.02)discard;}`;
+    const PDisc = prog(vsMVP, fsDisc);
     const uMDisc = gl.getUniformLocation(PDisc, 'M'),
           uVDisc = gl.getUniformLocation(PDisc, 'V'),
           uPDisc = gl.getUniformLocation(PDisc, 'P'),
           uColDisc = gl.getUniformLocation(PDisc, 'col');
 
-    const vboR = gl.createBuffer(), vaoR = gl.createVertexArray();
-    gl.bindVertexArray(vaoR);
-    gl.bindBuffer(gl.ARRAY_BUFFER, vboR);
-    // Quad for a 2D disc (two triangles), same layout used elsewhere
-    gl.bufferData(gl.ARRAY_BUFFER, new F32([-1,-1,  1,-1,  1,1,  -1,-1,  1,1,  -1,1]), gl.STATIC_DRAW);
-    gl.enableVertexAttribArray(0);
-    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);    
+    // No custom VAO: we reuse the existing quad with UVs (vaoPlants)
 
     // -- /MODULE: Scene-VR --
 
@@ -2285,7 +2279,7 @@
                 if (grip) {
                     const Mhand = new DOMMatrix(grip.transform.matrix).multiply(new DOMMatrix([.06,0,0,0, 0,.06,0,0, 0,0,.06,0, 0,0,0,1])).toFloat32Array();
                     gl.useProgram(PDisc);
-                    gl.bindVertexArray(vaoR);
+                    gl.bindVertexArray(vaoPlants);
 
                     gl.uniformMatrix4fv(uMDisc, false, Mhand);
                     gl.uniformMatrix4fv(uVDisc, false, v.transform.inverse.matrix); 
