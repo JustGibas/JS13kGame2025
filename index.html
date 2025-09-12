@@ -1447,7 +1447,7 @@
     // -- MODULE: Scene-Grass --
     // --- Grass Shaders ---
     // Uses instanced rendering to draw many blades of grass efficiently
-    const vsGrass=`uniform mat4 V,P;uniform vec2 c;uniform vec3 r;uniform float d,a;uniform int n;uniform float s;uniform sampler2D e;out vec3 uCol;float h12(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453123);}vec2 h22(vec2 p){float x=sin(dot(p,vec2(1.,113.)));return fract(vec2(262144.*x,32768.*x));}void main(){int iid=gl_InstanceID;vec2 camCellF=floor(c/a);vec2 cellF=camCellF+vec2(float(iid % n - n/2),float(iid / n - n/2));vec2 baseCenter=(cellF+vec2(.5))*a;vec2 tileKey=floor(baseCenter/a)+vec2(s);float biome=texture(e,baseCenter*0.0002).r;float H=mix(.6,.9,h12(tileKey*3.1));float t=float(gl_VertexID/2)/4.;float side=(gl_VertexID%2==0)?-1.:1.;float width=0.05*(1.-t)*(0.6+0.6*h12(tileKey*7.7))*1.45;float gust=0.6*sin(dot(baseCenter,vec2(.07,.05))+d*.7)+0.4*sin(dot(baseCenter,vec2(-.03,.04))-d*1.2);float sway=0.25*gust+0.07*sin(d*1.7+h12(tileKey*5.3)*6.2831853);float bend=(t*t)*sway;vec2 baseXZ=baseCenter+(h22(tileKey)-.5)*(a*90.9);vec2 w=vec2(cos(.3*d),sin(.32*d));w*=inversesqrt(dot(w,w)+.001);vec2 windDir=w;vec3 bendOff=vec3(windDir.x,0.,windDir.y)*bend*H;vec3 pos=vec3(baseXZ.x,0.,baseXZ.y)+normalize(r)*(side*width)+vec3(0.,t*H,0.)+bendOff;vec3 c0=mix(vec3(.12,.10,.01),vec3(.05,.12,.02),biome);vec3 c1=mix(vec3(.45,.38,.05),vec3(.30,.70,.22),biome);uCol=mix(c0,c1,smoothstep(0.,1.,t))*(.85+.15*h12(tileKey*11.1));gl_Position=P*V*vec4(pos,1.);}`;
+    const vsGrass=`uniform mat4 V,P;uniform vec2 c;uniform vec3 r;uniform float d,a;uniform int n;uniform float s;uniform sampler2D e;out vec3 uCol;float h12(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453123);}vec2 h22(vec2 p){float x=sin(dot(p,vec2(1.,113.)));return fract(vec2(262144.*x,32768.*x));}void main(){int iid=gl_InstanceID;vec2 camCellF=floor(c/a);vec2 cellF=camCellF+vec2(float(iid % n - n/2),float(iid / n - n/2));vec2 baseCenter=(cellF+vec2(.5))*a;vec2 tileKey=floor(baseCenter/a)+vec2(s);float biome=texture(e,baseCenter*.0002).r;float H=mix(.6,.9,h12(tileKey*3.1));float t=float(gl_VertexID/2)/4.;float side=(gl_VertexID%2==0)?-1.:1.;float width=.05*(1.-t)*(.6+.6*h12(tileKey*7.7))*1.45;float gust=.6*sin(dot(baseCenter,vec2(.07,.05))+d*.7)+.4*sin(dot(baseCenter,vec2(-.03,.04))-d*1.2);float sway=.25*gust+.07*sin(d*1.7+h12(tileKey*5.3)*6.2831853);float bend=(t*t)*sway;vec2 baseXZ=baseCenter+(h22(tileKey)-.5)*(a*90.9);vec2 w=vec2(cos(.3*d),sin(.32*d));w*=inversesqrt(dot(w,w)+.001);vec2 windDir=w;vec3 bendOff=vec3(windDir.x,0.,windDir.y)*bend*H;vec3 pos=vec3(baseXZ.x,0.,baseXZ.y)+normalize(r)*(side*width)+vec3(0.,t*H,0.)+bendOff;vec3 c0=mix(vec3(.12,.10,.01),vec3(.05,.12,.02),biome);vec3 c1=mix(vec3(.45,.38,.05),vec3(.30,.70,.22),biome);uCol=mix(c0,c1,smoothstep(0.,1.,t))*(.85+.15*h12(tileKey*11.1));gl_Position=P*V*vec4(pos,1.);}`;
     const fsGrass = `in vec3 uCol;out vec4 o;void main(){ o = vec4(uCol, 1.0); }`;
     //const fsGrass = `in vec3 h;out vec4 o;void main(){ o = vec4(h, 1.); }`;
     const PGRASS = prog(vsGrass, fsGrass);
@@ -1498,7 +1498,7 @@
         for(let gz=minZ; gz<=maxZ; gz++){
             for(let gx=minX; gx<=maxX; gx++){
                 const h = plantHash(gx, gz, .0);
-                if(h < 0.3){
+                if(h < .3){
                     // Stable jitter inside cell
                     const jx = plantHash(gx, gz, 1.) - .5;
                     const jz = plantHash(gx, gz, 2.) - .5;
@@ -1740,7 +1740,8 @@
 
             const camX = u.x;
             const camZ = u.z;
-            const plants = genPlants(camX, camZ);
+            //const plants = genPlants(camX, camZ);
+            const plants = genPlants(camX, camZ, 55);
 
             // Only regenerate plants every 10 frames or if camera moved significantly
             //if (frameCount % 10 === 0) {// || HYPOT(camX - lastPlantCamX, camZ - lastPlantCamZ) > 2.) {
@@ -2172,7 +2173,8 @@
                 const worldFromView = v.transform.matrix;
                 const camX = worldFromView[12];
                 const camZ = worldFromView[14];
-                const plants = genPlants(camX, camZ);
+                //const plants = genPlants(camX, camZ);
+                const plants = genPlants(camX, camZ, 120);
                 
                 // Only regenerate plants every 10 frames or if camera moved significantly
                 ///if (frameCount % 10 === 0) {// || HYPOT(camX - lastPlantCamX, camZ - lastPlantCamZ) > 5.) {
