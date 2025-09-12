@@ -576,12 +576,12 @@
     const obstacles = [];              // solid spheres for collision {x,y,z,r}
     const traps = [];                  // spheres spawnned by cat {x,y,z,r}
     // Player capsule constants (smaller than an object w/ props)
-    const CR = .5, CH = 1.6, CE = 1.6; // capsule radius, height, eye-offset
+    //const CR = .5;//, CH = 1.6, CE = 1.6; // capsule radius, height, eye-offset
     let playerMoveMag = 0;             // cached player movement magnitude (for chase detection)
 
     // -- MODULE: Gameplay-Cat --
     // Stylized Black Cat the player must catch. Roams near center, avoids player, drops boosts & obstacles.
-    const cat = { x:0, y:.6, z:0, vx:0, vz:0, caught:0, drop:1.2, baseS:3, anim:0, evade:0, yaw:0 };
+    const cat = { x:0, y:.6, z:0, vx:0, vz:0, caught:0, drop:1.2, baseS:2, anim:0, evade:0, yaw:0 };
     let chaseActive = false; // true when player is close and moving
 
     function resetCatPosition(){
@@ -612,13 +612,13 @@
         // If the player is far away (distance > 50), the cat will seek them.
         if(dist > 50){
             // Predict the player's future position for interception, limiting the look-ahead distance.
-            const lead = MIN(3, dist / (cat.baseS + 2));
+            const lead = MIN(3, dist / (cat.baseS + 5)); // look ahead time based on distance and cat speed
             // Calculate the vector to the player's predicted position.
             const tx = (u.x + userVelX*lead) - cat.x, tz = (u.z + userVelZ*lead) - cat.z;
             // Normalize the target vector to get a direction.
             const td = HYPOT(tx, tz)||1;
             // Apply a force towards the predicted position.
-            fx += (tx/td)*5; fz += (tz/td)*5;
+            fx += (tx/td)*10*(2+cat.caught*0.5); fz += (tz/td)*10*(2+cat.caught*0.5);
         // If the player is at a medium distance (10 to 50), the cat will orbit them.
         } else if(dist > 10){
             // Get the normalized vector towards the player.
@@ -626,11 +626,11 @@
             // Determine the orbit direction (clockwise/counter-clockwise) based on world position.
             const s = SIN((u.x+u.z)*.2)>0?1:-1;
             // Apply a force towards the player and a perpendicular force for orbiting.
-            fx += nx*1.1 + (-nz*s)*4; fz += nz*1.1 + (nx*s)*4;
+            fx += nx*1.1 + (-nz*s)*3; fz += nz*1.1 + (nx*s)*3;
         // If the player is very close (distance < 10), the cat will flee.
         } else {
             // Apply a force directly away from the player.
-            fx -= (dxP/dist)*5; fz -= (dzP/dist)*5;
+            fx -= (dxP/dist)*5*(1+cat.caught*0.4); fz -= (dzP/dist)*5*(1+cat.caught*0.4);
         }
 
         // Calculate the cat's distance from the world origin.
@@ -640,7 +640,7 @@
             // The force increases the further away the cat is.
             //const k=(dc-150)*0.06;
             // Apply the centering force.
-            fx += (-cat.x/dc); fz += (-cat.z/dc);
+            fx += (-cat.x/dc*2); fz += (-cat.z/dc*2);
         // If the cat is too close to the center (< 30), apply a gentle force to push it away.
         }// else if(dc < 30){
         //    // Apply a gentle outward force.
@@ -664,7 +664,7 @@
                 // Normalize the repulsion vector.
                 const d = SQRT(d2)||1;
                 // Apply the repulsion force.
-                fx -= (ox/d)*5; fz -= (oz/d)*5;
+                fx -= (ox/d)*5*(1+cat.caught*0.5); fz -= (oz/d)*5*(1+cat.caught*0.5);
             // If the obstacle is within the look-ahead distance, perform a more precise check.
             } else if(d2 < look*look){
                 // Project the obstacle's position onto the cat's forward vector.
@@ -680,7 +680,7 @@
                         // Normalize the perpendicular vector.
                         const pd = SQRT(pd2)||1;
                         // Apply a steering force away from the obstacle.
-                        fx -= (px/pd)*5; fz -= (pz/pd)*5;
+                        fx -= (px/pd)*5*(1+cat.caught*0.5); fz -= (pz/pd)*5*(1+cat.caught*0.5);
                     }
                 }
             }
@@ -688,11 +688,11 @@
 
         // Evade impulse when very close
         cat.evade -= dt;
-        if(dP2 < 9 && cat.evade<=0){ const d = SQRT(dP2)||1, nx = dxP/d, nz = dzP/d, s = RANDOM()<.5?1:-1; fx += (-nz*s)*50; fz += (nx*s)*50; cat.evade = .4; }
+        if(dP2 < 9 && cat.evade<=0){ const d = SQRT(dP2)||1, nx = dxP/d, nz = dzP/d, s = RANDOM()<.5?1:-1; fx += (-nz*s)*50*(1+cat.caught*0.2); fz += (nx*s)*50*(1+cat.caught*0.2); cat.evade = .8 / SQRT(1 + cat.caught*0.9); }
 
         // Integrate & clamp speed
         cat.vx += fx*dt; cat.vz += fz*dt;
-        const maxS = cat.baseS + cat.caught*1.5; let sp = HYPOT(cat.vx, cat.vz)||1;
+        const maxS = cat.baseS + cat.caught*.5; let sp = HYPOT(cat.vx, cat.vz)||1;
         if(sp>maxS){ cat.vx = cat.vx/sp*maxS; cat.vz = cat.vz/sp*maxS; sp = maxS; }
         cat.x += cat.vx*dt; cat.z += cat.vz*dt;
 
@@ -706,13 +706,13 @@
         cat.vx *= (1 - 1.1*dt); cat.vz *= (1 - 1.1*dt);
 
         // Chase / drops
-        const chased = dP2 < 100 && playerMoveMag>.15; chaseActive = chased;
+        const chased = dP2 < 120 ;/*&& playerMoveMag>.15;*/ chaseActive = chased;
         if(chased){ cat.drop -= dt; if(cat.drop<=0){ spawnDrop(cat.x, cat.z); cat.drop = 1.9 + RANDOM()*.8; } }
 
         // Anim & catch
-        cat.anim += sp*dt*3.5;
-        if(dP2 < (.5+CR)*(.5+CR)){
-            cat.caught++; log('Cat caught #'+cat.caught);
+        cat.anim += sp*dt*3.5;//3.5 radians per meter
+        if(dP2 < 1/*(.5+CR)*(.5+CR)*/){
+            cat.caught++; log('Cat caught #'+cat.caught/* +date.now */);
             if(audioCtx){ bell(audioCtx.currentTime,800,window.chipMusic,.5); bell(audioCtx.currentTime+.1,1000,window.chipMusic,.3); bell(audioCtx.currentTime+.2,1200,window.chipMusic,.4); }
             if(speedBoosts.length<10) speedBoosts.push({timeLeft:15, amount:.3});
             resetCatPosition();
@@ -737,12 +737,12 @@
 
     function tryPickupItems(){
         // Closest point on capsule segment (vertical)
-    const baseY = u.y - CE, topY = baseY + CH;
+    const baseY = u.y - 1.6, topY = baseY + 1.6;
         for (const itm of items){
             if (!(itm.r>0)) continue;
             const ny = MAX(baseY, MIN(topY, itm.y));
             const dx = itm.x - u.x, dy = itm.y - ny, dz = itm.z - u.z;
-            if (HYPOT(dx,dy,dz) < itm.r + CR){
+            if (HYPOT(dx,dy,dz) < itm.r + .5){
                 itm.r = 0; // mark consumed
                 if (speedBoosts.length < 10) speedBoosts.push({ timeLeft: 15, amount: .3 });
                 if(audioCtx) bell(audioCtx.currentTime, 880 * POW(2, ((RANDOM()*6)|0)/6), window.chipMusic, .2);
@@ -752,11 +752,11 @@
 
     function resolveCollisions(prevX, prevZ){
         // Capsule vs sphere obstacles
-    const baseY = u.y - CE, topY = baseY + CH;
+    const baseY = u.y - 1.6, topY = baseY + 1.6;
         const hit = o => {
             const ny = MAX(baseY, MIN(topY, o.y));
             let dx = u.x - o.x, dy = ny - o.y, dz = u.z - o.z;
-            const d = HYPOT(dx,dy,dz), minD = CR + o.r;
+            const d = HYPOT(dx,dy,dz), minD = .5 + o.r;
             if (d < minD){
                 if (d < .0001) { u.x = prevX; u.z = prevZ; }
                 else { const p = (minD - d)/d; u.x += dx * p; u.z += dz * p; }
@@ -765,7 +765,7 @@
         for (const o of obstacles) hit(o);
         for (const o of traps) hit(o);
         // Ground collision (keep eye at least capsule height above 0)
-    if (u.y - CE < 0) u.y = CE;
+    if (u.y - 1.6 < 0) u.y = 1.6;
     }
     // -- /MODULE: Gameplay-Items --
 
@@ -1187,6 +1187,21 @@
             // Text below
             hudCtx.strokeText('Can you catch again?', x, y + 60);
             hudCtx.fillText('Can you catch again?', x, y + 60);
+            // if cat.caught = 4 write additional text
+            if (cat.caught === 4 || cat.caught === 6) {
+                hudCtx.strokeText('Cat is getting' + (cat.caught === 6 ? 'faster!' : 'crazy!'), x, y + 120);
+                hudCtx.fillText('Cat is getting' + (cat.caught === 6 ? 'faster!' : 'crazy!'), x, y + 120);
+            };
+            if (cat.caught === 9) {
+                hudCtx.strokeText('Cats lives are almost gone!', x, y + 120);
+                hudCtx.fillText('Cats lives are almost gone!', x, y + 120);
+            };
+            if (cat.caught >= 13 && lastCaughtShown !== cat.caught) {
+                lastCaughtShown = cat.caught;
+                hudCtx.strokeText('Wow! You win!', x, y + 120);
+                hudCtx.fillText('Wow! You win!', x, y + 120);
+            };
+
 
             hudCtx.restore();
         }
@@ -1417,44 +1432,7 @@ const fsSky=`in vec2 a;out vec4 b;uniform mat4 c,d;uniform sampler2D e;uniform f
     // -- MODULE: Scene-Grass --
     // --- Grass Shaders ---
     // Uses instanced rendering to draw many blades of grass efficiently
-    const vsGrass = `
-        uniform mat4 V, P;
-        uniform vec2 c;
-        uniform vec3 r;
-        uniform float d;
-        uniform float a;
-        uniform int n;
-        uniform float s;
-        uniform sampler2D e;
-        out vec3 uCol;
-        float hash12(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453123); }
-        vec2  hash22(vec2 p){ float n = sin(dot(p, vec2(1.0,113.0))); return fract(vec2(262144.0*n, 32768.0*n)); }
-        void main(){
-            int iid = gl_InstanceID;
-            vec2 camCellF = floor(c / a);
-            vec2 cellF = camCellF + vec2(float(iid % n - n/2), float(iid / n - n/2));
-            vec2 baseCenter = (cellF + vec2(0.5)) * a;
-            vec2 tileKey = floor(baseCenter / a) + vec2(s);
-            float biome = texture(e, baseCenter * 0.0002).r;
-            float H = mix(0.6, 0.9, hash12(tileKey * 3.1));
-            float t = float(gl_VertexID / 2) / float(4);
-            float side = (gl_VertexID % 2 == 0) ? -1.0 : 1.0;
-            float nearWScale = mix(1.9, 1.0, smoothstep(0.0, 2.0, 1.0));
-            float width = 0.05 * (1.0 - t) * (0.6 + 0.6 * hash12(tileKey * 7.7)) * nearWScale;
-            float gust = 0.6 * sin(dot(baseCenter, vec2(0.07, 0.05)) + d * 0.7) + 0.4 * sin(dot(baseCenter, vec2(-0.03, 0.04)) - d * 1.2);
-            float sway = (0.25 * gust) + 0.07 * sin(d * 1.7 + hash12(tileKey * 5.3) * 6.2831853);
-            float bend = (t * t) * sway;
-            vec2 baseXZ = baseCenter + (hash22(tileKey) - 0.5) * (a * 90.9);
-            vec2 w = vec2(cos(0.3 * d), sin(0.32 * d));
-            w *= inversesqrt(dot(w,w) + 0.001);
-            vec2 windDir = w;
-            vec3 bendOff = vec3(windDir.x, 0.0, windDir.y) * bend * H;
-            vec3 pos = vec3(baseXZ.x, 0.0, baseXZ.y) + normalize(r) * (side * width) + vec3(0.0, t * H, 0.0) + bendOff;
-            vec3 c0 = mix(vec3(0.12, 0.10, 0.01), vec3(0.05, 0.12, 0.02), biome);
-            vec3 c1 = mix(vec3(0.45, 0.38, 0.05), vec3(0.30, 0.70, 0.22), biome);
-            uCol = mix(c0, c1, smoothstep(0.0, 1.0, t)) * (0.85 + 0.15 * hash12(tileKey * 11.1));
-            gl_Position = P * V * vec4(pos, 1.0);
-        }`;
+    const vsGrass=`uniform mat4 V,P;uniform vec2 c;uniform vec3 r;uniform float d,a;uniform int n;uniform float s;uniform sampler2D e;out vec3 uCol;float h12(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453123);}vec2 h22(vec2 p){float x=sin(dot(p,vec2(1.,113.)));return fract(vec2(262144.*x,32768.*x));}void main(){int iid=gl_InstanceID;vec2 camCellF=floor(c/a);vec2 cellF=camCellF+vec2(float(iid % n - n/2),float(iid / n - n/2));vec2 baseCenter=(cellF+vec2(.5))*a;vec2 tileKey=floor(baseCenter/a)+vec2(s);float biome=texture(e,baseCenter*0.0002).r;float H=mix(.6,.9,h12(tileKey*3.1));float t=float(gl_VertexID/2)/4.;float side=(gl_VertexID%2==0)?-1.:1.;float width=0.05*(1.-t)*(0.6+0.6*h12(tileKey*7.7))*1.45;float gust=0.6*sin(dot(baseCenter,vec2(.07,.05))+d*.7)+0.4*sin(dot(baseCenter,vec2(-.03,.04))-d*1.2);float sway=0.25*gust+0.07*sin(d*1.7+h12(tileKey*5.3)*6.2831853);float bend=(t*t)*sway;vec2 baseXZ=baseCenter+(h22(tileKey)-.5)*(a*90.9);vec2 w=vec2(cos(.3*d),sin(.32*d));w*=inversesqrt(dot(w,w)+.001);vec2 windDir=w;vec3 bendOff=vec3(windDir.x,0.,windDir.y)*bend*H;vec3 pos=vec3(baseXZ.x,0.,baseXZ.y)+normalize(r)*(side*width)+vec3(0.,t*H,0.)+bendOff;vec3 c0=mix(vec3(.12,.10,.01),vec3(.05,.12,.02),biome);vec3 c1=mix(vec3(.45,.38,.05),vec3(.30,.70,.22),biome);uCol=mix(c0,c1,smoothstep(0.,1.,t))*(.85+.15*h12(tileKey*11.1));gl_Position=P*V*vec4(pos,1.);}`;
     const fsGrass = `in vec3 uCol;out vec4 o;void main(){ o = vec4(uCol, 1.0); }`;
     //const fsGrass = `in vec3 h;out vec4 o;void main(){ o = vec4(h, 1.); }`;
     const PGRASS = prog(vsGrass, fsGrass);
@@ -1901,7 +1879,7 @@ const fsSky=`in vec2 a;out vec4 b;uniform mat4 c,d;uniform sampler2D e;uniform f
       const eye = [u.x, u.y, u.z];
       const center = [u.x - sy * cp, u.y - sp, u.z - cy * cp];
         LOOKAT(V, eye, center, [0, 1, 0]);
-    PERSP(P, 60, C.width / C.height, .5, 1000.);
+        PERSP(P, 60, C.width / C.height, .1, 1000.);
         PV = MULTMAT4(M4(), P, V);
         invPV = INV(PV);
     }
@@ -1985,10 +1963,10 @@ const fsSky=`in vec2 a;out vec4 b;uniform mat4 c,d;uniform sampler2D e;uniform f
         }
         rocks.length = 0;
         //const c = 5; const r = 400.0;
-        const minX = FLOOR((u.x - 400.)/5);
-        const maxX = FLOOR((u.x + 400.)/5);
-        const minZ = FLOOR((u.z - 400.)/5);
-        const maxZ = FLOOR((u.z + 400.)/5);
+        const minX = FLOOR((u.x - 500.)/5);
+        const maxX = FLOOR((u.x + 500.)/5);
+        const minZ = FLOOR((u.z - 500.)/5);
+        const maxZ = FLOOR((u.z + 500.)/5);
         for(let gz=minZ; gz<=maxZ; gz++){
             for(let gx=minX; gx<=maxX; gx++){
                 const h = rockHash(gx, gz, .0);
@@ -1998,7 +1976,7 @@ const fsSky=`in vec2 a;out vec4 b;uniform mat4 c,d;uniform sampler2D e;uniform f
                     const px = gx*5 + (jx * 5 * .6) + 5*.5;
                     const pz = gz*5 + (jz * 5 * .6) + 5*.5;
                     const dx = px - u.x, dz = pz - u.z;
-                    if (dx*dx + dz*dz <= 200.*200.){
+                    if (dx*dx + dz*dz <= 500.*500.){
                         const seed = rockHash(gx, gz, -7.) * 1000.;
                         const scale = 4. + rockHash(gx, gz, 5.) * 2.; // 1.0 .. 6.0 meters
                         const rx = px, rz = pz, ry = scale * .45; // small y offset
@@ -2023,7 +2001,7 @@ const fsSky=`in vec2 a;out vec4 b;uniform mat4 c,d;uniform sampler2D e;uniform f
         // Trigger congrats overlay on catch
         if (cat.caught > lastCaughtShown) {
             lastCaughtShown = cat.caught;
-            congratsTimer = 3.5;
+            congratsTimer = 5.5;
         }
         const moveMag = HYPOT(mv.x, mv.y);
         updateAdaptiveMusic(moveMag, dt);
@@ -2157,9 +2135,9 @@ const fsSky=`in vec2 a;out vec4 b;uniform mat4 c,d;uniform sampler2D e;uniform f
                 const camXZ = [worldFromView[12], worldFromView[14]];
                 const camRight = [worldFromView[0], worldFromView[1], worldFromView[2]];
                 const timeSec = t * .001;
-                drawGrassPass(v.transform.inverse.matrix, v.projectionMatrix, camXZ, camRight, timeSec, .8, 170, /*30.0,*/ 1.); 
-                drawGrassPass(v.transform.inverse.matrix, v.projectionMatrix, camXZ, camRight, timeSec, .3, 170, /*20.0,*/ 2.);
-                drawGrassPass(v.transform.inverse.matrix, v.projectionMatrix, camXZ, camRight, timeSec, .1, 170, /*10.0,*/ 3.);
+                drawGrassPass(v.transform.inverse.matrix, v.projectionMatrix, camXZ, camRight, timeSec, 2., 300, /*30.0,*/ 1.); 
+                drawGrassPass(v.transform.inverse.matrix, v.projectionMatrix, camXZ, camRight, timeSec, .7, 300, /*20.0,*/ 2.);
+                drawGrassPass(v.transform.inverse.matrix, v.projectionMatrix, camXZ, camRight, timeSec, .3, 300, /*10.0,*/ 3.);
             }
 
             // Render L-System Plants
