@@ -1070,7 +1070,7 @@
     // --- HUD Drawing ---
     // Draws the entire HUD onto the 2D canvas
     function drawHUDCanvas(mode, hit, uiSet, dt) {
-        const ui = uiSet || currentUI(); timer = ((window.t=(window.t||0)+dt)/60).toFixed(3);
+        const ui = uiSet || currentUI(); timer = ((window.t=(window.t||0)+dt)/100).toFixed(3);
         hudCtx.clearRect(0, 0, hudCan.width, hudCan.height);
 
         if (!hudVisible) {
@@ -1098,7 +1098,8 @@
             hudCtx.font = '20px system-ui';
             //hudCtx.fillText('Timer: ' + ((window.t=(window.t||0)+dt).toFixed(1)), 320, 60);
             //hudCtx.fillText('Timer: '+(window.t0=window.t0||performance.now(),((performance.now()-window.t0)/1000).toFixed(1)), 320, 60);
-            hudCtx.fillText('Timer: '+ timer, 320, 60);
+            //hudCtx.fillText('Timer: '+ timer, 320, 60);
+            hudCtx.fillText('Minutes: '+ timer, 320, 60);
 
             hudCtx.textAlign = 'left';
             hudCtx.textBaseline = 'alphabetic';
@@ -1130,7 +1131,7 @@
             hudCtx.fillText(`Cat Caught: ${cat.caught}`, 20, 100);
             //hudCtx.fillText('Timer: ' + ((window.t=(window.t||0)+dt).toFixed(1)), 130, 100);
             //timer = ((window.t=(window.t||0)+dt).toFixed(1));
-            hudCtx.fillText('Timer: ' + timer, 130, 100);
+            hudCtx.fillText('Minutes: ' + timer, 130, 100);
             //hudCtx.fillText('Timer: '+(window.t0=window.t0||performance.now(),((performance.now()-window.t0)/1000).toFixed(1)), 320, 100);
 
             // MMO status line
@@ -1217,8 +1218,8 @@
             //hudCtx.strokeText('Can you catch again?', x, y + 60);
             //hudCtx.fillText('Can you catch again?', x, y + 60);
             if(cat.caught < 13) {
-                hudCtx.strokeText(`${13-cat.caught} Cats left to catch`, x, y + 60);
-                hudCtx.fillText(`${13-cat.caught} Cats left to catch`, x, y + 60);
+                hudCtx.strokeText(`${13-cat.caught} Cats to catch`, x, y + 60);
+                hudCtx.fillText(`${13-cat.caught} Cats to catch`, x, y + 60);
             }//else{
             //    hudCtx.globalAlpha = 1
             //    hudCtx.strokeText(timer, x, y + 60);
