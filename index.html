@@ -23,7 +23,7 @@
             height: 112px;
             border-radius: 50%;
             background: rgba(255, 255, 200, .08);
-            border: 2px solid rgba(255, 255, 200, .25);
+            border: 2px solid rgba(255, 255, 200, .3);
             z-index: 10;
             display: none; /* Hidden by default, shown for touch devices */
         }
@@ -618,7 +618,7 @@
             // Normalize the target vector to get a direction.
             const td = HYPOT(tx, tz)||1;
             // Apply a force towards the predicted position.
-            fx += (tx/td)*10*(2+cat.caught*0.5); fz += (tz/td)*10*(2+cat.caught*0.5);
+            fx += (tx/td)*10*(1+cat.caught*.5); fz += (tz/td)*10*(1+cat.caught*.5);
         // If the player is at a medium distance (10 to 50), the cat will orbit them.
         } else if(dist > 10){
             // Get the normalized vector towards the player.
@@ -630,7 +630,7 @@
         // If the player is very close (distance < 10), the cat will flee.
         } else {
             // Apply a force directly away from the player.
-            fx -= (dxP/dist)*5*(1+cat.caught*0.4); fz -= (dzP/dist)*5*(1+cat.caught*0.4);
+            fx -= (dxP/dist)*5*(1+cat.caught*.4); fz -= (dzP/dist)*5*(1+cat.caught*.4);
         }
 
         // Calculate the cat's distance from the world origin.
@@ -664,7 +664,7 @@
                 // Normalize the repulsion vector.
                 const d = SQRT(d2)||1;
                 // Apply the repulsion force.
-                fx -= (ox/d)*5*(1+cat.caught*0.5); fz -= (oz/d)*5*(1+cat.caught*0.5);
+                fx -= (ox/d)*5*(1+cat.caught*.5); fz -= (oz/d)*5*(1+cat.caught*.5);
             // If the obstacle is within the look-ahead distance, perform a more precise check.
             } else if(d2 < look*look){
                 // Project the obstacle's position onto the cat's forward vector.
@@ -680,7 +680,7 @@
                         // Normalize the perpendicular vector.
                         const pd = SQRT(pd2)||1;
                         // Apply a steering force away from the obstacle.
-                        fx -= (px/pd)*5*(1+cat.caught*0.5); fz -= (pz/pd)*5*(1+cat.caught*0.5);
+                        fx -= (px/pd)*5*(1+cat.caught*.5); fz -= (pz/pd)*5*(1+cat.caught*.5);
                     }
                 }
             }
@@ -688,7 +688,7 @@
 
         // Evade impulse when very close
         cat.evade -= dt;
-        if(dP2 < 9 && cat.evade<=0){ const d = SQRT(dP2)||1, nx = dxP/d, nz = dzP/d, s = RANDOM()<.5?1:-1; fx += (-nz*s)*50*(1+cat.caught*0.2); fz += (nx*s)*50*(1+cat.caught*0.2); cat.evade = .8 / SQRT(1 + cat.caught*0.9); }
+        if(dP2 < 9 && cat.evade<=0){ const d = SQRT(dP2)||1, nx = dxP/d, nz = dzP/d, s = RANDOM()<.5?1:-1; fx += (-nz*s)*50*(1+cat.caught*.2); fz += (nx*s)*50*(1+cat.caught*.2); cat.evade = .8 / SQRT(1 + cat.caught*.9); }
 
         // Integrate & clamp speed
         cat.vx += fx*dt; cat.vz += fz*dt;
@@ -772,8 +772,8 @@
     // -- MODULE: Gameplay-Movement --
     // --- Movement Logic ---
     // Movement and input constants
-    const MOVES = 3;    // Movement speed in meters per second
-    const TURNS = 2;    // Turning speed in radians per second
+    //const MOVES = 3;    // Movement speed in meters per second
+    //const TURNS = 2;    // Turning speed in radians per second
 
     // Consolidates input from keyboard, joysticks, and VR controllers into a single movement vector
     function getMove(session) {
@@ -818,16 +818,16 @@
     function step(dt, mv) {
         // New movement logic
         updateBoosts(dt);
-        const speed = MOVES * (currentSpeedMult());
+        const speed = 3/*MOVES*/ * (currentSpeedMult());
         // Apply movement
         const now = performance.now();
         const moveMagnitude = HYPOT(mv.x, mv.y); playerMoveMag = moveMagnitude;
         // Trigger movement music activation (only sets flag / lazy init)
-        if(moveMagnitude > .1 && now - lastStepTime > stepInterval){
+        if(moveMagnitude > .1 && now - lastStepTime > 500/*stepInterval*/){
             playStepSound(); // now activates loop system
             lastStepTime = now;
         }
-    u.yaw += mv.t * TURNS * dt; // Apply turning
+    u.yaw += mv.t * 2/*TURNS*/ * dt; // Apply turning
         
         // Calculate forward and right vectors based on current yaw
     const cy = COS(u.yaw);
@@ -860,7 +860,7 @@
     // todo: implement stereo sources to get spatial audio (directional wind sound)
     let audioCtx = null;
     let lastStepTime = 0;
-    const stepInterval = 500; // ms between walking sounds
+    //const stepInterval = 500; // ms between walking sounds
     // Global toggle for step/adaptive music sounds
     let music = true;
     
@@ -995,7 +995,7 @@
     // -- MODULE: Scene-HUD --
     // --- Log and HUD UI State ---
     const LOG = [];
-    const LOG_MAX = 200;
+    //const LOG_MAX = 200;
     let logScroll = 0;
     //let logVisible = true;
     let hudVisible = true;
@@ -1006,16 +1006,16 @@
     let HUD_WH_world = M4(); // World matrix of the HUD quad
     let hoverBtn = null; // The button currently being hovered over
 
-    function log(s) { LOG.push(s); if (LOG.length > LOG_MAX) LOG.shift(); }
+    function log(s) { LOG.push(s); if (LOG.length > 200) LOG.shift(); }
     //function logClear() { LOG.length = 0; log('log cleared'); }
 
     // UI button definitions. Each object defines a button's ID, position (in UV space), label, and click handler
     let uiEnterLabel = 'Enter VR';
     const UI_MAIN = [
-    { id: 'reset', u0: .4, v0: .05, u1: .7, v1: .15, label: 'Reset', onClick: () => { playClickSound(); u.x = 0; u.z = 2; u.yaw = 0; u.pitch = .2; resetCatPosition(); log('reset position'); } },
+    { id: 'reset', u0: .4, v0: .05, u1: .7, v1: .15, label: 'Reset', onClick: () => { playClickSound(); u.x = 0; u.z = 2; u.yaw = 0; u.pitch = .2; resetCatPosition(); /*log('reset position');*/ } },
         { id: 'vr', u0: .4, v0: .2, u1: .7, v1: .3, label: () => uiEnterLabel, onClick: () => { playClickSound(); toggleXRFromUI(); } },
         { id: 'mmo', u0: .4, v0: .35, u1: .7, v1: .45, label: () => 'MMO: ' + (mmoEnabled ? 'ON' : 'OFF'), onClick: () => { playClickSound(); toggleMMO(); } },
-        { id: 'music', u0: .8, v0: .3, u1: .98, v1: .4, label: () => 'Music: ' + (music ? 'ON' : 'OFF'), onClick: () => { playClickSound(); music = !music; log('music ' + (music ? 'on' : 'off')); } },
+        { id: 'music', u0: .8, v0: .35, u1: .98, v1: .45, label: () => 'Music: ' + (music ? 'ON' : 'OFF'), onClick: () => { playClickSound(); music = !music; log('music ' + (music ? 'on' : 'off')); } },
         //{ id: 'logtog', u0: 0.85, v0: 0.5, u1: 0.98, v1: 0.6 , label: 'LOG', onClick: () => { playClickSound(); logVisible = !logVisible; } },
         { id: 'logdn', u0: .85, v0: .8, u1: .98, v1: .9, label: 'Down', onClick: () => { playClickSound(); logScroll = MAX(0, logScroll - 1); } },
         { id: 'logup', u0: .85, v0: .7, u1: .98, v1: .8, label: 'Up', onClick: () => { playClickSound(); logScroll = MIN(MAX(0, LOG.length - 1), logScroll + 1); } },
@@ -1080,7 +1080,7 @@
                   h = (b.v1 - b.v0) * hudCan.height;
             const hov = hoverBtn && hoverBtn.id === 'hudopen';
             hudCtx.fillStyle = hov ? 'rgba(160,200,160,.3)' : 'rgba(120,160,120,.2)';
-            hudCtx.strokeStyle = hov ? 'rgba(190,220,190,.9)' : 'rgba(160,200,160,.5)';
+            hudCtx.strokeStyle = hov ? 'rgba(190,220,190,.9)' : 'rgba(160,200,160,.3)';
             hudCtx.lineWidth = 2;
             hudCtx.beginPath();
             hudCtx.roundRect(x, y, w, h, 10);
@@ -1096,7 +1096,7 @@
         } else {
             // Draw the full HUD panel
             hudCtx.fillStyle = 'rgba(40,30,20,.8)';
-            hudCtx.strokeStyle = 'rgba(160,200,160,.5)';
+            hudCtx.strokeStyle = 'rgba(160,200,160,.3)';
             hudCtx.lineWidth = 2;
             hudCtx.beginPath();
             hudCtx.roundRect(6, 6, hudCan.width - 12, hudCan.height - 12, 16);
@@ -1109,16 +1109,20 @@
             hudCtx.fillText('HUD', 20, 34);
             hudCtx.fillStyle = '#fff';
             hudCtx.font = '16px system-ui';
-            hudCtx.fillText(`Mode: ${mode}${isMobile ? ' Touch' : ''}`, 20, 60);
-            hudCtx.fillText(`FPS: ${ROUND(1/dt)}`, 20, 80);// if xr active show multiple
-            hudCtx.fillText(`MS: ${dt.toFixed(3)}`, 100, 80);// if xr active, show
-            hudCtx.fillText(`Pos: (${u.x.toFixed(1)}, ${u.z.toFixed(1)})`, 100, 100);
-            hudCtx.fillText(`Yaw: ${(u.yaw * 180 / PI | 0)}°`, 20, 100);
-            hudCtx.fillText(`Cat Caught: ${cat.caught}`, 20, 120);
-            hudCtx.fillText(`Boosts: ${speedBoosts.length}`, 150, 120);
+            //hudCtx.fillText(`Mode: ${mode}${isMobile ? ' Touch' : ''}`, 20, 60);
+            //hudCtx.fillText(`FPS: ${ROUND(1/dt)}`, 20, 80);// if xr active show multiple
+            //hudCtx.fillText(`FPS: ${ROUND(1/dt)}`, 120, 40);// if xr active show multiple
+            //hudCtx.fillText(`MS: ${dt.toFixed(3)}`, 100, 80);// if xr active, show
+            //hudCtx.fillText(`Pos: (${u.x.toFixed(1)}, ${u.z.toFixed(1)})`, 100, 100);
+            //hudCtx.fillText(`Yaw: ${(u.yaw * 180 / PI | 0)}°`, 20, 100);
+            //hudCtx.fillText(`Cat Caught: ${cat.caught}`, 20, 120);
+            //hudCtx.fillText(`Boosts: ${speedBoosts.length}`, 150, 120);
+            hudCtx.fillText(`Boosts: ${speedBoosts.length}`, 20, 70);
+            hudCtx.fillText(`Cat Caught: ${cat.caught}`, 20, 100);
             // MMO status line
             const peerCount = (function(){ let n=0; try{ peers.forEach((p,id)=>{ if(id!==myId && performance.now() - (p.last||0) < 15000) n++; }); }catch(_){} return n; })();
-            hudCtx.fillText(`MMO: ${mmoEnabled ? (myId? 'ON':'CONNECTING') : 'OFF'}  Peers: ${peerCount}`, 20, 140);
+            //hudCtx.fillText(`MMO: ${mmoEnabled ? (myId? 'ON':'CONNECTING') : 'OFF'}  Peers: ${peerCount}`, 20, 140);
+            hudCtx.fillText(`MMO: ${mmoEnabled ? 'ON' : 'OFF'}  Peers: ${peerCount}`, 20, 130);
             //if (hit) { hudCtx.fillStyle = '#afa';
             //hudCtx.fillText(`Hit @ ground: (${hit[0].toFixed(2)}, ${hit[2].toFixed(2)})`, 20, 140); }
 
@@ -1141,6 +1145,7 @@
                 hudCtx.fillStyle = '#eee';
                 hudCtx.font = '14px ui-monospace, system-ui';
                 const lines = LOG.slice(MAX(0, LOG.length - 8 - logScroll), LOG.length - logScroll);
+                //const lines = LOG.slice(MAX(0, LOG.length - 8), LOG.length);
                 for (let i = 0; i < lines.length; i++)
                     hudCtx.fillText(lines[i], x + 12, y + 14 + i * 16);
                 hudCtx.restore();
@@ -1155,7 +1160,7 @@
                       h = (b.v1 - b.v0) * hudCan.height;
                 const hov = hoverBtn && hoverBtn.id === b.id;
                 hudCtx.fillStyle = hov ? 'rgba(150,190,150,.2)' : 'rgba(120,160,120,.1)';
-                hudCtx.strokeStyle = hov ? 'rgba(190,220,190,.9)' : 'rgba(160,200,160,.4)';
+                hudCtx.strokeStyle = hov ? 'rgba(190,220,190,.9)' : 'rgba(160,200,160,.3)';
                 hudCtx.lineWidth = 1;
                 hudCtx.beginPath();
                 hudCtx.roundRect(x, y, w, h, 8);
@@ -1195,21 +1200,23 @@
             hudCtx.fillStyle = g;
             hudCtx.fillText(text, x, y);
             // Text below
-            hudCtx.strokeText('Can you catch again?', x, y + 60);
-            hudCtx.fillText('Can you catch again?', x, y + 60);
+            //hudCtx.strokeText('Can you catch again?', x, y + 60);
+            //hudCtx.fillText('Can you catch again?', x, y + 60);
+            hudCtx.strokeText(`${13-cat.caught} Cats left to catch`, x, y + 60);
+            hudCtx.fillText(`${13-cat.caught} Cats left to catch`, x, y + 60);
             // if cat.caught = 4 write additional text
-            if (cat.caught === 4 || cat.caught === 6) {
-                hudCtx.strokeText('Cat is getting faster!', x, y + 120);
-                hudCtx.fillText('Cat is getting faster!', x, y + 120);
-            };
-            if (cat.caught === 9) {
-                hudCtx.strokeText('Nine lives fading!', x, y + 120);
-                hudCtx.fillText('Nine lives fading!', x, y + 120);
-            };
-            if (cat.caught >= 13 && lastCaughtShown !== cat.caught) {
+            //if (cat.caught === 4 || cat.caught === 6) {
+            //    hudCtx.strokeText('Cat is getting faster!', x, y + 120);
+            //    hudCtx.fillText('Cat is getting faster!', x, y + 120);
+            //};
+            //if (cat.caught === 9) {
+            //    hudCtx.strokeText('Nine lives fading!', x, y + 120);
+            //    hudCtx.fillText('Nine lives fading!', x, y + 120);
+            //};
+            if (cat.caught === 13) {
                 lastCaughtShown = cat.caught;
-                hudCtx.strokeText('Wow! You win!', x, y + 120);
-                hudCtx.fillText('Wow! You win!', x, y + 120);
+                hudCtx.strokeText('Victory! You win!', x, y + 120);
+                hudCtx.fillText('Victory! You win!', x, y + 120);
             };
 
 
@@ -1351,7 +1358,7 @@
     // -- MODULE: Scene-Ground --
     // --- Grid Shader ---
     // A simple shader to draw a grid on the ground plane
-    const fsG=`in vec3 W;out vec4 o;float h(vec2 v){return fract(sin(dot(v,vec2(41,289)))*9e3);}void main(){vec2 q=floor(W.xz/.6);float r=h(q),r2=h(q+13.);vec3 c=mix(vec3(.08,.05,.02),vec3(.3,.2,.1),r)+step(.97,r2)*vec3(.1,.08,.04);o=vec4(c,1);}`;
+    const fsG=`in vec3 W;out vec4 o;float h(vec2 v){return fract(sin(dot(v,vec2(41,289)))*9e3);}void main(){vec2 q=floor(W.xz/.6);float r=h(q),r2=h(q+13.);o=vec4(mix(vec3(.08,.05,.02),vec3(.3,.2,.1),r)+step(.97,r2)*vec3(.1,.08,.04),1);}`;
 
     const PG = prog(vsMVP, fsG);
     const uM = gl.getUniformLocation(PG, 'M');
@@ -1508,8 +1515,8 @@
         return out;
     }
 
-    let cachedPlants = [];
-    let lastPlantCamX = 0, lastPlantCamZ = 0;
+    //let cachedPlants = [];
+    //let lastPlantCamX = 0, lastPlantCamZ = 0;
     
     const fsPlants=`in vec2 f;out vec4 o;uniform float g;uniform int h;uniform vec3 i;uniform float j;mat3 R(float a){float c=cos(a),s=sin(a);return mat3(vec3(c,s,0),vec3(-s,c,0),vec3(0,0,1));}mat3 D(vec2 d){return mat3(vec3(1,0,0),vec3(0,1,0),vec3(d,1));}float C(vec2 p,vec2 h){p-=vec2(0.,h.y);vec2 d=abs(p)-h;return min(max(d.x,d.y),0.)+length(max(d,0.));}float k(float x){return fract(sin(x)*43758.5453);}float l(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}float E(vec2 p){float m=25.7+j*10.;mat3 n=R(-m*.01745),q=R(m*.01745);int r=3+int(j*4.),s=1;for(int a=0;a<r;a++)s*=3;float t=1.5,u=.002;p+=vec2(0,2);float v=C(p,vec2(u,t)),w=1e9;int x=0;vec2 y=vec2(.07,.05),z=vec2(-.03,.04);float A=.6*sin(dot(i.xz,y)+g*.7)+.4*sin(dot(i.xz,z)-g*1.2);float F=fract(sin(dot(i.xz,vec2(12.9898,78.233)))*43758.5453)*6.283;float G=.25*A+.07*sin(g*1.7+F);mat3 H=R(G*.5);for(int a=0;a<h;++a){int I=s;vec2 J=p;for(int j=1;j<=r;++j){float K=t/exp2(float(j));I/=3;int L=x/I;int M=L-3*(L/3);mat3 N;if(M==0)N=n*D(vec2(0,-2.*K));else if(M==1)N=H*q*D(vec2(0,-2.*K));else N=H*D(vec2(0,-4.*K));J=(N*vec3(J,1)).xy;float O=C(J,vec2(u,K));if(O>2.*K){x+=I-1;break;}w=min(w,O);if(w<.01)break;}if(w<.01||++x>s)break;}return min(w,v);}void main(){vec2 p=(f*2.-1.)*5.;p.y+=3.;if(E(p)>.038)discard;float P=clamp(f.y,0.,1.),T=k(j*37.17),U=.85+.3*l(i.xz+vec2(j));vec3 Q=vec3(.3,.4,.1),S=vec3(.5,.4,.2),b=mix(Q,S,smoothstep(0.,1.,T));vec3 c=mix(b*.4,b,smoothstep(0.,1.,P))*U;c*=.97+.06*l(i.xz+f*12.34);o=vec4(c,1);}`; 
 
@@ -1638,7 +1645,7 @@
         // Update camera matrices
         buildViewProj();
         // Update wind stereo each frame (after camera matrix updated)
-    if(audioCtx) updateWind(t/1000, u.x, u.z, u.yaw);
+        if(audioCtx) updateWind(t/1000, u.x, u.z, u.yaw);
         // --- Rendering ---
         gl.viewport(0, 0, C.width, C.height);
         gl.clearColor(0, 0, 0, 1);
@@ -1718,9 +1725,9 @@
             const cy = COS(u.yaw), sy = SIN(u.yaw);
             const camRight = [cy, 0, -sy];
             const timeSec = t * .001;
-            drawGrassPass(V, P, [u.x, u.z], camRight, timeSec, .8, 170, /*30.0,*/ 1.); // Cell size, Strands number, Radius(bad), Seed
-            drawGrassPass(V, P, [u.x, u.z], camRight, timeSec, .3, 170, /*20.0,*/ 2.);
-            drawGrassPass(V, P, [u.x, u.z], camRight, timeSec, .1, 170, /*10.0,*/ 3.);
+            drawGrassPass(V, P, [u.x, u.z], camRight, timeSec, 1.1, 500, /*30.0,*/ 1.); // Cell size, Strands number, Radius(bad), Seed
+            drawGrassPass(V, P, [u.x, u.z], camRight, timeSec, .4, 300, /*20.0,*/ 2.);
+            drawGrassPass(V, P, [u.x, u.z], camRight, timeSec, .15, 200, /*10.0,*/ 3.);
         }
 
         // Render L-System Plants
@@ -1733,15 +1740,17 @@
 
             const camX = u.x;
             const camZ = u.z;
+            const plants = genPlants(camX, camZ);
 
             // Only regenerate plants every 10 frames or if camera moved significantly
             //if (frameCount % 10 === 0) {// || HYPOT(camX - lastPlantCamX, camZ - lastPlantCamZ) > 2.) {
-                cachedPlants = genPlants(camX, camZ, 55);
-                lastPlantCamX = camX;
-                lastPlantCamZ = camZ;
+                //cachedPlants = genPlants(camX, camZ, 55);
+                //lastPlantCamX = camX;
+                //lastPlantCamZ = camZ;
             //}
 
-            for(const p of cachedPlants){
+            //for(const p of cachedPlants){
+            for(const p of plants){
                 const px = p.px, pz = p.pz, scale = p.scale;
 
                 // Distance & LOD
@@ -1902,6 +1911,7 @@
             return;
         }
         //navigator.xr.isSessionSupported('immersive-vr').then(s => log(s ? 'VR ready: Click Enter VR button' : 'VR error: reload and try again'));
+        navigator.xr.isSessionSupported('immersive-vr').then(s => log(s ? 'VR ready: Click Enter VR' : 'VR error'));
     }
     // if vr not avalable we split screen in to stereo view
 
@@ -2146,9 +2156,9 @@
                 const camXZ = [worldFromView[12], worldFromView[14]];
                 const camRight = [worldFromView[0], worldFromView[1], worldFromView[2]];
                 const timeSec = t * .001;
-                drawGrassPass(v.transform.inverse.matrix, v.projectionMatrix, camXZ, camRight, timeSec, 2., 300, /*30.0,*/ 1); 
-                drawGrassPass(v.transform.inverse.matrix, v.projectionMatrix, camXZ, camRight, timeSec, .7, 300, /*20.0,*/ 2);
-                drawGrassPass(v.transform.inverse.matrix, v.projectionMatrix, camXZ, camRight, timeSec, .2, 300, /*10.0,*/ 3);
+                drawGrassPass(v.transform.inverse.matrix, v.projectionMatrix, camXZ, camRight, timeSec, 1.1, 2000, /*30.0,*/ 1); 
+                drawGrassPass(v.transform.inverse.matrix, v.projectionMatrix, camXZ, camRight, timeSec, .3, 1000, /*20.0,*/ 2);
+                drawGrassPass(v.transform.inverse.matrix, v.projectionMatrix, camXZ, camRight, timeSec, .15, 500, /*10.0,*/ 3);
             }
 
             // Render L-System Plants
@@ -2162,17 +2172,18 @@
                 const worldFromView = v.transform.matrix;
                 const camX = worldFromView[12];
                 const camZ = worldFromView[14];
-
+                const plants = genPlants(camX, camZ);
                 
                 // Only regenerate plants every 10 frames or if camera moved significantly
                 ///if (frameCount % 10 === 0) {// || HYPOT(camX - lastPlantCamX, camZ - lastPlantCamZ) > 5.) {
-                    cachedPlants = genPlants(camX, camZ,120);
-                    lastPlantCamX = camX;
-                    lastPlantCamZ = camZ;
+                    //cachedPlants = genPlants(camX, camZ,120);
+                    //lastPlantCamX = camX;
+                    //lastPlantCamZ = camZ;
                 //}
 
             //if (frameCount % 10 === 0) {
-            for(const p of cachedPlants){
+            //for(const p of cachedPlants){
+            for(const p of plants){
                 const px = p.px, pz = p.pz, scale = p.scale;
 
                 // Distance & LOD
@@ -2342,13 +2353,14 @@
     (function main() {
         initXR();
         requestAnimationFrame(loop);
+        log(`Catch the Black Cat 13 times`);
         //log(`Catch the black cat!`);
-        //log('Close HUD: X/H/Esc');
+        log('Close HUD: X/H/Esc');
         //log('Touch-drag to Look around');
         //if (!isMobile) log('Move: WASD, Rotate: Q & E');
-        //log('Move: WASD, Rotate: Q & E');
+        log('Move: WASD, Rotate: Q & E');
         //if (isMobile) log('Move: left joy, Rotate: right joy');
-        //log('Move: left, Rotate: right');
+        log('Move: left, Rotate: right');
         //log('Move: '+(isMobile ? 'left joy' : 'WASD')+', Rotate: '+(isMobile ? 'right joy' : 'Q & E'));
     })();
     
