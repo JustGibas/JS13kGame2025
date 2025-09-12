@@ -1070,7 +1070,7 @@
     // --- HUD Drawing ---
     // Draws the entire HUD onto the 2D canvas
     function drawHUDCanvas(mode, hit, uiSet, dt) {
-        const ui = uiSet || currentUI();
+        const ui = uiSet || currentUI(); timer = ((window.t=(window.t||0)+dt)/60).toFixed(3);
         hudCtx.clearRect(0, 0, hudCan.width, hudCan.height);
 
         if (!hudVisible) {
@@ -1093,6 +1093,13 @@
             hudCtx.textAlign = 'center';
             hudCtx.textBaseline = 'middle';
             hudCtx.fillText('HUD', x + w / 2, y + h / 2);
+            //hudCtx.textAlign = 'left';
+            //hudCtx.textBaseline = 'alphabetic';
+            hudCtx.font = '20px system-ui';
+            //hudCtx.fillText('Timer: ' + ((window.t=(window.t||0)+dt).toFixed(1)), 320, 60);
+            //hudCtx.fillText('Timer: '+(window.t0=window.t0||performance.now(),((performance.now()-window.t0)/1000).toFixed(1)), 320, 60);
+            hudCtx.fillText('Timer: '+ timer, 320, 60);
+
             hudCtx.textAlign = 'left';
             hudCtx.textBaseline = 'alphabetic';
         } else {
@@ -1121,6 +1128,11 @@
             //hudCtx.fillText(`Boosts: ${speedBoosts.length}`, 150, 120);
             hudCtx.fillText(`Boosts: ${speedBoosts.length}`, 20, 70);
             hudCtx.fillText(`Cat Caught: ${cat.caught}`, 20, 100);
+            //hudCtx.fillText('Timer: ' + ((window.t=(window.t||0)+dt).toFixed(1)), 130, 100);
+            //timer = ((window.t=(window.t||0)+dt).toFixed(1));
+            hudCtx.fillText('Timer: ' + timer, 130, 100);
+            //hudCtx.fillText('Timer: '+(window.t0=window.t0||performance.now(),((performance.now()-window.t0)/1000).toFixed(1)), 320, 100);
+
             // MMO status line
             const peerCount = (function(){ let n=0; try{ peers.forEach((p,id)=>{ if(id!==myId && performance.now() - (p.last||0) < 15000) n++; }); }catch(_){} return n; })();
             //hudCtx.fillText(`MMO: ${mmoEnabled ? (myId? 'ON':'CONNECTING') : 'OFF'}  Peers: ${peerCount}`, 20, 140);
@@ -1204,8 +1216,14 @@
             // Text below
             //hudCtx.strokeText('Can you catch again?', x, y + 60);
             //hudCtx.fillText('Can you catch again?', x, y + 60);
-            hudCtx.strokeText(`${13-cat.caught} Cats left to catch`, x, y + 60);
-            hudCtx.fillText(`${13-cat.caught} Cats left to catch`, x, y + 60);
+            if(cat.caught < 13) {
+                hudCtx.strokeText(`${13-cat.caught} Cats left to catch`, x, y + 60);
+                hudCtx.fillText(`${13-cat.caught} Cats left to catch`, x, y + 60);
+            }//else{
+            //    hudCtx.globalAlpha = 1
+            //    hudCtx.strokeText(timer, x, y + 60);
+            //    hudCtx.fillText(timer, x, y + 60);
+            //}
             // if cat.caught = 4 write additional text
             //if (cat.caught === 4 || cat.caught === 6) {
             //    hudCtx.strokeText('Cat is getting faster!', x, y + 120);
@@ -1217,14 +1235,13 @@
             //};
             if (cat.caught === 13) {
                 lastCaughtShown = cat.caught;
-                hudCtx.strokeText('Victory! You win!', x, y + 120);
-                hudCtx.fillText('Victory! You win!', x, y + 120);
+                hudCtx.strokeText('Victory! The End?', x, y + 120);
+                hudCtx.fillText('Victory! The End?', x, y + 120);
             };
-
 
             hudCtx.restore();
         }
-
+        
         // Upload the canvas content to the WebGL texture
         gl.bindTexture(gl.TEXTURE_2D, hudTex);
         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
@@ -1630,7 +1647,7 @@
         // Trigger congrats overlay on catch
         if (cat.caught > lastCaughtShown) {
             lastCaughtShown = cat.caught;
-            congratsTimer = 3.5;
+            congratsTimer = 5.5;
         }
         //const moveMag = HYPOT(mv.x, mv.y);
         //updateAdaptiveMusic(moveMag, dt);
