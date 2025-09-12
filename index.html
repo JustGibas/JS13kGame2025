@@ -1071,7 +1071,15 @@
     // --- HUD Drawing ---
     // Draws the entire HUD onto the 2D canvas
     function drawHUDCanvas(mode, hit, uiSet, dt) {
-        const ui = uiSet || currentUI(); timer = ((window.t=(window.t||0)+dt)/100).toFixed(3);
+        const ui = uiSet || currentUI();
+        //timer = ((window.t=(window.t||0)+dt)/100).toFixed(3);
+        //timer=((globalThis._gt=(globalThis._gt??0)+dt),globalThis._gt.toFixed(3));
+        //timer=(globalThis.t=(globalThis.t??0)+dt/1e3).toFixed(3);
+        //timer=(self.t=(self.t||0)+dt).toFixed(3);
+        //timer=((self.t=(self.t||0)+dt/1000)*60).toFixed(3);
+        //timer=(self.m=(self.m||0)+dt/60).toFixed(3);
+        //timer=(self.m=(self.m||0)+dt/60).toFixed(3);
+        timer=(self._tm=(+self._tm||0)+dt/60).toFixed(3);
         hudCtx.clearRect(0, 0, hudCan.width, hudCan.height);
 
         if (!hudVisible) {
