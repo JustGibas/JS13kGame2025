@@ -119,6 +119,154 @@
     gl = canvas.getContext('webgl2', { antialias: true, xrCompatible: true });
     if (!gl) { alert('WebGL2 is required for this application.'); }
 
+    // -- FEATURE: MMO --
+    // Minimal MMO support using JS13k relay. Toggle via HUD. Other players are drawn as whitish cats.
+    const MMO_URL = 'wss://relay.js13kgames.com/wild-catch'; // append subpaths to shard into rooms if desired
+    let mmoEnabled = false;
+    let ws = null;
+    let myId = null;
+    const peers = new Map(); // id -> {x,z,yaw,last,hist:[{t,x,z,yaw}], sx,sz,syaw}
+    let mmoSendTimer = 0;
+
+    // Peer interpolation delay (ms). Higher = smoother but more laggy. 120ms is a good balance.
+    function lerp(a,b,t){ return a + (b-a)*t; }
+    function lerpAngle(a,b,t){
+        let d = b - a;
+        if (d > PI) d -= 2*PI; else if (d < -PI) d += 2*PI;
+        return a + d * t;
+    }
+    function pushPeerSample(p, x, z, yaw, now){
+        if (!p.hist) p.hist = [];
+        p.hist.push({ t: now, x, z, yaw });
+        p.last = now;
+        // trim old samples
+        const cutoff = now - 2000;
+        while (p.hist.length && p.hist[0].t < cutoff) p.hist.shift();
+        // also keep a compact last-known for quick fallback
+        p.x = x; p.z = z; p.yaw = yaw;
+    }
+    function samplePeer(p, targetT){
+        const h = p.hist; if (!h || h.length === 0) return null;
+        // if only one sample or target before first -> use first/last
+        if (h.length === 1) return h[0];
+        if (targetT <= h[0].t) return h[0];
+        const n = h.length;
+        if (targetT >= h[n-1].t) return h[n-1];
+        // find bracketing samples (linear scan is fine for small buffers)
+        for (let i=0; i<n-1; i++){
+            const a = h[i], b = h[i+1];
+            if (a.t <= targetT && targetT <= b.t){
+                const dt = (b.t - a.t) || 1;
+                const t = (targetT - a.t) / dt;
+                return {
+                    t: targetT,
+                    x: lerp(a.x, b.x, t),
+                    z: lerp(a.z, b.z, t),
+                    yaw: lerpAngle(a.yaw, b.yaw, t)
+                };
+            }
+        }
+        return h[n-1];
+    }
+
+    function logMMO(s){ log('[MMO] ' + s); }
+
+    function toggleMMO(){
+        mmoEnabled = !mmoEnabled;
+        if (mmoEnabled) connectMMO(); else disconnectMMO();
+    }
+
+    function disconnectMMO(){
+        try { if (ws) ws.close(); } catch(_){}
+        ws = null; myId = null; peers.clear();
+        logMMO('disabled');
+    }
+
+    function connectMMO(){
+        if (ws) try { ws.close(); } catch(_){}
+        logMMO('connecting…');
+        try {
+            ws = new WebSocket(MMO_URL);
+        } catch (e) {
+            logMMO('WebSocket error: ' + e.message);
+            return;
+        }
+        ws.onopen = _ => { try { ws.send('hello!'); } catch(_){} logMMO('connected'); };
+        ws.onclose = _ => { logMMO('closed'); ws = null; if (mmoEnabled) setTimeout(connectMMO, 1000); };
+        ws.onerror = _ => { /* errors surface via close */ };
+        ws.onmessage = ev => handleMMOMessage(ev.data);
+    }
+
+    function handleMMOMessage(msg){
+        if (typeof msg !== 'string') return;
+        const c = msg[0];
+        switch(c){
+            case '@': myId = msg.slice(1); logMMO('my id: ' + myId); return;
+            case '+': { const id = msg.slice(1); if (id && !peers.has(id)) peers.set(id, {x:0,z:0,yaw:0,last:performance.now(),hist:[]}); return; }
+            case '-': { const id = msg.slice(1); peers.delete(id); return; }
+        }
+        // Strip optional direct prefix @targetId|payload -> payload
+        let payload = msg;
+        if (payload[0] === '@'){
+            const bar = payload.indexOf('|');
+            if (bar > 0) payload = payload.slice(bar+1);
+        }
+        // Expected: p|id|x|z|yaw
+        if (payload[0] === 'p' && payload[1] === '|'){
+            const parts = payload.split('|');
+            if (parts.length >= 5){
+                const id = parts[1];
+                if (id && id !== myId){
+                    const x = parseFloat(parts[2]);
+                    const z = parseFloat(parts[3]);
+                    const yaw = parseFloat(parts[4]);
+                    const p = peers.get(id) || {x:0,z:0,yaw:0,last:0,hist:[]};
+                    const now = performance.now();
+                    const nx = isFinite(x)?x:p.x;
+                    const nz = isFinite(z)?z:p.z;
+                    const ny = isFinite(yaw)?yaw:p.yaw;
+                    pushPeerSample(p, nx, nz, ny, now);
+                    peers.set(id, p);
+                }
+            }
+        }
+    }
+
+    function mmoTick(dt){
+        if (!mmoEnabled || !ws || ws.readyState !== 1 || !myId) return;
+        mmoSendTimer += dt;
+        if (mmoSendTimer >= 0.1){ // ~10 Hz
+            mmoSendTimer = 0;
+            // compact broadcast with our id
+            const msg = 'p|' + myId + '|' + user.x.toFixed(2) + '|' + user.z.toFixed(2) + '|' + user.yaw.toFixed(3);
+            try { ws.send(msg); } catch(_){}
+        }
+    }
+
+    // Unified cat model renderer (used for main cat and peers)
+    const PEER_COL = [0.88,0.88,0.94];
+    function drawCat(Vmat, Pmat, x, y, z, yaw, anim, amp, col){
+        const cy = COS(yaw-20), sy = SIN(yaw-20);
+        function place(lx, ly, lz, r){
+            const wx = x + lx*cy + lz*sy;
+            const wz = z + lz*cy - lx*sy;
+            drawSphere(Vmat, Pmat, wx, y + ly, wz, r, col);
+        }
+        // Body core (chain) + head
+        place(0.10,0,0,0.25); place(-0.05,0,0,0.25); place(-0.20,0,0,0.24);
+        place(0.38,0.18,0,0.20);
+        // Animated legs and tail
+        const cyc = v=>SIN(v)*amp, cy0 = cyc(anim), cy1 = cyc(anim+PI), baseY = -0.30;
+        place(0.15, baseY + cy0, 0.14, 0.09);
+        place(0.15, baseY + cy1,-0.14, 0.09);
+        place(-0.25, baseY + cy1, 0.15, 0.09);
+        place(-0.25, baseY + cy0,-0.15, 0.09);
+        place(-0.40,0.15, cy0*0.4,0.14);
+        place(-0.55,0.25, 0,0.12);
+        place(-0.70,0.30, cy1*0.5,0.11);
+    }
+    // -- /FEATURE: MMO --
+
     // Resize the canvas to fill the window, accounting for device pixel ratio
     function resize() {
         const w = innerWidth, h = innerHeight, dpr = devicePixelRatio || 1;
@@ -1041,8 +1189,9 @@
     // UI button definitions. Each object defines a button's ID, position (in UV space), label, and click handler
     let uiEnterLabel = 'Enter VR';
     const UI_MAIN = [
-        { id: 'reset', u0: 0.4, v0: 0.1, u1: 0.7, v1: 0.2, label: 'Reset', onClick: () => { playClickSound(); user.x = 0; user.z = 2; user.yaw = 0; user.pitch = 0.2; resetCatPosition(); log('reset position'); } },
-        { id: 'vr', u0: 0.4, v0: 0.3, u1: 0.7, v1: 0.4, label: () => uiEnterLabel, onClick: () => { playClickSound(); toggleXRFromUI(); } },
+        { id: 'reset', u0: 0.4, v0: 0.05, u1: 0.7, v1: 0.15, label: 'Reset', onClick: () => { playClickSound(); user.x = 0; user.z = 2; user.yaw = 0; user.pitch = 0.2; resetCatPosition(); log('reset position'); } },
+        { id: 'vr', u0: 0.4, v0: 0.2, u1: 0.7, v1: 0.3, label: () => uiEnterLabel, onClick: () => { playClickSound(); toggleXRFromUI(); } },
+        { id: 'mmo', u0: 0.4, v0: 0.35, u1: 0.7, v1: 0.45, label: () => 'MMO: ' + (mmoEnabled ? 'ON' : 'OFF'), onClick: () => { playClickSound(); toggleMMO(); } },
         { id: 'music', u0: 0.8, v0: 0.3, u1: 0.98, v1: 0.4, label: () => 'Music: ' + (music ? 'ON' : 'OFF'), onClick: () => { playClickSound(); music = !music; log('music ' + (music ? 'on' : 'off')); } },
         { id: 'logtog', u0: 0.85, v0: 0.5, u1: 0.98, v1: 0.6 , label: 'LOG', onClick: () => { playClickSound(); logVisible = !logVisible; } },
         { id: 'logdn', u0: 0.85, v0: 0.8, u1: 0.98, v1: 0.9, label: 'Down', onClick: () => { playClickSound(); logScroll = MAX(0, logScroll - 1); } },
@@ -1144,15 +1293,20 @@
             hudCtx.fillText(`Yaw: ${(user.yaw * 180 / PI | 0)}°`, 20, 100);
             hudCtx.fillText(`Cat Caught: ${cat.caught}`, 20, 120);
             hudCtx.fillText(`Boosts: ${speedBoosts.length}`, 150, 120);
+            // MMO status line
+            const peerCount = (function(){ let n=0; try{ peers.forEach((p,id)=>{ if(id!==myId && performance.now() - (p.last||0) < 15000) n++; }); }catch(_){} return n; })();
+            hudCtx.fillText(`MMO: ${mmoEnabled ? (myId? 'ON':'CONNECTING') : 'OFF'}  Peers: ${peerCount}`, 20, 140);
+
+            // hit LOG
             if (hit) { hudCtx.fillStyle = '#afa';
             hudCtx.fillText(`Hit @ ground: (${hit[0].toFixed(2)}, ${hit[2].toFixed(2)})`, 20, 140); }
 
             // Log box
             if (logVisible) {
                 const x = 18,
-                      y = 150,
+                      y = 155,
                       w = hudCan.width - 120,
-                      h = hudCan.height - 160;
+                      h = hudCan.height - 170;
                 hudCtx.fillStyle = 'rgba(0,0,0,.35)';
                 hudCtx.strokeStyle = 'rgba(255,255,255,.1)';
                 hudCtx.beginPath();
@@ -2142,9 +2296,10 @@
         // Update user position
         const mv = getMove();
         step(dt, mv);
-        // Update black cat AI & drops
+    // Update black cat AI & drops
         updateCat(dt);
-
+    // MMO tick (send position)
+    mmoTick(dt);
         // Trigger congrats overlay on catch
         if (cat.caught > lastCaughtShown) {
             lastCaughtShown = cat.caught;
@@ -2203,28 +2358,19 @@
         for(const o of obstacles) if(!o._isRock) drawSphere(V,P,o.x,o.y,o.z,o.r,[0.9,0.2,0.2]);
         for(const t of traps) drawSphere(V,P,t.x,t.y,t.z,t.r,[0.8,0.5,0.1]);
         // Render Black Cat
-        const c=[0.02,0.02,0.02];
-        const yaw = cat.yaw-20; const cy = COS(yaw), sy = SIN(yaw);
-        // helper to rotate local offsets (forward = +Z local)
-        function place(lx, ly, lz, r){
-            const wx = cat.x + lx*cy + lz*sy;
-            const wz = cat.z + lz*cy - lx*sy;
-            drawSphere(V, P, wx, cat.y + ly, wz, r, c);
+        drawCat(V,P,cat.x,cat.y,cat.z,cat.yaw,cat.anim,0.08,[0.02,0.02,0.02]);
+
+        // Render MMO peers as whitish cats (smoothed)
+        if (peers && peers.size){
+            const nowMs = performance.now();
+            const targetT = nowMs - 120;
+            peers.forEach((p,id)=>{
+                if (id===myId) return;
+                if ((nowMs - (p.last||0)) >= 15000) return; // stale peer
+                const s = samplePeer(p, targetT) || p;
+                drawCat(V,P,s.x,0.6,s.z,(s.yaw||0)+PI,t*0.003,0.06,PEER_COL);
+            });
         }
-        // Body core (chain)
-        place(0.10,0,0,0.25); place(-0.05,0,0,0.25); place(-0.20,0,0,0.24);
-        // Head
-        place(0.38,0.18,0,0.20);
-        // Legs (animated)
-        const amp=0.08, a=cat.anim, cyc=(v)=>SIN(v)*amp, cy0=cyc(a), cy1=cyc(a+PI), baseY=-0.30;
-        place(0.15, baseY + cy0, 0.14, 0.09); // FR
-        place(0.15, baseY + cy1,-0.14, 0.09); // FL
-        place(-0.25, baseY + cy1, 0.15, 0.09); // BR
-        place(-0.25, baseY + cy0,-0.15, 0.09); // BL
-        // Tail segments (use leg phases for subtle motion)
-        place(-0.40,0.15, cy0*0.4,0.14);
-        place(-0.55,0.25, 0,0.12);
-        place(-0.70,0.30, cy1*0.5,0.11);
 
         // Draw procedural rocks (flat-shaded, stylized)
         for(const r of rocks)
@@ -2480,9 +2626,10 @@
         // Apply movement based on controller input
         const mv = getMove(s);
         step(dt, mv);
-        // Update black cat AI & drops
+    // Update black cat AI & drops
         updateCat(dt);
-
+    // MMO tick (send position)
+    mmoTick(dt);
         // Trigger congrats overlay on catch
         if (cat.caught > lastCaughtShown) {
             lastCaughtShown = cat.caught;
@@ -2584,30 +2731,20 @@
             for(const itm of items) if (itm.active) drawSphere(v.transform.inverse.matrix,v.projectionMatrix,itm.x,itm.y,itm.z,itm.r,[0.2,1.0,0.3]);
             for(const o of obstacles)  if(!o._isRock) drawSphere(v.transform.inverse.matrix,v.projectionMatrix,o.x,o.y,o.z,o.r,[0.9,0.2,0.2]);
             for(const t of traps) drawSphere(v.transform.inverse.matrix,v.projectionMatrix,t.x,t.y,t.z,t.r,[0.8,0.5,0.1]);
-
             // Render Black Cat
-            const c=[0.02,0.02,0.02];
-            const yaw = cat.yaw-20; const cy = COS(yaw), sy = SIN(yaw);
-            // helper to rotate local offsets (forward = +Z local)
-            function place(lx, ly, lz, r){
-                const wx = cat.x + lx*cy + lz*sy;
-                const wz = cat.z + lz*cy - lx*sy;
-                drawSphere(v.transform.inverse.matrix,v.projectionMatrix, wx, cat.y + ly, wz, r, c);
+            drawCat(v.transform.inverse.matrix,v.projectionMatrix,cat.x,cat.y,cat.z,cat.yaw,cat.anim,0.08,[0.02,0.02,0.02]);
+
+            // Render MMO peers (VR eye, smoothed)
+            if (peers && peers.size){
+                const nowMs = performance.now();
+                const targetT = nowMs - 120;
+                peers.forEach((p,id)=>{
+                    if (id===myId) return;
+                    if ((nowMs - (p.last||0)) >= 15000) return;
+                    const s = samplePeer(p, targetT) || p;
+                    drawCat(v.transform.inverse.matrix, v.projectionMatrix, s.x, 0.6, s.z, (s.yaw||0)+PI, t*0.003, 0.06, PEER_COL);
+                });
             }
-            // Body core (chain)
-            place(0.10,0,0,0.25); place(-0.05,0,0,0.25); place(-0.20,0,0,0.24);
-            // Head
-            place(0.38,0.18,0,0.20);
-            // Legs (animated)
-            const amp=0.08, a=cat.anim, cyc=(v)=>SIN(v)*amp, cy0=cyc(a), cy1=cyc(a+PI), baseY=-0.30;
-            place(0.15, baseY + cy0, 0.14, 0.09); // FR
-            place(0.15, baseY + cy1,-0.14, 0.09); // FL
-            place(-0.25, baseY + cy1, 0.15, 0.09); // BR
-            place(-0.25, baseY + cy0,-0.15, 0.09); // BL
-            // Tail segments (use leg phases for subtle motion)
-            place(-0.40,0.15, cy0*0.4,0.14);
-            place(-0.55,0.25, 0,0.12);
-            place(-0.70,0.30, cy1*0.5,0.11);
 
             // Draw procedural rocks (flat-shaded, stylized)
             for(const r of rocks)
