@@ -4,6 +4,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>'Wild Catch' 13K Game 2025</title>
+    <meta name="author" content="Justinas Gibas" />
+
     <link rel="icon" type="image/svg+xml" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="55%" x="50%" dominant-baseline="middle" text-anchor="middle" font-size="80">🐈‍⬛</text></svg>'>
     <style>
         /* Basic styles to make the canvas and joysticks fill the screen */
@@ -191,7 +193,7 @@
             logMMO('WebSocket error: ' + e.message);
             return;
         }
-        ws.onopen = _ => { try { ws.send('hello!'); } catch(_){} logMMO('connected'); };
+        ws.onopen = _ => { try { ws.send('Cat!'); } catch(_){} logMMO('connected'); };
         ws.onclose = _ => { logMMO('closed'); ws = null; if (mmoEnabled) setTimeout(connectMMO, 1000); };
         ws.onerror = _ => { /* errors surface via close */ };
         ws.onmessage = ev => handleMMOMessage(ev.data);
@@ -280,6 +282,9 @@
 
     // Helper function to compile and link a shader program
     function prog(vs, fs) {
+        //const H = '#version 300 es\nprecision highp float;';
+        //vs = H + /*'#define U uniform' )+*/ vs;
+        //fs = H + fs;
         const p = gl.createProgram();
         const v = gl.createShader(gl.VERTEX_SHADER);
         const f = gl.createShader(gl.FRAGMENT_SHADER);
@@ -1406,8 +1411,32 @@
 
             // Text below
             //hudCtx.font = '44px system-ui';
-            hudCtx.strokeText('Hunt continues?', x, y + 60);
-            hudCtx.fillText('Hunt continues?', x, y + 60);
+            hudCtx.strokeText('Hunt continues!?', x, y + 60);
+            hudCtx.fillText('Hunt continues!?', x, y + 60);
+            //hudCtx.strokeText('Can you catch again?', x, y + 60);
+            //hudCtx.fillText('Can you catch again?', x, y + 60);
+            //if(cat.caught < 13) {
+            //    hudCtx.strokeText(`${13-cat.caught} Cats to catch`, x, y + 60);
+            //    hudCtx.fillText(`${13-cat.caught} Cats to catch`, x, y + 60);
+            //}//else{
+            //    hudCtx.globalAlpha = 1
+            //    hudCtx.strokeText(timer, x, y + 60);
+            //    hudCtx.fillText(timer, x, y + 60);
+            //}
+            // if cat.caught = 4 write additional text
+            //if (cat.caught === 4 || cat.caught === 6) {
+            //    hudCtx.strokeText('Cat is getting faster!', x, y + 120);
+            //    hudCtx.fillText('Cat is getting faster!', x, y + 120);
+            //};
+            //if (cat.caught === 9) {
+            //    hudCtx.strokeText('Nine lives fading!', x, y + 120);
+            //    hudCtx.fillText('Nine lives fading!', x, y + 120);
+            //};
+            //if (cat.caught === 13) {
+            //    lastCaughtShown = cat.caught;
+            //    hudCtx.strokeText('Victory! The End?', x, y + 120);
+            //    hudCtx.fillText('Victory! The End?', x, y + 120);
+            //};
 
             hudCtx.restore();
         }
@@ -2307,7 +2336,7 @@
         // Update user position
         const mv = getMove();
         step(dt, mv);
-    // Update black cat AI & drops
+        // Update black cat AI & drops
         updateCat(dt);
     // MMO tick (send position)
     mmoTick(dt);
@@ -2643,7 +2672,7 @@
         // Apply movement based on controller input
         const mv = getMove(s);
         step(dt, mv);
-    // Update black cat AI & drops
+        // Update black cat AI & drops
         updateCat(dt);
     // MMO tick (send position)
     mmoTick(dt);
