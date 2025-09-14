@@ -331,7 +331,9 @@
             input.look.id = e.pointerId;
             input.look.x = e.clientX;
             input.look.y = e.clientY;
-            canvas.setPointerCapture(e.pointerId); // Lock the pointer to the canvas
+            //canvas.setPointerCapture(e.pointerId); // Lock the pointer to the canvas
+            xr ? C.requestPointerLock() : C.setPointerCapture(e.pointerId);
+
         }
         // Always update pointer position for picking
         input.pointer.x = e.clientX;
@@ -583,6 +585,8 @@
         // Random point within preferred radius
         const a = RANDOM()*PI*2; const r = RANDOM()*CAT_PREF_R*0.8;
         cat.x = COS(a)*r; cat.z = SIN(a)*r; cat.vx = cat.vz = 0;
+        // remove traps
+        traps.length = 0;
     }
     function spawnDrop(x,z){
         // Respect existing weighting (boost scarce), tweak slightly
@@ -691,7 +695,8 @@
         cat.anim += sp*dt*3.5;
         // Catch detection
         if(dP2 < (CAT_CATCH_R+playerCapsule.radius)*(CAT_CATCH_R+playerCapsule.radius)){
-            cat.caught++; log('Cat caught #' + cat.caught);
+            //cat.caught++; log('Cat caught #' + cat.caught);
+            log(`Cat caught #${++cat.caught} @ ${new Date().toISOString().replace('T',' ').slice(0,23)}`);
             if(audioCtx) {
                 //playClickSound();
                 spawnBell(audioCtx.currentTime, 800, window.chipMusic, 0.5);
@@ -1246,6 +1251,7 @@
     // Draws the entire HUD onto the 2D canvas
     function drawHUDCanvas(mode, hit, uiSet, dt) {
         const ui = uiSet || currentUI();
+        timer=(self._tm=(+self._tm||0)+dt/60).toFixed(3);
         hudCtx.clearRect(0, 0, hudCan.width, hudCan.height);
 
         if (!hudVisible) {
@@ -1268,8 +1274,11 @@
             hudCtx.textAlign = 'center';
             hudCtx.textBaseline = 'middle';
             hudCtx.fillText('HUD', x + w / 2, y + h / 2);
+            hudCtx.font = '20px system-ui';
+            hudCtx.fillText("Min's: "+ timer, 320, 60);
             hudCtx.textAlign = 'left';
             hudCtx.textBaseline = 'alphabetic';
+
         } else {
             // Draw the full HUD panel
             hudCtx.fillStyle = 'rgba(40,30,20,.90)';
@@ -1293,6 +1302,8 @@
             hudCtx.fillText(`Yaw: ${(user.yaw * 180 / PI | 0)}°`, 20, 100);
             hudCtx.fillText(`Cat Caught: ${cat.caught}`, 20, 120);
             hudCtx.fillText(`Boosts: ${speedBoosts.length}`, 150, 120);
+            // Timer in minutes and seconds`
+            hudCtx.fillText("Min's: " + timer, 120, 20);
             // MMO status line
             const peerCount = (function(){ let n=0; try{ peers.forEach((p,id)=>{ if(id!==myId && performance.now() - (p.last||0) < 15000) n++; }); }catch(_){} return n; })();
             hudCtx.fillText(`MMO: ${mmoEnabled ? (myId? 'ON':'CONNECTING') : 'OFF'}  Peers: ${peerCount}`, 20, 140);
@@ -2590,6 +2601,12 @@
             ref = await xr.requestReferenceSpace('local-floor');
 
             xr.addEventListener('end', () => {
+                // Cleanup audio when the session ends
+                audioCtx.close();
+                //audioCtx = null;
+                initAudio(); // Recreate audio context for desktop
+                // If the canvas holds pointer lock, release it when exiting VR
+                document.exitPointerLock();
                 //cancelAnimationFrame(onXR); // Stop XR loop
                 xr = null;
                 uiEnterLabel = 'Enter VR';
@@ -2958,6 +2975,7 @@
         log('close HUD using Close button X (H & Esc)');
         if (!isMobile) log('Use (WASD) to move and (Q & E) to rotate');
         if (isMobile) log('Use left joystick to move and right joystick to rotate');
+        //log('Move: '+(isMobile ? 'left joy' : 'WASD')+', Rotate: '+(isMobile ? 'right joy' : 'Q & E'));
         log('Use touch-drag to Look around');
     })();
     
